@@ -1,0 +1,47 @@
+# ─── Binaries (no extension on macOS/Linux) ───
+**/snake-game/snake
+**/game-2048/game2048
+**/game-2048/lc3_longest_substring
+**/game-2048/lc42_trap
+**/minesweeper/minesweeper
+**/flappy-bird/flappy_bird
+**/hangman/hangman
+**/practice/lemon88
+**/practice/lemon88_largest_rectangle
+**/practice/lc48
+**/practice/2026-03-26/lemon88
+**/practice/2026-03-26/lemon88_largest_rectangle
+**/practice/lc48
+
+# ─── Compiled objects ───
+*.o
+*.a
+*.so
+*.dylib
+
+# ─── macOS ───
+.DS_Store
+*.swp
+*.swo
+*~
+
+# ─── IDE ───
+.vscode/
+.idea/
+
+# ─── Local config (do not publish) ───
+.openclaw/
+HEARTBEAT.md
+BOOTSTRAP.md
+SC_AUTONOMY_SYSTEM.md
+kvcache/
+shortconv/
+skills/
+tasks/
+memory/companywork/
+lfm2_shortconv.py
+AGENTS.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
