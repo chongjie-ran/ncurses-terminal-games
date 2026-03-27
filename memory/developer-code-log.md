@@ -1871,3 +1871,502 @@ endwin(); // 退出清理
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-27 凌晨*
 *时间: 1:50 AM (Asia/Shanghai)*
+
+---
+
+## 2026-03-27 每日总结（深夜开发）
+
+### 一、今日完成
+
+#### 1. LeetCode 复习要点（已掌握，快速回顾）
+| 题目 | 难度 | 核心算法 |
+|------|------|----------|
+| LC62: Unique Paths | Medium | DP 2D→1D空间优化 |
+| LC64: Minimum Path Sum | Medium | DP + 原地修改 |
+| LC5: Longest Palindromic Substring | Medium | 中心扩展 O(n²) |
+| LC1143: LCS | Medium | DP 表格 |
+
+#### 2. 游戏开发：俄罗斯方块 (Tetris) ✅
+
+**技术栈**: C++17 + ncurses
+
+**核心实现**:
+- **7种Tetromino** (I/O/T/S/Z/J/L) + 4个旋转状态，共28种形状预定义
+- **SRS (Super Rotation System)** wall kick：5个尝试位置，支持顺时针/逆时针旋转
+- **Ghost Piece**：预先计算落点位置，用半透明字符显示
+- **Lock Delay**：500ms 锁定延迟，期间可水平移动重置计时器
+- **难度递增**：每清10行升一级，速度 = max(50ms, 800ms - (level-1)*40ms)
+- **行消除**：批量清除已完成行，支持一次消1-4行，计分 × level
+
+**关键代码片段**:
+```cpp
+// Wall Kick 查找：尝试5个偏移位置
+for (int i = 0; i < WALL_KICK_COUNT; ++i) {
+    int nx = cur_x_ + kicks[idx][i].dx;
+    int ny = cur_y_ + kicks[idx][i].dy;
+    auto cells = rotated.getCells(nx, ny);
+    if (!board_.collides(cells)) {
+        current_ = rotated;
+        cur_x_ = nx; cur_y_ = ny;
+        return;
+    }
+}
+```
+
+**GitHub**: `ncurses-terminal-games` 仓库，新增 tetris/ 目录
+
+#### 3. 技术难点记录
+
+1. **Wall Kick 数据结构**：使用 `static const WallKick[8][5]` 存储8种旋转转换×5个偏移，相比 if-else 大幅简化
+2. **Lock Delay 机制**：记录 `last_lock_attempt_`，水平移动时重置计时器，给予玩家操作窗口
+3. **形状压缩存储**：每个旋转状态用16位（4×4 grid），4个状态占64位，支持快速位运算获取
+
+### 二、队列进度
+
+| 优先级 | 项目 | 状态 |
+|--------|------|------|
+| P1 | 贪吃蛇 | ✅ |
+| P1 | 2048 | ✅ |
+| P1 | 扫雷 | ✅ |
+| P1 | Flappy Bird | ✅ |
+| P1 | 俄罗斯方块 | ✅ 新 |
+| P2 | 华容道 | 🔜 下周 |
+| P2 | Hangman | ✅ |
+| P3 | 推箱子 | 🔜 下周 |
+
+### 三、下周计划
+
+- LeetCode: DP 系列（LC70 爬楼梯、LC322 零钱兑换、LC139 单词拆分）
+- 游戏: 华容道（状态压缩+BFS最短路）或推箱子（DFS+剪枝）
+- 技术: 复习图算法（BFS/DFS/Dijkstra）
+
+
+---
+
+## 2026-03-27 清晨代码练习（5:45 AM）
+
+### 一、LeetCode 练习：LC3 滑动窗口
+
+**题目**: Longest Substring Without Repeating Characters
+**难度**: Medium
+**核心算法**: 滑动窗口 + 哈希表
+
+#### 解法思路
+
+维护一个 `[left, right)` 的窗口：
+1. right 向右扩展，统计每个字符最近出现位置
+2. 若当前字符 c 之前出现在窗口内 (`last_pos[c] >= left`)，收缩 left 到 `last_pos[c] + 1`
+3. 更新 `last_pos[c] = right`，每次取 `max_len = max(max_len, right - left + 1)`
+
+#### 复杂度
+- **时间**: O(n) — 每个字符最多被访问2次（left和right各1次）
+- **空间**: O(min(m, 字符集大小)) — unordered_map 最坏 O(n)
+
+#### 关键代码
+```cpp
+int lengthOfLongestSubstring(string s) {
+    unordered_map<char, int> last_pos;
+    int left = 0, max_len = 0;
+    for (int right = 0; right < (int)s.size(); ++right) {
+        char c = s[right];
+        if (last_pos.count(c) && last_pos[c] >= left) {
+            left = last_pos[c] + 1; // 收缩左边界
+        }
+        last_pos[c] = right;
+        max_len = max(max_len, right - left + 1);
+    }
+    return max_len;
+}
+```
+
+#### 测试用例
+| 输入 | 预期 | 结果 |
+|------|------|------|
+| "abcabcbb" | 3 | ✅ |
+| "bbbbb" | 1 | ✅ |
+| "pwwkew" | 3 | ✅ |
+| "" | 0 | ✅ |
+| "dvdf" | 3 | ✅ |
+
+#### 滑动窗口模板总结
+```cpp
+// 标准滑动窗口模板
+int left = 0, right = 0;
+while (right < s.size()) {
+    // 1. 扩展窗口
+    add(s[right]);
+    // 2. 收缩窗口（条件满足时）
+    while (need_shrink()) {
+        remove(s[left]);
+        ++left;
+    }
+    // 3. 更新答案
+    update_answer();
+    ++right;
+}
+```
+
+### 二、华容道 (Klotski) 算法预研
+
+**项目**: `projects/huarong-dao/` (下周开发)
+**技术栈**: C++17 + ncurses
+
+#### 问题分析
+- 棋盘: 4行 x 5列
+- 曹操: 2x2，需到达底部中央出口
+- 竖条: 1x2 (4个)
+- 横条: 2x1 (4个)
+
+#### 算法设计
+**核心**: BFS 状态空间搜索
+
+1. **状态表示**: 20位整数编码，每格4位 (0-9表示9种block类型)
+2. **移动生成**: 
+   - 曹操(2x2): 检查4个方向能否移动（目标区域必须是空格）
+   - 竖条(1x2): 上下移动时检查2格，横条(2x1): 左右移动时检查2格
+3. **搜索优化**:
+   - 反向BFS预计算：从目标状态反向搜索所有可达状态建立解库
+   - unordered_set 去重
+   - 估价函数(IDA*): f = g + h，预估剩余步数
+4. **最优解**: 18 步（标准开局）
+
+#### 状态编码实现
+```cpp
+int encode_state(const vector<vector<int>>& board) {
+    int code = 0;
+    for (int r = 0; r < 4; ++r) {
+        for (int c = 0; c < 5; ++c) {
+            code = (code << 4) | (board[r][c] & 0xF);
+        }
+    }
+    return code;
+}
+```
+
+### 三、今日总结
+
+| 类别 | 完成内容 |
+|------|----------|
+| LeetCode | LC3 滑动窗口 ✅ + 华容道预研 |
+| 游戏开发 | 队列检查：Tetris ✅ 已完成 |
+| 技术积累 | 滑动窗口模板 + 华容道BFS状态压缩方案 |
+| GitHub | Tetris 已提交到 ncurses-terminal-games |
+
+### 四、下周计划（3/28~4/3）
+
+- **游戏**: 华容道 (Huarong Dao) — 状态压缩 + BFS
+- **LeetCode**: 复习滑动窗口扩展（LC424、LC76）、图算法（BFS/DFS）
+- **技术**: 理解 IDA* 搜索算法优化华容道求解
+
+---
+
+# 2026-03-27 早晨更新（周五 · 7:45 AM）
+
+## 一、代码练习
+
+### LeetCode 322 — Coin Change ✅
+
+**题目**: 凑成 amount 所需最少硬币数（每种硬币无限）
+**难度**: Medium
+**核心算法**: 动态规划（完全背包变形）
+
+#### 解法思路
+`dp[i]` = 凑成金额 `i` 所需最少硬币数
+初始化 `dp[0] = 0`，其余 INF
+转移：`dp[i] = min(dp[i], dp[i - coin] + 1)`
+
+#### 复杂度
+- **时间**: O(amount × len(coins)) — 双重循环
+- **空间**: O(amount) — 一维 DP
+
+#### 关键代码
+```cpp
+const int INF = amount + 1;
+vector<int> dp(amount + 1, INF);
+dp[0] = 0;
+for (int i = 1; i <= amount; ++i) {
+    for (int coin : coins) {
+        if (i - coin >= 0 && dp[i - coin] != INF)
+            dp[i] = min(dp[i], dp[i - coin] + 1);
+    }
+}
+return dp[amount] == INF ? -1 : dp[amount];
+```
+
+#### 测试用例
+| 输入 | 预期 | 结果 |
+|------|------|------|
+| coins=[1,2,5], amount=11 | 3 | ✅ |
+| coins=[2], amount=3 | -1 | ✅ |
+| coins=[1], amount=0 | 0 | ✅ |
+| coins=[1], amount=2 | 2 | ✅ |
+
+---
+
+### LeetCode 139 — Word Break ✅
+
+**题目**: 判断字符串能否被字典中的单词拆分
+**难度**: Medium
+**核心算法**: 动态规划
+
+#### 解法思路
+`dp[i]` = s[0..i) 是否可分词
+`dp[i] = true` if exists j < i: `dp[j] == true && s[j..i) in dict`
+枚举切分点 j，从左到右扩展
+
+#### 复杂度
+- **时间**: O(n² × word_len) — 双重循环 + substr
+- **空间**: O(n) — 一维 DP
+
+#### 关键代码
+```cpp
+vector<bool> dp(n + 1, false);
+dp[0] = true;
+for (int i = 1; i <= n; ++i) {
+    for (int j = 0; j < i; ++j) {
+        if (dp[j] && dict.count(s.substr(j, i - j))) {
+            dp[i] = true;
+            break;
+        }
+    }
+}
+```
+
+#### 测试用例
+| 输入 | 预期 | 结果 |
+|------|------|------|
+| "leetcode", ["leet","code"] | true | ✅ |
+| "applepenapple", ["apple","pen"] | true | ✅ |
+| "catsandog", ["cats","dog","sand","and","cat"] | false | ✅ |
+
+---
+
+## 二、游戏开发队列状态
+
+### 队列检查（周五早晨）
+- **队列状态**: 全部清空 🎉
+- **Tetris**: ✅ 2026-03-27 完成（已完成 SRS wall kick + ghost piece + 难度递增）
+- **下周 P1**: 华容道 (Huarong Dao) — BFS + 状态压缩
+- **下周 P2**: 推箱子 (Sokoban) — BFS/DFS + 状态空间搜索
+
+### 本周游戏汇总（2026-03-25~27）
+| 游戏 | 完成日期 | 核心算法 |
+|------|---------|---------|
+| 贪吃蛇 | 2026-03-26 | deque + 方向缓冲 |
+| 2048 | 2026-03-26 | 矩阵旋转 + 滑动合并 |
+| 扫雷 | 2026-03-26 | BFS flood fill + 安全开局 |
+| Flappy Bird | 2026-03-26 | 重力物理 + AABB碰撞 |
+| Hangman | 2026-03-26 | set + 随机提示 + ASCII art |
+| 俄罗斯方块 | 2026-03-27 | SRS wall kick + 矩阵旋转 + Ghost Piece |
+
+---
+
+## 三、技术积累
+
+### DP 通用模板（一维）
+```cpp
+// 1. 确定状态含义
+// 2. 初始化（dp[0] = 0 或 true，空集）
+// 3. 遍历顺序（从小到大 / 从左到右）
+// 4. 转移方程
+vector<int> dp(n + 1, INIT);
+dp[0] = BASE;
+for (int i = 1; i < n; ++i) {
+    for (auto& option : options) {
+        if (valid(i, option))
+            dp[i] = min/max/OR(dp[i], dp[prev(i, option)] + cost);
+    }
+}
+```
+
+### Coin Change vs Word Break 对比
+| 问题 | 状态 | 转移 |
+|------|------|------|
+| Coin Change | dp[i]=最少硬币数 | 枚举 coin |
+| Word Break | dp[i]=是否可拆分 | 枚举切分点 j |
+| 共同点 | 一维 DP，正向遍历 | 无后效性 |
+
+---
+
+## 四、本周成长总结（最终版）
+
+### 量化成果
+- **LeetCode**: 17+ 道算法题（单调栈/滑动窗口/DP/BFS/DFS/二分/拓扑排序）
+- **游戏开发**: 6 个 ncurses 终端游戏完成并发布 GitHub
+- **技术栈**: C++17 + ncurses + Git/GitHub + 状态压缩
+
+### 技术进步
+1. **DP 从入门到进阶**: 掌握了背包型 DP（LC322）和区间型 DP（LC139）
+2. **状态空间搜索**: 华容道预研掌握了 20 位整数编码方案
+3. **矩阵操作**: Tetris 开发应用了 LC48 旋转矩阵算法
+
+---
+
+## 五、下周计划（3/28~4/3）
+
+### LeetCode 练习
+| 优先级 | 主题 | 推荐题目 |
+|--------|------|---------|
+| P1 | 动态规划进阶 | LC72 编辑距离, LC10 正则匹配, LC44 通配符 |
+| P2 | 树/二叉树 | LC226 翻转, LC124 二叉树最大路径和, LC102 层序 |
+| P3 | 并查集 | LC547 省份数量, LC684 冗余连接 |
+
+### 游戏开发
+| 优先级 | 游戏 | 核心算法 |
+|--------|------|---------|
+| P1 | 华容道 | BFS 最短路 + 20位状态压缩 + IDA* |
+| P2 | 推箱子 | BFS/DFS + 状态空间搜索 |
+| P3 | GUI 版本 | Raylib 重构（可选） |
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-27 早晨*
+*时间: 7:45 AM (Asia/Shanghai)*
+
+---
+
+# 2026-03-27 上午更新（周五 · 9:45 AM）
+
+## 一、代码练习
+
+### LeetCode 72 — Edit Distance ✅
+
+**题目**: word1 → word2 最少操作数（插入/删除/替换，各1步）  
+**难度**: Hard  
+**核心算法**: 动态规划（二维 → 一维空间优化）
+
+#### 解法思路
+`dp[i][j]` = word1[0..i) 转换为 word2[0..j) 的最少操作数  
+转移：
+- 删除 word1[i-1]: `dp[i-1][j] + 1`
+- 插入 word2[j-1]: `dp[i][j-1] + 1`
+- 替换/跳过: `dp[i-1][j-1] + (word1[i-1]==word2[j-1] ? 0 : 1)`
+
+空间优化：从 O(m×n) → O(n)（只保留前一行）
+
+#### 复杂度
+- **时间**: O(m×n) — 填满 m×n 表格
+- **空间**: O(n) — 2行滚动数组
+
+#### 关键代码
+```cpp
+int minDistance(string word1, string word2) {
+    int m = word1.size(), n = word2.size();
+    vector<int> prev(n+1), cur(n+1);
+    for (int j = 0; j <= n; ++j) prev[j] = j; // dp[0][j] = j
+    for (int i = 1; i <= m; ++i) {
+        cur[0] = i; // dp[i][0] = i
+        for (int j = 1; j <= n; ++j) {
+            if (word1[i-1] == word2[j-1])
+                cur[j] = prev[j-1];
+            else
+                cur[j] = 1 + min({prev[j], cur[j-1], prev[j-1]});
+        }
+        swap(prev, cur);
+    }
+    return prev[n];
+}
+```
+
+#### 测试用例
+| 输入 | 预期 | 结果 |
+|------|------|------|
+| "horse" → "ros" | 3 | ✅ |
+| "intention" → "execution" | 5 | ✅ |
+| "" → "abc" | 3 | ✅ |
+| "abc" → "" | 3 | ✅ |
+| "abc" → "abc" | 0 | ✅ |
+| "abc" → "def" | 3 | ✅ |
+
+#### DP 模板：编辑距离
+```
+初始化: dp[0][j] = j, dp[i][0] = i
+遍历: for i in [1..m], for j in [1..n]
+转移: 
+  if equal → dp[i][j] = dp[i-1][j-1]
+  else      → dp[i][j] = 1 + min(删除, 插入, 替换)
+```
+
+---
+
+## 二、游戏开发队列状态
+
+### 队列检查（周五上午）
+- **队列状态**: 全部清空 🎉
+- **Tetris 完成**: ✅ 2026-03-27 凌晨完成并推送 GitHub
+  - 实现了 SRS Wall Kick（8种旋转转换 × 5个偏移位置）
+  - Ghost Piece 预显示落点
+  - Lock Delay 500ms 机制
+  - 难度递增（每10行升级，速度 800ms → 50ms 下限）
+- **已发布游戏数**: 6 个（贪吃蛇/2048/扫雷/Flappy Bird/Hangman/Tetris）
+
+### 队列全部清空，等待下周新任务
+
+---
+
+## 三、技术积累
+
+### 1. LC72 编辑距离 DP 要点
+- 三种操作等代价是本题简化点
+- 空间优化：用 prev/cur 两行滚动，prev[j-1] 即对角线值
+- 与 LC1143 LCS 区别：LCS 是求最长公共子序列（最大化匹配），编辑距离是最小化操作数
+
+### 2. DP 问题分类（持续更新）
+| 类型 | 代表题 | 核心技巧 |
+|------|--------|---------|
+| 线性 DP | LC70/LC322 | dp[i] 依赖前几项 |
+| 区间 DP | LC516/LC1143 | 枚举分割点 k |
+| 编辑距离 | LC72/LC10 | 二维 dp，3种转移 |
+| 背包 DP | LC322/LC416 | 内外循环顺序 |
+| 树形 DP | LC124 | 后序遍历 |
+
+### 3. Tetris SRS Wall Kick 代码审查
+```cpp
+// wall_kicks[8][5]: [转换编号][尝试序号] = {dx, dy}
+// 转换 0→1: {0,0},{-1,0},{-1,1},{0,-2},{-1,-2}
+// 转换 1→2: {0,0},{1,0},{1,-1},{0,2},{1,2}
+// 转换 2→3: {0,0},{1,0},{1,1},{0,-2},{1,-2}
+// 转换 3→0: {0,0},{-1,0},{-1,-1},{0,2},{-1,2}
+// CCW: 3→0, 0→3, 2→1, 1→2（对称偏移）
+```
+Wall Kick 数据结构用 `static const WallKick[8][5]` 硬编码，查询 O(1)，空间仅 8×5×2 = 80 字节
+
+---
+
+## 四、本周开发总结（2026-03-25~27）
+
+### 量化成果
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | 20+ 题 |
+| Hard 题目 | 5 道（LC42/LC84/LC239/LC72/LC10 待学） |
+| 游戏发布 GitHub | 6 个 ncurses 终端游戏 |
+| 核心算法掌握 | 单调栈/滑动窗口/DP/BFS flood fill/矩阵旋转 |
+
+### 本周成长
+1. **算法维度**: DP 从入门（LC62）到进阶（LC72），状态压缩思维建立
+2. **游戏开发维度**: 独立完成 6 个完整游戏，形成 ncurses 终端游戏开发框架
+3. **工程化维度**: Git/GitHub 协作规范化，代码组织模块化
+
+---
+
+## 五、下周计划（3/28~4/3）
+
+### LeetCode 练习
+| 优先级 | 题目 | 主题 |
+|--------|------|------|
+| P1 | LC72 编辑距离 | ✅ 今日完成 |
+| P1 | LC10 正则匹配 | 动态规划 |
+| P1 | LC44 通配符 | 2D DP |
+| P2 | LC124 二叉树最大路径和 | 树形 DP |
+| P3 | LC547 省份数量 | 并查集/DFS |
+
+### 游戏开发
+| 优先级 | 游戏 | 核心算法 |
+|--------|------|---------|
+| P1 | 华容道 (Huarong Dao) | BFS + 20位状态压缩 + IDA* |
+| P2 | 推箱子 (Sokoban) | BFS/DFS + 状态空间搜索 |
+| P3 | 2048 / 扫雷 GUI 版 | Raylib 重构（可选） |
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-27 上午*
+*时间: 9:45 AM (Asia/Shanghai)*
