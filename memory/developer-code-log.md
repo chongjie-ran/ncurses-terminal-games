@@ -195,3 +195,87 @@ bool is_complete(const vector<string>& board) {
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-28 凌晨*
 *时间: 3:48 AM (Asia/Shanghai)*
+
+---
+
+## 2026-03-28 早5点练习 | 每日总结
+
+### LeetCode 算法练习
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC1269 停在原地方案数 | DP一维 | Hard | ✅ |
+
+**LC1269 Number of Ways to Stay in the Same Place After Some Steps** ✅
+
+**题目**: 数组长度 arrLen，你在位置 0。每次可以移动到 arrLen-1 范围内的左/右/不动。还剩 steps 步时回到位置 0 的方案数？  
+**核心算法**: 1D DP + 空间优化
+
+**核心思路**:
+- `dp[pos]` = 还剩 s 步时，在位置 pos 能回到 0 的方案数
+- 转移：`dp_next[pos] = dp[pos] (不动) + dp[pos-1] (从左来) + dp[pos+1] (从右来)`
+- 空间优化：`maxPos = min(arrLen-1, steps/2)` — 走更远是浪费步数
+- 模 1e9+7
+
+**代码实现**:
+```cpp
+int numWays(int steps, int arrLen) {
+    const int MOD = 1e9 + 7;
+    int maxPos = min(arrLen - 1, steps / 2);
+    vector<int> dp(maxPos + 1, 0);
+    dp[0] = 1;
+    for (int s = 1; s <= steps; ++s) {
+        vector<int> ndp(maxPos + 1, 0);
+        for (int pos = 0; pos <= maxPos; ++pos) {
+            long long val = dp[pos];
+            if (pos > 0) val += dp[pos - 1];
+            if (pos < maxPos) val += dp[pos + 1];
+            ndp[pos] = val % MOD;
+        }
+        dp.swap(ndp);
+    }
+    return dp[0];
+}
+```
+
+**关键洞察**: 为什么要 `min(arrLen-1, steps/2)`？
+- 最多走 `steps/2` 步（去+回）才能回到 0
+- 但也不能超过数组边界
+- 这个剪枝将复杂度从 O(steps * arrLen) 降到 O(steps²)
+
+**验证**: ✅ 测试用例全部通过 (3/2→4, 2/4→2, 4/2→8)
+
+---
+
+### LC1463 Cherry Pickup II — 待解决
+
+**状态**: ❌ 结果偏差（Test1: 21 vs 期望24，Test2: 11 vs 期望10）
+
+**问题分析**:
+- DP 逻辑自洽，但与 LeetCode expected 值不符
+- 可能原因：对题目理解有偏差，或有边界情况未处理
+- 两人初始位置：`grid[0][0]` 和 `grid[0][n-1]` 开始，共同向下走
+
+**下次行动**: 重新阅读 LC1463 原文，理解精确题目描述后修正 DP
+
+---
+
+### 游戏开发队列状态
+
+- **队列**: ✅ 全部清空
+- **已完成**: 8 个 ncurses 游戏
+- **下次**: 推箱子已发布，下周计划：GUI 重构 (Raylib)
+
+### 本周累计
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | 29+ 道 |
+| Hard 题目 | 9 道（+LC1269）|
+| ncurses 游戏 | 8 个 |
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-28 早*
+*时间: 5:48 AM (Asia/Shanghai)*
