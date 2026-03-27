@@ -2938,3 +2938,289 @@ return true;
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-27 晚间*
 *时间: 7:47 PM (Asia/Shanghai) — 定时任务自动记录*
+
+---
+
+# 2026-03-27 晚间总结 | 本周五 + 本周完整汇总
+
+## 一、今日完成 (2026-03-27)
+
+### LeetCode 算法练习
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC48 旋转矩阵 | 矩阵操作 | Medium | ✅ |
+| LC3 无重复字符最长子串 | 滑动窗口 | Medium | ✅ 复习 |
+| LC322 零钱兑换 | DP（完全背包）| Medium | ✅ |
+| LC139 单词拆分 | DP（区间）| Medium | ✅ |
+| LC72 编辑距离 | DP（二维）| Hard | ✅ |
+| LC10 正则表达式匹配 | DP（二维状态机）| Hard | ✅ 14/14 测试 |
+| LC516 最长回文子序列 | DP（二维）| Medium | ✅ 10/10 |
+| LC102 二叉树层序遍历 | BFS/树 | Medium | ✅ |
+| LC226 翻转二叉树 | DFS/树 | Easy | ✅ |
+| LC547 省份数量 | 并查集 | Medium | ✅ 3/3 测试 |
+
+### 游戏开发
+
+| 游戏 | 路径 | 核心算法 | 状态 |
+|------|------|---------|------|
+| 俄罗斯方块 | projects/tetris/ | SRS wall kick + Ghost Piece + Lock Delay + 难度递增 | ✅ (凌晨) |
+| 华容道 | projects/huarong-dao/ | BFS 最短路 + 20位状态压缩 + 滑动块碰撞检测修复 | ✅ (上午) |
+
+### GitHub 推送
+- 本周五推送 3 次：
+  1. `ce4c907` LC516 LPS
+  2. `9b9c9f6` 华容道 + LC10/LC44（清理二进制文件）
+  3. 修复 tetris 二进制删除
+- 仓库包含：贪吃蛇/2048/扫雷/Flappy Bird/Hangman/Tetris/华容道，共 7 个游戏 + LeetCode 练习
+
+---
+
+## 二、本周成长分析 (2026-03-25 ~ 2026-03-27)
+
+### 量化成果
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | 26+ 道 |
+| Hard 题目 | 6 道（LC42/LC84/LC239/LC72/LC10/LC33）|
+| 游戏发布 GitHub | 7 个 ncurses 终端游戏 |
+| GitHub 推送次数 | 5+ 次 |
+
+### 技术栈进步
+
+| 技术领域 | 掌握情况 | 相关题目/项目 |
+|---------|---------|--------------|
+| 单调栈 | **熟练** | LC42/LC84/LC739 — O(n) 最大矩形/接雨水 |
+| 单调队列 | **熟练** | LC239 — O(n) 滑动窗口最大值 |
+| 滑动窗口 | **熟练** | LC3 — 无重复字符最长子串 |
+| 矩阵旋转 | **熟练** | LC48/Tetris — 转置+镜像翻转 |
+| DFS/BFS 图遍历 | **熟练** | LC200/LC130 — 岛屿类问题 |
+| 二分查找 | **熟练** | LC33 — 旋转排序数组 |
+| 拓扑排序 | **熟练** | LC207/LC210 — Kahn's + 三色DFS |
+| BST 验证 | **掌握** | LC98 — 中序升序 + 边界约束 |
+| DP 线性 | **熟练** | LC322/LC139 — 完全背包/单词拆分 |
+| DP 二维 | **掌握** | LC72/LC10/LC516 — 编辑距离/正则匹配/LPS |
+| 并查集 | **入门** | LC547 — 省份连通性 |
+| 树遍历 | **掌握** | LC102/LC226 — BFS层序/DFS翻转 |
+| ncurses 游戏 | **熟练** | 7 个终端游戏完成 |
+| BFS 状态空间搜索 | **掌握** | 华容道求解器 |
+| Git/GitHub 协作 | **掌握** | 仓库管理/子模块问题处理 |
+
+### 游戏发布数量
+- **本周: 7 个 ncurses 终端游戏** 🎉
+  1. 贪吃蛇 — deque + 方向缓冲 + 加速机制
+  2. 2048 — 矩阵旋转 + 滑动合并 + 分数累计
+  3. 扫雷 — BFS flood fill + 安全开局 + 8方向数字计算
+  4. Flappy Bird — 重力物理引擎 + AABB碰撞 + 随机管道生成
+  5. Hangman — ASCII 7阶段 + 分类单词库 + 随机提示
+  6. 俄罗斯方块 — SRS wall kick + Ghost Piece + Lock Delay + 难度递增
+  7. 华容道 — BFS 最短路 + 20位状态压缩 + 滑动块碰撞检测修复
+
+---
+
+## 三、本周技术难点回顾
+
+### 1. SRS Wall Kick（俄罗斯方块）
+- **难点**: 旋转时碰到墙壁需要尝试多个偏移位置
+- **解决**: 预定义 8 种旋转转换 × 5 个偏移位置的 WallKick 表
+- **关键**: Wall Kick 数据用 `static const WallKick[8][5]` 硬编码，O(1) 查询
+
+### 2. 华容道碰撞检测修复
+- **难点**: 滑动块移动时目的地是自己已占格子，算作碰撞
+- **解决**: 碰撞检测需排除自身当前位置
+  ```cpp
+  // 目的地非空 → 检查是否是自身占据的格子
+  if (!is_own) { ok = false; break; }
+  ```
+
+### 3. DP `*` 量词双语义（LC10）
+- **难点**: `x*` 可以匹配 0 次或 1+ 次，语义复杂
+- **解决**: 
+  - 匹配 0 次 → `dp[i][j] = dp[i][j-2]`
+  - 匹配 1+ 次 → `dp[i][j] |= dp[i-1][j]`（注意是 `dp[i-1][j]` 而非 `dp[i-1][j-1]`）
+
+### 4. Git 子模块问题
+- **难点**: `projects/huarong-dao/` 内嵌 `.git` 目录，导致 `git add` 报 embedded repo 警告
+- **解决**: 删除内嵌 `.git`，然后重新 `git add`
+- **教训**: 新建项目时不要在已有 git 仓库内嵌套初始化新仓库
+
+### 5. 二进制文件清理
+- **难点**: tetris 可执行文件被跟踪，需删除
+- **解决**: `find ... -name "*.o" -o -name "tetris" ... -delete`，然后 `git add -A` + commit
+
+---
+
+## 四、经验沉淀（代码片段/技巧）
+
+### 1. DP 二维模板（编辑距离/正则匹配）
+```cpp
+// 初始化
+dp[0][0] = 1;
+for (int j=1; j<=n; ++j) if (p[j-1]=='*'&&j>=2) dp[0][j]=dp[0][j-2];
+for (int i=1; i<=m; ++i) cur[0]=i;
+
+// 转移
+if (p[j-1]=='*') {
+    dp[i][j] = dp[i][j-2];  // * 匹配0次
+    if (p[j-2]=='.'||p[j-2]==s[i-1])
+        dp[i][j] = dp[i][j] || dp[i-1][j];  // * 匹配1+次
+} else if (p[j-1]=='.'||p[j-1]==s[i-1]) {
+    dp[i][j] = dp[i-1][j-1];
+}
+```
+
+### 2. Union-Find 并查集模板
+```cpp
+class UnionFind {
+    vector<int> parent, rank;
+public:
+    UnionFind(int n) : parent(n), rank(n,0) {
+        for (int i=0;i<n;++i) parent[i]=i;
+    }
+    int find(int x) {
+        return parent[x]==x ? x : parent[x]=find(parent[x]);
+    }
+    void unite(int a, int b) {
+        int pa=find(a), pb=find(b);
+        if (pa==pb) return;
+        if (rank[pa]<rank[pb]) swap(pa,pb);
+        parent[pb]=pa;
+        if (rank[pa]==rank[pb]) ++rank[pa];
+    }
+};
+```
+
+### 3. BFS 二叉树层序遍历
+```cpp
+vector<vector<int>> levelOrder(TreeNode* root) {
+    vector<vector<int>> result;
+    queue<TreeNode*> q;
+    q.push(root);
+    while (!q.empty()) {
+        int levelSize = q.size();
+        vector<int> level;
+        for (int i = 0; i < levelSize; ++i) {
+            TreeNode* node = q.front(); q.pop();
+            level.push_back(node->val);
+            if (node->left) q.push(node->left);
+            if (node->right) q.push(node->right);
+        }
+        result.push_back(level);
+    }
+    return result;
+}
+```
+
+### 4. 翻转二叉树（DFS 递归）
+```cpp
+TreeNode* invertTree(TreeNode* root) {
+    if (!root) return nullptr;
+    swap(root->left, root->right);
+    invertTree(root->left);
+    invertTree(root->right);
+    return root;
+}
+```
+
+### 5. Wall Kick 查找模板（Tetris）
+```cpp
+for (int i=0; i<WALL_KICK_COUNT; ++i) {
+    int nx = cur_x_ + kicks[idx][i].dx;
+    int ny = cur_y_ + kicks[idx][i].dy;
+    auto cells = rotated.getCells(nx, ny);
+    if (!board_.collides(cells)) {
+        current_ = rotated; cur_x_ = nx; cur_y_ = ny; return;
+    }
+}
+```
+
+### 6. BFS 状态空间搜索模板
+```cpp
+unordered_map<State, int> dist;
+queue<State> q;
+dist[start] = 0; q.push(start);
+while (!q.empty()) {
+    auto cur = q.front(); q.pop();
+    for (auto& nxt : get_neighbors(cur)) {
+        if (!dist.count(nxt)) {
+            dist[nxt] = dist[cur] + 1;
+            if (is_goal(nxt)) return dist[nxt];
+            q.push(nxt);
+        }
+    }
+}
+```
+
+---
+
+## 五、下周计划 (2026-03-28 ~ 2026-04-03)
+
+### LeetCode 练习
+
+| 优先级 | 主题 | 推荐题目 | 目标 |
+|--------|------|---------|------|
+| P1 | 动态规划进阶 | LC174 地下城游戏, LC124 二叉树最大路径和 | 掌握 2D DP |
+| P2 | 树/二叉树 | LC124, LC236 LCA, LC112 路径总和 | 树形 DP + 路径问题 |
+| P3 | 并查集 | LC684 冗余连接, LC1319 连通网络 | 图连通性 |
+
+### 游戏开发
+
+| 优先级 | 游戏 | 核心算法 | 说明 |
+|--------|------|---------|------|
+| P1 | 推箱子 (Sokoban) | BFS/DFS + 状态空间搜索 | 经典推箱子，P1 优先级 |
+| P2 | GUI 版本重构 | Raylib | 可选扩展 |
+
+### GitHub 维护
+- 确认所有 7 个游戏已推送到 GitHub
+- 更新仓库 README，添加游戏截图说明
+- 添加 .gitignore 排除二进制文件
+
+---
+
+## 六、周报：2026-03-25 ~ 2026-03-27 成长报告
+
+### 本周核心成就
+
+1. **算法能力飞跃**：从"单调栈入门"到"DP 二维状态机 + 并查集入门"
+   - 单调栈三问（LC42/LC84/739）全部掌握
+   - 滑动窗口（LC3/LC76）形成肌肉记忆
+   - DP 从一维（LC70）到二维（LC72/LC10/LC516），理解状态机 DP
+   - 并查集（LC547）入门，掌握连通分量统计
+
+2. **游戏开发产业化**：7 个 ncurses 终端游戏完成
+   - 形成可复用的 ncurses 框架（窗口/输入/渲染）
+   - 覆盖经典游戏类型（益智/动作/文字/解谜/滑动）
+   - GitHub 仓库 ncurses-terminal-games 初步建立
+
+3. **调试能力提升**：
+   - 华容道碰撞检测：学会区分"自身占据"和"真正碰撞"
+   - Wall Kick 数据结构：用查表代替 if-else
+   - 安全开局算法：延迟放雷 + 保护区域
+   - Git 子模块问题处理
+
+4. **工程化能力**：
+   - Git/GitHub 协作规范化，commit message 规范化
+   - 二进制文件清理和 .gitignore 管理
+   - 多文件 C++ 项目 Makefile 编写
+
+### 关键成长指标
+
+| 指标 | 周初 | 周末 | 变化 |
+|------|------|------|------|
+| LeetCode 累计 | ~10 道 | 26+ 道 | +16 道 |
+| Hard 题目 | 0 道 | 6 道 | +6 道 |
+| 独立游戏 | 0 个 | 7 个 | +7 个 |
+| 技术栈深度 | 广而不深 | 栈/队/DP 深入 | 显著提升 |
+
+### 后续重点
+- **深度**：DP 进阶（LC174 地下城、LC124 二叉树最大路径和）
+- **广度**：并查集扩展、树形 DP、概率模拟
+- **工程**：GitHub 仓库维护、代码质量优化
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-27 晚间*
+*时间: 9:48 PM (Asia/Shanghai)*
+
