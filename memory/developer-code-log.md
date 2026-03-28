@@ -863,3 +863,283 @@ void insert(const string& word) {
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-28 晚*
 *时间: 7:51 PM (Asia/Shanghai)*
+
+---
+
+## 2026-03-28 晚9:51 | 每日练习（周六晚间 — 本日最终）
+
+### LeetCode 算法练习
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC547 省份数量 | 并查集 | Medium | ✅ |
+
+**LC547 Number of Provinces** ✅
+
+**题目**: n 个城市，某些对相连，求连通分量数量（省份数）。  
+**核心算法**: 并查集（Union-Find）
+
+**核心思路**:
+- 初始化：每个节点父亲是自身
+- 遍历邻接矩阵上三角，对相连的 (i,j) 做 union
+- 最后数 parent[i] == i 的个数，即连通分量数
+
+**代码实现**:
+```cpp
+vector<int> parent, rank;
+int find(int x) { return parent[x] == x ? x : parent[x] = find(parent[x]); }
+void unite(int a, int b) {
+    a = find(a); b = find(b);
+    if (a == b) return;
+    if (rank[a] < rank[b]) swap(a, b);
+    parent[b] = a;
+    if (rank[a] == rank[b]) ++rank[a];
+}
+int findCircleNum(vector<vector<int>>& isConnected) {
+    int n = isConnected.size();
+    parent.resize(n);
+    rank.assign(n, 0);
+    iota(parent.begin(), parent.end(), 0);
+    for (int i = 0; i < n; ++i)
+        for (int j = i + 1; j < n; ++j)
+            if (isConnected[i][j]) unite(i, j);
+    int cnt = 0;
+    for (int i = 0; i < n; ++i) if (parent[i] == i) ++cnt;
+    return cnt;
+}
+```
+
+**关键洞察**: 为什么只需遍历 j > i？
+- 邻接矩阵对称，只需处理上三角
+- 减少一半重复 unify 操作
+
+**验证**: ✅ Test1=2, Test2=3
+
+### GitHub 推送
+
+| Commit | 内容 | 状态 |
+|--------|------|------|
+| `a6229ea` | 清理lc-practice编译产物 | ❌ 推送失败（GitHub 443网络超时）|
+
+**待推送**: 4 commits（GitHub网络故障中，恢复后执行 `git push`）
+
+---
+
+## 本周六全天练习汇总（2026-03-28）
+
+| 时段 | 题目 | 算法 |
+|------|------|------|
+| 凌晨 | LC174 地下城游戏 | 逆向二维 DP |
+| 凌晨 | LC98 验证二叉搜索树 | DFS 上下界传递 |
+| 凌晨 | LC1269 停在原地方案数 | 1D DP + 空间优化 |
+| 早7点 | LC312 戳气球 | 区间 DP（枚举最后戳破）|
+| 早7点 | LC1463 Cherry Pickup II | 双人路径 DP（调试修正）|
+| 下午1点 | LC743 网络延迟时间 | Dijkstra（堆优化）|
+| 下午1点 | LC787 K站最便宜航班 | Bellman-Ford 限边数 |
+| 下午 | LC1631 最小体力消耗路径 | Dijkstra 变体（max更新）|
+| 傍晚5点 | LC1584 连接所有点最小费用 | Kruskal MST + 并查集 |
+| 傍晚5点 | LC1334 阈值为K的城市 | Floyd-Warshall 全源最短路 |
+| 晚7点 | LC208 实现 Trie 前缀树 | Trie 字典树 |
+| **晚9点** | **LC547 省份数量** | **并查集** |
+
+### 并查集（Union-Find）本周积累
+
+| 题目 | 场景 | 核心技巧 |
+|------|------|---------|
+| LC547 省份数量 | 统计连通分量 | 只遍历上三角，减少 unify |
+| LC684 冗余连接 | 检测环路 | 在 union 前检测是否同根 |
+| LC1584 MST | Kruskal 选边 | 并查集判断是否成环 |
+
+**并查集三件套**: `find` (路径压缩) + `unite` (按秩合并) + 计数 `parent[i]==i`
+
+---
+
+## 本周最终累计（2026-03-25 ~ 2026-03-28）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **38+ 道** |
+| Hard 题目 | **12 道** |
+| ncurses 游戏 | **8 个** |
+| GitHub 待推送 | 4 条 commit（网络恢复后） |
+
+### 本周技术栈成长
+
+| 技术领域 | 掌握情况 | 题目 |
+|---------|---------|------|
+| 单调栈 | **熟练** | LC42/LC84 |
+| 单调队列 | **熟练** | LC239 |
+| 滑动窗口 | **熟练** | LC3 |
+| 矩阵旋转 | **熟练** | LC48/Tetris |
+| DFS/BFS | **熟练** | LC200/LC130/Sokoban |
+| 二分查找 | **熟练** | LC33 |
+| 拓扑排序 | **熟练** | LC207/LC210 |
+| DP 一维 | **熟练** | LC322/LC139/LC1269 |
+| DP 二维 | **掌握** | LC72/LC10/LC516/LC174/LC1463 |
+| 区间 DP | **突破** | LC312 |
+| 树形 DP | **入门** | LC124 |
+| 并查集 | **熟练** | LC547/LC684/LC1584 |
+| Dijkstra | **熟练** | LC743/LC1631 |
+| Bellman-Ford | **掌握** | LC787 |
+| Kruskal MST | **掌握** | LC1584 |
+| Floyd-Warshall | **掌握** | LC1334 |
+| Trie 字典树 | **掌握** | LC208 |
+| ncurses 游戏 | **熟练** | 8 个游戏 |
+
+---
+
+## 下周计划（2026-03-29 ~ 2026-04-04）
+
+| 优先级 | 任务 | 说明 |
+|--------|------|------|
+| P1 | 动态规划进阶 | LC10 正则匹配（重新复习）/ LC44 Wildcard |
+| P1 | 回溯/DFS 进阶 | LC79 单词搜索, LC51 N皇后 |
+| P2 | 并查集扩展 | LC685 冗余连接 II |
+| P2 | 图论扩展 | LC269 拓扑排序变体 |
+| P3 | Raylib GUI 重构 | ncurses → 图形界面，至少 1 个游戏可视化 |
+| P3 | WebAssembly 探索 | 浏览器版游戏发布 |
+
+---
+
+## GitHub 推送失败记录
+
+> 2026-03-28 晚 9:51 — GitHub 443 连接超时
+> 待推送 commits: a77eec8, 07ab8fc, e51913f, 88076ff, f78924a, a6229ea
+> 恢复网络后执行: `cd ~/.openclaw/workspace-developer && git push`
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-28 晚*
+*时间: 9:51 PM (Asia/Shanghai)*
+
+---
+
+## 2026-03-29 凌晨1:32 | 每日练习（周日）
+
+### LeetCode 算法练习
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC79 单词搜索 | DFS回溯 | Hard | ✅ |
+| LC51 N皇后 | 回溯 | Hard | ✅ |
+
+**LC79 Word Search** ✅
+
+**题目**: m×n 棋盘，找单词是否存在于棋盘中（相邻格移动，每格只用一次）。  
+**核心算法**: DFS 回溯 + 路径标记
+
+**核心思路**:
+- 枚举每个起点，从该格开始 DFS
+- 用 `#` 标记已访问，回溯时恢复
+- 四方向扩展（上下左右）
+- 找到目标词尾 `idx == word.size()-1` 时返回 true
+
+**代码实现**:
+```cpp
+bool dfs(board, word, idx, x, y) {
+    if (board[x][y] != word[idx]) return false;
+    if (idx == word.size() - 1) return true;
+    char original = board[x][y];
+    board[x][y] = '#'; // 标记已访问
+    for (dir in 四方向) {
+        if (dfs(board, word, idx+1, nx, ny)) {
+            board[x][y] = original;
+            return true;
+        }
+    }
+    board[x][y] = original; // 恢复
+    return false;
+}
+```
+
+**验证**: ✅ ABCCED/SEE/ABCB/单格/蛇形路径 全部通过
+
+---
+
+**LC51 N-Queens** ✅
+
+**题目**: 将 N 个皇后放在 N×N 棋盘上，使任意两皇后不互相攻击。  
+**核心算法**: 回溯 + 对角线去重
+
+**核心思路**:
+- 按行递归放置皇后
+- 用三个 set 记录：列占用 `cols`、主对角线 `diag1`、副对角线 `diag2`
+- 主对角线ID: `row - col + n-1`（偏移确保非负）
+- 副对角线ID: `row + col`（最大 2n-2）
+- 放置时标记三方向，回溯时取消标记
+
+**代码实现**:
+```cpp
+void backtrack(int row) {
+    if (row == n) { results.push_back(board); return; }
+    for (int col = 0; col < n; ++col) {
+        int d1 = row - col + n - 1, d2 = row + col;
+        if (cols[col] || diag1[d1] || diag2[d2]) continue;
+        board[row][col] = 'Q';
+        cols[col] = diag1[d1] = diag2[d2] = true;
+        backtrack(row + 1);
+        board[row][col] = '.';
+        cols[col] = diag1[d1] = diag2[d2] = false;
+    }
+}
+```
+
+**关键洞察**: 为什么对角线可以用固定 ID？
+- 主对角线：`row - col` 常数（同一条对角线 row-col 相同）
+- 副对角线：`row + col` 常数（同一条对角线 row+col 相同）
+- 通过偏移量把负数映射到 [0, 2n-2] 范围
+
+**验证**: ✅ n=1→1解, n=2→0解, n=3→0解, n=4→2解, n=8→92解（全部正确）
+
+---
+
+### GitHub 推送
+
+| Commit | 内容 | 状态 |
+|--------|------|------|
+| `4846ff3` | LC79 Word Search + LC547 并查集 + memory/2026-03-28.md | ✅ 已推送 |
+| `a8ff5b1` | LC51 N-Queens: 回溯+对角线去重 | ✅ 已推送 |
+
+**网络问题解决**: 昨晚 GitHub 443 超时已自动恢复，今晨 push 成功
+
+---
+
+### 游戏开发状态
+
+- **队列**: ✅ 全部清空（8个 ncurses 游戏已发布）
+- **Raylib GUI 重构**: 计划中（brew 可安装 raylib 5.5）
+- **已完成**: 本周 8 个 ncurses 游戏 + GitHub 推送完成
+
+---
+
+### 本周最终累计（2026-03-25 ~ 2026-03-29）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **40+ 道** |
+| Hard 题目 | **14 道**（+LC79 +LC51）|
+| ncurses 游戏 | **8 个** |
+| GitHub 推送 | ✅ 全部推送完成 |
+
+### 技术栈新增
+
+| 技术领域 | 掌握情况 | 相关题目 |
+|---------|---------|---------|
+| 回溯/DFS | **熟练** | LC79 单词搜索, LC51 N皇后 |
+| 对角线去重 | **熟练** | LC51 N皇后（主/副对角线ID计算）|
+
+### 本周成长总结
+
+| 技术领域 | 周初 | 周末 |
+|---------|------|------|
+| Hard LeetCode | ~6道 | **14道** |
+| ncurses 游戏 | 0个 | **8个** |
+| 图论算法 | 入门 | **掌握**（Dijkstra/Bellman-Ford/Kruskal/Floyd-Warshall）|
+| 回溯/DFS | 基础 | **熟练**（单词搜索+N皇后）|
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-29 凌晨*
+*时间: 1:50 AM (Asia/Shanghai)*
