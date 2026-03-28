@@ -663,6 +663,113 @@ int nd = max(cur.effort, abs(grid[nx][ny] - grid[x][y]));
 
 ---
 
+## 2026-03-28 晚5:51 | 每日练习（周六傍晚）
+
+### LeetCode 算法练习
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC1584 连接所有点的最小费用 | 图论-Kruskal MST | Medium | ✅ |
+| LC1334 阈值为K的城市的数量 | 图论-Floyd-Warshall | Medium | ✅ |
+
+**LC1584 Min Cost to Connect All Points** ✅
+
+**题目**: 将所有点用曼哈顿距离的边连接，求最小总成本（类似旅行商但只求 MST）。  
+**核心算法**: Kruskal 最小生成树 + 并查集
+
+**核心思路**:
+- 所有 n 个点构成完全图，边数 = n*(n-1)/2
+- 边权重 = 曼哈顿距离 `|x1-x2| + |y1-y2|`
+- 对所有边按权重排序，贪心选最小边
+- 用并查集检测环路（已在同一连通分量则跳过）
+- 选 n-1 条边即构成 MST
+
+**代码实现**:
+```cpp
+struct DSU {
+    vector<int> p, r;
+    DSU(int n): p(n), r(n, 0) { iota(p.begin(), p.end(), 0); }
+    int find(int x) { return p[x]==x ? x : p[x]=find(p[x]); }
+    bool unite(int a, int b) {
+        a = find(a); b = find(b);
+        if (a == b) return false;
+        if (r[a] < r[b]) swap(a, b);
+        p[b] = a;
+        if (r[a] == r[b]) ++r[a];
+        return true;
+    }
+};
+// Kruskal: 选 n-1 条边即可，总成本即 MST
+```
+
+**关键洞察**: 为什么 Kruskal 能保证最优？
+- MST 性质：切割属性（任何切割，最小横切边在某个 MST 中）
+- 贪心正确性：由切割属性保证，每次选最小横切边，最终得到全局最优
+
+---
+
+**LC1334 Find the City With the Smallest Number of Neighbors at a Threshold Distance** ✅
+
+**题目**: n 个城市，给定边和距离阈值 distanceThreshold，求可达邻居数最小的城市（编号最大者优先）。  
+**核心算法**: Floyd-Warshall 全源最短路
+
+**核心思路**:
+- 先建邻接矩阵，`dist[i][j] = 边权`，无边 = INF
+- Floyd-Warshall 三重循环：`dist[i][j] = min(dist[i][j], dist[i][k]+dist[k][j])`
+- 对每个城市 i，统计 `dist[i][j] <= threshold` 的 j 的个数
+- 取最小邻居数，编号最大者
+
+**代码实现**:
+```cpp
+for (int k = 0; k < n; ++k)
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]);
+```
+
+**关键洞察**: 什么时候用 Floyd-Warshall vs Dijkstra？
+- 单源多目标：Dijkstra（堆优化）O(E log V）
+- 全源所有对：Floyd-Warshall O(n³)（n ≤ 500 时可接受）
+- 本题需要「每个点到所有其他点的距离」，所以 Floyd-Warshall 合适
+
+**验证**: ✅ Test1=3, Test2=0 全部通过
+
+---
+
+### GitHub 推送
+
+| Commit | 内容 |
+|--------|------|
+| `f78924a` | LC1463 注释修正，验证正确性（21而非24，11而非10）|
+| `88076ff` | LC1584 Kruskal MST + LC1334 Floyd-Warshall |
+
+---
+
+### 本周最终累计（2026-03-25 ~ 2026-03-28 傍晚）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **36+ 道** |
+| Hard 题目 | **12 道** |
+| ncurses 游戏 | **8 个** |
+| GitHub 推送 | 本周 6 条 commit |
+
+---
+
+### 图论全系列完成情况
+
+| 题目 | 难度 | 算法 | 状态 |
+|------|------|------|------|
+| LC207 课程表 | Medium | 拓扑排序 | ✅ |
+| LC210 课程表 II | Medium | 拓扑排序 | ✅ |
+| LC743 网络延迟时间 | Medium | Dijkstra（堆优化）| ✅ |
+| LC787 K站最便宜航班 | Medium | Bellman-Ford 限边数 | ✅ |
+| LC1631 最小体力消耗路径 | Hard | Dijkstra 变体（max更新）| ✅ |
+| LC1584 连接所有点的最小费用 | Medium | Kruskal MST + 并查集 | ✅ |
+| LC1334 阈值为K的城市 | Medium | Floyd-Warshall 全源最短路 | ✅ |
+
+---
+
 *记录人: 悟通 (开发者 Agent)*
-*日期: 2026-03-28 下午*
-*时间: 3:51 PM (Asia/Shanghai)*
+*日期: 2026-03-28 傍晚*
+*时间: 5:51 PM (Asia/Shanghai)*
