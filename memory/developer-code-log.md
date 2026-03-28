@@ -773,3 +773,93 @@ for (int k = 0; k < n; ++k)
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-28 傍晚*
 *时间: 5:51 PM (Asia/Shanghai)*
+
+---
+
+## 2026-03-28 晚7:51 | 每日练习（周六晚）
+
+### LeetCode 算法练习
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC208 实现 Trie 前缀树 | 字典树 | Medium | ✅ |
+
+**LC208 Implement Trie (Prefix Tree)** ✅
+
+**题目**: 实现前缀树，支持 insert/search/startsWith 操作。  
+**核心算法**: 字典树（Trie）
+
+**核心思路**:
+- 每个节点有 `isWord` 标记和 `children` 映射
+- `insert`: 沿路径走，不存在则创建，到词尾标记 `isWord = true`
+- `search`: 沿路径走，词尾 `isWord == true` 才算找到
+- `startsWith`: 沿路径走，只要能走完 prefix 就返回 true
+
+**代码实现**:
+```cpp
+struct Node {
+    bool isWord = false;
+    unordered_map<char, Node*> children;
+};
+// insert: O(m) | search: O(m) | startsWith: O(m)  m = word.length
+void insert(const string& word) {
+    Node* cur = root;
+    for (char c : word) {
+        if (!cur->children.count(c)) cur->children[c] = new Node();
+        cur = cur->children[c];
+    }
+    cur->isWord = true;
+}
+```
+
+**验证**: ✅ 4/4 测试通过（LeetCode 示例）
+
+### GitHub 推送状态
+- **网络问题**：GitHub 443 连接超时，push 失败
+- **本地状态**: commit `07ab8fc` 已创建，待网络恢复后推送
+- **受影响文件**: `projects/lc-practice/lc208_implement_trie.cpp`
+
+### 本周最终累计（2026-03-25 ~ 2026-03-28 晚）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **37+ 道** |
+| Hard 题目 | **12 道** |
+| ncurses 游戏 | **8 个** |
+| GitHub 待推送 | 1 条（网络恢复后） |
+
+### 今日全天练习汇总（2026-03-28）
+
+| 时段 | 完成题目 |
+|------|---------|
+| 凌晨 | LC174 地下城游戏（逆向 DP） |
+| 凌晨 | LC98 验证二叉搜索树（DFS 上下界） |
+| 凌晨 | LC1269 停在原地方案数（1D DP） |
+| 早7点 | LC312 戳气球（区间 DP） |
+| 早7点 | LC1463 Cherry Pickup II 调试完成 |
+| 下午1点 | LC743 网络延迟时间（Dijkstra） |
+| 下午1点 | LC787 K站最便宜航班（Bellman-Ford） |
+| 下午 | LC1631 最小体力消耗路径（Dijkstra 变体） |
+| 傍晚5点 | LC1584 连接所有点最小费用（Kruskal MST） |
+| 傍晚5点 | LC1334 阈值为K的城市（Floyd-Warshall） |
+| **晚7点** | **LC208 实现 Trie 前缀树** ✅ |
+
+### 技术沉淀
+
+**Trie 字典树 vs 其他数据结构**:
+| 数据结构 | 适用场景 | 时间复杂度 |
+|---------|---------|-----------|
+| Trie | 前缀搜索、自动补全、IP 路由 | O(m) per op |
+| HashMap | 精确查找 | O(1) 平均 |
+| B-Tree | 有序范围查找 | O(log n) |
+
+**Trie 核心洞察**:
+- 空间换时间：每个节点开销大，但搜索极快
+- `startsWith` 是 `search` 的放松版（不要求 `isWord`）
+- 可用数组 `[26]` 或 `unordered_map` 存储 children（26字母用数组更快）
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-28 晚*
+*时间: 7:51 PM (Asia/Shanghai)*
