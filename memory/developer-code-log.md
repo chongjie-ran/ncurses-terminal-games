@@ -1885,3 +1885,87 @@ public:
 *日期: 2026-03-29 下午*
 *版本: v2.0 最终版*
 
+
+---
+
+## 2026-03-29 下午 | 定时任务（周日）
+
+### LeetCode 练习
+
+| 题目 | 难度 | 算法 | 结果 |
+|------|------|------|------|
+| LC1091 二进制矩阵中的最短路径 | Medium | BFS（8方向）| ✅ |
+| LC329 矩阵中的最长递增路径 | Hard | DFS+Memoization / 拓扑排序 | ✅ |
+
+**LC1091 Binary Matrix Shortest Path** — Medium
+
+- 8方向BFS，从左上角到右下角最短路径长度
+- 只经过值为0的格子
+- 剪枝：已访问节点跳过（`dist[nx][ny] <= d+1`）
+- 提前终止：到达终点立即返回
+
+```cpp
+// 8方向BFS + 剪枝
+int shortestPathBinaryMatrix(grid) {
+    if (grid[0][0] != 0) return -1;
+    queue<pair<int,int>> q;
+    q.emplace(0,0);
+    while (!q.empty()) {
+        auto [x,y] = q.front(); q.pop();
+        int d = dist[x][y];
+        for (8 directions) {
+            if (valid && grid[nx][ny]==0 && dist[nx][ny] > d+1) {
+                dist[nx][ny] = d+1;
+                if (nx==n-1 && ny==n-1) return d+1;
+                q.emplace(nx,ny);
+            }
+        }
+    }
+}
+```
+- 时间: O(n²) 空间: O(n²)
+
+**LC329 Longest Increasing Path in Matrix** — Hard
+
+**方法1: DFS + Memoization**
+- 每个格子作为起点，DFS往4个方向扩展
+- `memo[i][j]` = 从 (i,j) 出发的最长递增路径长度
+- 记忆化：每个格子只计算一次，O(mn)
+
+```cpp
+int dfs(matrix, i, j, memo):
+    if memo[i][j] != 0: return memo[i][j]
+    best = 1
+    for 4 directions:
+        if matrix[ni][nj] > matrix[i][j]:
+            best = max(best, 1 + dfs(ni,nj))
+    memo[i][j] = best
+    return best
+```
+
+**方法2: 拓扑排序（更高效）**
+- 计算每个格子的出度（四周大于自己的格子数）
+- 从出度为0的格子开始BFS层层删除
+- 层数 = 最长递增路径长度
+- O(mn)
+
+**两种方法对比**:
+| 方法 | 适用场景 | 复杂度 |
+|------|---------|--------|
+| DFS+Memo | 递归深度可控 | O(mn) |
+| 拓扑排序 | 避免递归栈溢出 | O(mn) |
+
+### GitHub Push
+- ✅ `f4b20d5` — LC1091 + LC329
+
+### 游戏开发状态
+- **队列**: 🎉 已清空（8个ncurses游戏完成）
+- **新项目**: 启动 `snake-game-raylib/` 图形版贪吃蛇骨架
+- **Raylib安装**: 待安装（brew install raylib）
+- **Makefile**: 已创建基本构建脚本
+
+### 本周累计
+- LeetCode: 49+ 题
+- Hard: 21+
+- 游戏: 8个ncurses + 1个Web (ai-memory-ghost v1.1)
+
