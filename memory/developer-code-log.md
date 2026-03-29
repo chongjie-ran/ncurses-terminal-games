@@ -2206,3 +2206,99 @@ for (int i = 0; i < (4 - nrot) % 4; ++i) rotateCW(board); // 转回来
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-29 晚*
 *时间: 9:36 PM (Asia/Shanghai)*
+
+---
+
+## 2026-03-29 最终记录 | 本周第11个游戏完成
+
+### 晚间新增完成
+- **游戏队列清空** ✅ 本周累计 **11 个游戏**
+- `game-2048-raylib/` 完整图形版（Win/KeepPlaying/GameOver/动画）
+- GitHub commit `50538b4` 已 push
+- 零警告编译通过
+
+### 本周完整统计（2026-03-25 ~ 2026-03-29）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **51+ 道** |
+| Hard 题目 | **23 道** |
+| ncurses 游戏 | 8 个 |
+| Raylib 图形游戏 | 2 个（贪吃蛇+2048）|
+| Web 游戏 | 1 个（AI意识守护者）|
+| **本周游戏总计** | **11 个** 🎉 |
+
+### GitHub Push 汇总（今日）
+- `90d72ca` — LC154+LC41
+- `50538b4` — game-2048-raylib 完成，队列清空
+- `8dde20c` — hrd_test + superpowers learning doc
+
+### 本周技术栈成长
+- 新增：树状数组 BIT、原地哈希、区间DP变体
+- 强化：状态机DP、回溯Hard、图论全系列
+- 图形游戏：Raylib 入门（2个游戏）
+
+### 下周计划（2026-03-30 ~ 2026-04-05）
+- P1: Tetris Raylib 图形版
+- P1: 每日 LeetCode 练习
+- P2: Sokoban Raylib
+- P3: WebAssembly 探索
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-29*
+*时间: 11:36 PM (Asia/Shanghai)*
+
+---
+
+## 2026-03-30 凌晨 | 代码练习与游戏开发
+
+### LeetCode 完成
+
+| 题目 | 难度 | 算法 | 核心技巧 |
+|------|------|------|---------|
+| LC315 统计右侧更小的数 | Hard | BIT+离散化 | 从右往左扫描，BIT.sum(idx-1) |
+| LC218 天际线问题 | Hard | 扫描线+堆 | 主动删除式 max-heap，map.rbegin() |
+
+### 游戏开发：Tetris Raylib ✅
+
+**Commit**: `84267bc`
+**核心功能**: SRS Wall Kick + Ghost Piece + 7-Bag Randomizer + Hold + Hard/Soft Drop
+
+**SRS Wall Kick 数据结构**:
+```cpp
+// 3组墙踢数据：[group][from_rot][kick_idx][x_or_y]
+// group 0=JLSTZ, 1=I, 2=O
+// 每组4行（4个旋转方向），每行5个(x,y)测试位置
+static const int WALL_KICKS[3][4][5][2] = { ... };
+
+// 旋转尝试（5次墙踢测试）
+int grp = (type==0)?1:(type==1)?2:0;
+for (int i=0; i<5; ++i) {
+    int nx = cur.x + WALL_KICKS[grp][cur.rot][i][0];
+    int ny = cur.y + WALL_KICKS[grp][cur.rot][i][1];
+    if (validPos(type, newRot, nx, ny)) { ... }
+}
+```
+
+**天际线问题关键洞察**:
+- 主动删除法 vs 延迟删除法
+- `map<int,int>` 记录 (height → count)
+- start: count++, end: count--, count==0则erase
+- 当前最大 = `active.rbegin()->first`
+
+### 本周游戏总数
+| 日期 | 游戏 | 平台 |
+|------|------|------|
+| ... | (此前11个) | ... |
+| 03-30 | Tetris | Raylib 图形版 ✅ |
+
+**本周总计: 12 个游戏 🎉**
+
+---
+
+*记录人: 悟通 (Developer Agent)*
+*日期: 2026-03-30*
+*时间: 1:37 AM (Asia/Shanghai)*
+

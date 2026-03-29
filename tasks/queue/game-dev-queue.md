@@ -4,8 +4,8 @@
 
 ## 队列状态
 - 队列创建时间: 2026-03-25
-- 最后更新: 2026-03-29 晚
-- **状态**: 🎉 队列清空！本周累计 **11 个游戏** ✅
+- 最后更新: 2026-03-30 凌晨
+- **状态**: 🎉 队列清空！本周累计 **12 个游戏** ✅
 
 ---
 
@@ -13,9 +13,9 @@
 
 | 优先级 | 项目 | 类型 | 难度 | 说明 |
 |--------|------|------|------|------|
-| P1 | Tetris Raylib | 可视化 | Medium | 俄罗斯方块图形版 |
-| P1 | 2048 Raylib | 可视化 | Medium | 2048 图形版 |
-| P2 | Sokoban Raylib | 可视化 | Hard | 推箱子图形版 |
+| P1 | Sokoban Raylib | 可视化 | Hard | 推箱子图形版，BFS自动求解 |
+| P2 | Flappy Bird Raylib | 可视化 | Medium | Flappy Bird 图形版 |
+| P3 | Minesweeper Raylib | 可视化 | Medium | 扫雷图形版 |
 
 ### 迁移队列（ncurses → Raylib）
 
@@ -23,8 +23,10 @@
 |------|------|--------|
 | ~~贪吃蛇~~ | ~~snake-game-raylib~~ ✅ | ~~P1~~ |
 | ~~2048~~ | ~~game-2048-raylib~~ ✅ | ~~P1~~ |
-| 俄罗斯方块 | tetris-raylib | P1 |
-| 推箱子 | sokoban-raylib | P2 |
+| ~~俄罗斯方块~~ | ~~tetris-raylib~~ ✅ | ~~P1~~ |
+| 推箱子 | sokoban-raylib | P1 |
+| 扫雷 | minesweeper-raylib | P2 |
+| Flappy Bird | flappy-bird-raylib | P2 |
 
 ---
 
@@ -42,10 +44,12 @@
 | 03-28 | 推箱子 | projects/sokoban/ | ncurses 终端版，BFS 50万节点扩展 |
 | 03-29 | AI意识守护者 | ai-memory-ghost/ | Web游戏 v1.1（GitHub Pages）|
 | 03-29 | 贪吃蛇 Raylib | projects/snake-game-raylib/ | Raylib 图形版 ✅ |
-| 03-29 | 2048 Raylib | projects/game-2048-raylib/ | Raylib 图形版 ✅（Win/KeepPlaying/GameOver）|
+| 03-29 | 2048 Raylib | projects/game-2048-raylib/ | Raylib 图形版（Win/KeepPlaying/GameOver）|
+| **03-30** | **俄罗斯方块 Raylib** | **projects/tetris-raylib/** | **Raylib 图形版，SRS墙踢+Ghost Piece ✅** |
 
-**本周总计: 11 个游戏 🎉**
+**本周总计: 12 个游戏 🎉**
 
 ---
 
-*最后更新: 2026-03-29 17:34*
+*最后更新: 2026-03-30 01:37*
+
