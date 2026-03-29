@@ -57,3 +57,5 @@ projects/lc124_max_path_sum
 **/raylib-gui-refactor/
 **/snake-game-raylib/
 **/flappy-bird-raylib/flappy_raylib
+**/sokoban-raylib/sokoban-raylib
+**/sokoban-raylib/*.o
