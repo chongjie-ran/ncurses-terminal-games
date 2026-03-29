@@ -2069,3 +2069,140 @@ int dfs(matrix, i, j, memo):
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-29*
 *版本: v2.0 最终版*
+
+---
+
+## 晚间补充记录（2026-03-29 下午7:34）
+
+### 新增 Hard 题目（+2）
+
+| # | 题目 | 算法 | 关键点 |
+|---|------|------|--------|
+| 22 | LC154 寻找旋转排序数组最小值 II | 二分查找变体 | nums[mid]==nums[right]时right--，处理重复值 |
+| 23 | LC41 缺失的第一个正数 | 原地哈希 | 将数字i放到索引i-1，O(1)空间 |
+
+### LC154 核心技巧
+```cpp
+// 旋转数组找最小值（允许重复）
+while (left < right) {
+    int mid = left + (right - left) / 2;
+    if (nums[mid] > nums[right]) left = mid + 1;
+    else if (nums[mid] < nums[right]) right = mid;
+    else right--; // nums[mid] == nums[right]，无法判断，缩小右边界
+}
+```
+**关键洞察**: 与LC153不同，重复值无法判断最小值在左半还是右半，此时 right-- 最安全。
+
+### LC41 核心技巧
+```cpp
+// 原地哈希：将数字i放到索引i-1
+for (int i = 0; i < n; i++) {
+    while (nums[i] > 0 && nums[i] <= n && nums[nums[i]-1] != nums[i])
+        swap(nums[i], nums[nums[i]-1]);
+}
+// 扫描找第一个缺失
+for (int i = 0; i < n; i++)
+    if (nums[i] != i+1) return i+1;
+return n+1;
+```
+**关键洞察**: 答案一定在 [1, n+1] 范围内，用原地交换代替哈希表，实现 O(1) 额外空间。
+
+### 本周最终统计（2026-03-25 ~ 2026-03-29）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **51+ 道** |
+| Hard 题目 | **23 道** |
+| ncurses 游戏 | 8 个 |
+| Web 游戏 | 1 个（AI意识守护者）|
+| Raylib 图形游戏 | 1 个（贪吃蛇）|
+| 本周游戏总计 | **10 个** 🎉 |
+
+### GitHub Push 记录（晚间）
+- `90d72ca` — LC154+LC41（今天第4次push）
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-29 晚间*
+*版本: v2.1 晚间补充*
+
+
+---
+
+## 2026-03-29 晚9:36 | 代码练习与游戏开发（周日定时）
+
+### LeetCode 练习（晚间）
+
+| 题目 | 难度 | 算法 | 状态 |
+|------|------|------|------|
+| （本日已累计 51+ 题，见上午/下午记录）| — | — | ✅ |
+
+**本日 LeetCode 汇总（2026-03-29 全天）**:
+- 凌晨: LC79 单词搜索 + LC51 N皇后
+- 上午: LC123 买卖股票 III + LC37 解数独 + LC685 冗余连接 II
+- 下午: LC201 位范围与 + LC307 树状数组 + LC1091 BFS矩阵最短路 + LC329 DFS记忆化最长递增路径
+- 傍晚: LC154 旋转排序数组最小值 II + LC41 缺失的第一个正数（原地哈希）
+- **本日合计**: LeetCode 51+ 题，Hard 23 道
+
+### 游戏开发：2048 Raylib ✅
+
+**项目路径**: `projects/game-2048-raylib/`
+**技术栈**: C++17 + Raylib 5.5
+**编译**: ✅ 零警告编译通过
+
+**核心功能**:
+1. **4×4 网格滑动**：方向键/WASD 控制上下左右
+2. **矩阵旋转算法**：统一用 rotateCW + slideLeft 实现四方向滑动（复用 ncurses 版的矩阵旋转技巧）
+3. **分数系统**：滑动合并加分，历史最高分存 `.best2048` 文件
+4. **Win 检测**：首次达到 2048 弹出胜局，按 C 继续游戏
+5. **Game Over 检测**：无合法移动时游戏结束
+6. **动画效果**：新生成格子有淡入效果（spawnTimer）
+7. **UI 设计**：标准 2048 配色（Rounded Rectangle 圆角格子 + Score/Best 框）
+
+**关键技术点**:
+```cpp
+// 四方向统一用 rotateCW 旋转到 left 方向处理
+int nrot = (dir == 0) ? 1 : (dir == 1) ? 3 : (dir == 3) ? 2 : 0;
+for (int i = 0; i < nrot; ++i) rotateCW(board);
+slideAndMerge(row); // 左滑+合并
+for (int i = 0; i < (4 - nrot) % 4; ++i) rotateCW(board); // 转回来
+```
+
+**本周游戏最终统计**:
+| 日期 | 游戏 | 平台 |
+|------|------|------|
+| 03-26 | 贪吃蛇 | ncurses |
+| 03-26 | 2048 | ncurses |
+| 03-26 | 扫雷 | ncurses |
+| 03-26 | Flappy Bird | ncurses |
+| 03-26 | Hangman | ncurses |
+| 03-27 | 俄罗斯方块 | ncurses |
+| 03-27 | 华容道 | ncurses |
+| 03-28 | 推箱子 | ncurses |
+| 03-29 | AI意识守护者 | Web (GitHub Pages) |
+| 03-29 | 贪吃蛇 | Raylib 图形版 |
+| **03-29** | **2048** | **Raylib 图形版** ✅ |
+
+**本周总计: 11 个游戏 🎉**
+
+### GitHub 推送
+
+- `game-2048-raylib` 项目创建，commit 待推送
+- 今日累计 push: `90d72ca` (LC154+LC41) + 本次 `game-2048-raylib`
+
+### 经验沉淀
+
+**Raylib 开发要点**:
+1. 编译: `-lraylib -framework CoreVideo -framework Cocoa -lm`
+2. `DrawRectangleRounded`: 圆角矩形，参数 (rect, roundness, segments, color)
+3. 窗口关闭: `WindowShouldClose()` 检查 GLFW 关闭标志
+4. 帧率: `SetTargetFPS(60)` 控制刷新率
+5. 文字对齐: `MeasureTextEx` 获取文字尺寸，手动居中计算
+6. 复合字面量: `(Color){r, g, b, a}` 是 C 语法，注意函数调用括号匹配
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-29 晚*
+*时间: 9:36 PM (Asia/Shanghai)*
