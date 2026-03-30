@@ -3045,3 +3045,138 @@ for (int i = 1; i <= m; ++i) {
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-30*
 *时间: 5:35 PM (Asia/Shanghai)*
+
+---
+
+## 2026-03-30 晚7:35 | 每日总结
+
+### LeetCode 练习（晚间）
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC139 Word Break | 字符串DP | Medium | ✅ |
+| LC1143 最长公共子序列 | DP+prev变量 | Medium | ✅ |
+| LC514 自由之路 | DP+贪心选择 | Hard | ✅ |
+| LC416 分割等和子集 | 0/1 背包 | Hard | ✅ |
+| LC474 01字符串 | 二维背包DP | Medium | ✅ |
+
+**LC139 Word Break** ✅
+- `dp[i]` = s[0..i-1] 是否可拆分
+- 枚举所有 j，检测 s[j..i-1] 是否在字典
+
+**LC1143 LCS (1D 优化)** ✅
+- `dp[j] = prev + 1` 当匹配
+- `prev` 记住左上角旧值
+- 空间 O(n)
+
+**LC514 Freedom Trail** ✅
+- 环形转盘拼写单词最少步数
+- DP[i][j] = 在 ring 位置 j 拼到 key[i] 的最小步数
+- 对每个 key 字符，枚举所有 ring 位置贪心选
+
+**LC416 背包** ✅
+- 总和奇数直接 false
+- 0/1 背包：`dp[j] = dp[j] || dp[j-num]`
+- 从后往前遍历
+
+**LC474 二维背包** ✅
+- m 个 0，n 个 1 的限制
+- `dp[i][j] = max(dp[i][j], dp[i-cnt0][j-cnt1]+1)`
+
+---
+
+### 游戏开发：Pac-Man Raylib ✅
+
+**项目**: `projects/pacman-raylib/`
+**编译**: ✅ 零警告通过
+**特性**: 经典吃豆人 + 4个AI幽灵 + 能量豆 + 3条命
+
+**4种 AI 幽灵**:
+| 幽灵 | 颜色 | 追踪目标 |
+|------|------|---------|
+| Blinky | 红色 | Pac-Man 当前位置 |
+| Pinky | 粉色 | Pac-Man 前方 4 格 |
+| Inky | 青色 | 基于 Blinky 位置 2 倍偏移 |
+| Clyde | 橙色 | 距离>8格追踪，<8格随机 |
+
+**核心技术**:
+- 迷宫布局：28×31 经典 Pac-Man 布局
+- 隧道穿墙：左右边界互通
+- 能量豆：蓝色大点，吃后幽灵变蓝 8 秒
+- Ghost House：中央区域幽灵出生/返回点
+- 关卡递进：消灭所有豆子进入下一关
+
+---
+
+### Emscripten 安装 ✅
+
+```bash
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk && ./emsdk install latest && ./emsdk activate latest
+source ./emsdk_env.sh
+emcc --version  # 5.0.4 ✅
+emcc test.c -o test.js -s WASM=1  # 编译成功 ✅
+```
+
+---
+
+### 本周累计（2026-03-25 ~ 2026-03-30 晚）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **70+ 道** |
+| Hard 题目 | **34 道** |
+| ncurses 游戏 | 8 个 |
+| Raylib 图形游戏 | **9 个** |
+| Web 游戏 | 1 个 |
+| **本周游戏总计** | **19 个** 🎉 |
+
+---
+
+### 技术沉淀：背包 DP
+
+**1D 背包模板**:
+```cpp
+for (int num : nums) {
+    for (int j = target; j >= num; --j)
+        dp[j] = dp[j] || dp[j - num];
+}
+```
+
+**2D 背包模板**:
+```cpp
+for (string& s : strs) {
+    int c0=0, c1=0;
+    for (char c: s) c=='0' ? c0++ : c1++;
+    for (int i = m; i >= c0; --i)
+        for (int j = n; j >= c1; --j)
+            dp[i][j] = max(dp[i][j], dp[i-c0][j-c1] + 1);
+}
+```
+
+**LCS prev 变量精髓**:
+```cpp
+int prev = 0;
+for (int j = 1; j <= n; ++j) {
+    int temp = dp[j];  // 记住旧值（当前行左上角）
+    dp[j] = (text1[i-1]==text2[j-1]) ? prev+1 : max(dp[j], dp[j-1]);
+    prev = temp;
+}
+```
+
+---
+
+### 下周计划（2026-03-31 ~ 2026-04-06）
+
+| 优先级 | 任务 | 核心技术 |
+|--------|------|---------|
+| P1 | WASM 编译测试 | Emscripten 编译游戏到浏览器 |
+| P1 | LeetCode 每日练习 | 每日2-3题，DP进阶 |
+| P2 | Pac-Man WASM | 编译 Pac-Man 到 WebAssembly |
+| P3 | 图形游戏增强 | 粒子效果/音效集成 |
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-30*
+*时间: 7:35 PM (Asia/Shanghai)*
