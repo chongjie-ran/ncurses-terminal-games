@@ -4,8 +4,8 @@
 
 ## 队列状态
 - 队列创建时间: 2026-03-25
-- 最后更新: 2026-03-30 晚11:55
-- **状态**: 🎉 本周队列全部清空
+- 最后更新: 2026-03-31 凌晨3:37
+- **状态**: 🎉 本周队列全部清空，已开始 WASM 探索
 
 ---
 
@@ -33,18 +33,19 @@
 | 03-30下午 | Space Invaders | projects/space-invaders-raylib/ | 5波+4种外星人+爆炸动画 ✅ |
 | 03-30晚 | Pac-Man | projects/pacman-raylib/ | 4 AI幽灵+能量豆+关卡递进 ✅ |
 | 03-30晚 | Frogger | projects/frogger-raylib/ | 5车道交通+5水道原木+3条命+计时 ✅ |
+| **03-31凌晨** | **Frogger WASM** | **projects/frogger-raylib/wasm/** | **Canvas 2D + Emscripten ✅** |
 
-**本周游戏总计: 20 个 🎉**
+**本周游戏总计: 21 个 🎉**
 
 ---
 
-## 下周计划 (2026-03-31 ~ 2026-04-06)
+## 下周计划 (2026-04-01 ~ 2026-04-06)
 
 | 优先级 | 项目 | 类型 | 说明 |
 |--------|------|------|------|
-| P1 | WebAssembly 探索 | 技术 | Emscripten 编译Raylib游戏到WASM |
-| P1 | Frogger WASM | 图形 | 编译 Frogger 到浏览器 |
-| P2 | Pac-Man WASM | 图形 | 编译 Pac-Man 到浏览器 |
+| P1 | Frogger WASM 浏览器测试 | WASM | 验证 Canvas 渲染正确性 |
+| P1 | Pac-Man WASM | WASM | 编译 Pac-Man 到 WebAssembly |
+| P2 | Space Invaders WASM | WASM | 编译 Space Invaders 到浏览器 |
 | P3 | 图形游戏增强 | 图形 | 粒子效果/音效集成 |
 
 ---
@@ -56,49 +57,64 @@
 | ncurses 终端游戏 | 8 |
 | Raylib 图形游戏 | 10 |
 | Web 游戏 | 1 |
-| LeetCode 练习 | 75+ 道 |
-| Hard 题目 | 38 道 |
+| WASM 游戏 | 1 |
+| LeetCode 练习 | 77+ 道 |
+| Hard 题目 | 40 道 |
 
 ---
 
-## 今日完成 (2026-03-30 晚11:55)
+## 今日完成 (2026-03-31 03:37)
 
 ### LeetCode 练习
 
 | 题目 | 算法 | 结果 |
 |------|------|------|
-| LC146 LRU Cache | 哈希表+双向链表 | ✅ |
-| LC295 Median Finder | 双堆（max-heap+min-heap）| ✅ |
+| LC32 最长有效括号 | DP | ✅ |
+| LC239 滑动窗口最大值 | 单调递减队列 | ✅ |
 
 ### LeetCode 关键题目（今日新增）
 
 | 题目 | 算法 |
 |------|------|
-| LC87 Scramble String | 递归+记忆化+字符集剪枝 |
-| LC188 Best Time Stock IV | k笔交易DP+空间优化 |
-| LC97 Interleaving String | 2D字符串DP→1D空间优化 |
-| LC146 LRU Cache | 哈希表+双向链表 O(1) |
-| LC295 Median Finder | 双堆中位数 O(log n) |
+| LC32 Longest Valid Parentheses | DP（栈辅助） |
+| LC239 Sliding Window Maximum | 单调递减队列 O(n) |
 
-### GitHub Push
+### 游戏开发：Frogger WASM ✅
 
-| Commit | 内容 | 状态 |
-|--------|------|------|
-| `960fee4` | Frogger Raylib 🆕 | ✅ 已推送 |
-| `98d50d0` | Pac-Man Raylib | ✅ 已补推 |
-| `b945ce4` | LC87+LC188+LC97 | ✅ 已推送 |
+**项目**: `projects/frogger-raylib/wasm/`
+**Commit**: 待推送
+**WASM 编译**: ✅ 零错误通过（Emscripten 5.0.4）
+**产物**: `frogger.js` (12KB) + `frogger.wasm` (3.7KB) + `index.html`
+
+**技术实现**:
+- `game.h/game.c` 纯C逻辑 → Emscripten 编译到 WASM
+- `wasm_renderer.c`: 25个导出函数，无 raylib 依赖
+- `index.html`: Canvas 2D 渲染 + 键盘控制
+
+**导出函数列表**:
+```c
+_init_game, _update_game, _get_game_state,
+_get_frog_x, _get_frog_y, _get_frog_alive, _get_frog_lives,
+_get_time_left, _get_homes_filled, _get_score,
+_get_obs_count, _get_obs_x, _get_obs_y, _get_obs_active,
+_get_log_count, _get_log_x, _get_log_y, _get_log_active,
+_get_safe_zone, _get_invincible_timer,
+_move_frog, _reset_frog,
+_get_grid_h, _get_grid_w, _get_cell
+```
 
 ---
 
-### 本日累计 (2026-03-30 全天)
+### 本日累计 (2026-03-31 全天)
 
 | 指标 | 数量 |
 |------|------|
-| LeetCode 完成 | **75+ 道** |
-| Hard 题目 | **38 道** |
-| Raylib 图形游戏 | **10 个** |
-| 本日游戏总计 | **20 个** 🎉 |
+| LeetCode 完成 | **77+ 道** |
+| Hard 题目 | **40 道** |
+| Raylib 图形游戏 | 10 个 |
+| WASM 游戏 | **1 个** 🆕 |
+| 本日游戏总计 | **21 个** 🎉 |
 
 ---
 
-*最后更新: 2026-03-30 23:55*
+*最后更新: 2026-03-31 03:37*

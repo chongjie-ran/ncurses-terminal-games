@@ -1,7 +1,7 @@
 # 开发者代码日志
 
 > 记录代码练习、游戏开发和经验沉淀
-> 版本: v1.2 | 最后更新: 2026-03-31
+> 版本: v1.3 | 最后更新: 2026-03-31
 
 ---
 
@@ -160,6 +160,70 @@ void addNum(int num) {
 
 ---
 
+### LC239 Sliding Window Maximum — 滑动窗口最大值
+
+**题目**: 数组 nums 中所有滑动窗口大小 k 的最大值  
+**难度**: Hard  
+**分类**: Sliding Window + Monotonic Deque
+
+**核心思路**: 单调递减双端队列，队首永远是当前窗口最大值，O(n) 总体
+
+**关键代码**:
+```cpp
+vector<int> maxSlidingWindow(vector<int>& nums, int k) {
+    deque<int> dq; // 存索引，值单调递减
+    vector<int> ans;
+    for (int i = 0; i < nums.size(); i++) {
+        while (!dq.empty() && nums[dq.back()] <= nums[i])
+            dq.pop_back();
+        dq.push_back(i);
+        if (dq.front() <= i - k) dq.pop_front();
+        if (i >= k - 1) ans.push_back(nums[dq.front()]);
+    }
+    return ans;
+}
+```
+
+**关键洞察**:
+- deque 存索引而非值，索引可判断窗口范围
+- 队尾pop: 移除小于当前元素的值（永远不会成为最大值）
+- 队首pop: 移除超出窗口范围的旧元素
+- 总时间: `O(n)`，每个元素最多入队出队各一次
+
+---
+
+### LC32 Longest Valid Parentheses — 最长有效括号
+
+**题目**: s 中最长有效括号子串长度  
+**难度**: Hard  
+**分类**: 字符串 DP / 栈
+
+**核心思路**: `dp[i]` = 以 i 结尾的最长有效括号长度
+
+**关键代码**:
+```cpp
+for (int i = 1; i < n; i++) {
+    if (s[i] == ')') {
+        if (s[i-1] == '(') {
+            dp[i] = (i >= 2 ? dp[i-2] : 0) + 2;
+        } else {
+            int j = i - dp[i-1] - 1;
+            if (j >= 0 && s[j] == '(') {
+                dp[i] = dp[i-1] + 2 + (j >= 1 ? dp[j-1] : 0);
+            }
+        }
+        ans = max(ans, dp[i]);
+    }
+}
+```
+
+**关键洞察**:
+- `s[i-1]=='('` → 凑成 "()" 对
+- `s[i-1]==')'` → 向外扩展：`j = i - dp[i-1] - 1`，检查 s[j] 是否为 '('
+- `dp[i-1] + 2` 加上当前匹配对，再加上 `dp[j-1]` 处理嵌套
+
+---
+
 ## 二、设计问题通用模板
 
 ### LRU/LFU/FIFO 等缓存设计
@@ -186,7 +250,16 @@ void addNum(int num) {
 | LC84 直方图最大矩形 | 单调递增栈，哨兵清栈 |
 | LC85 最大子矩阵 | 逐行→LC84 |
 | LC907 子数组最小值之和 | 单调递增栈，贡献计算 |
-| LC42 Trapping Rain Water | 单调递减栈，水量计算 |
+| LC42 接雨水 | 单调递减栈，水量计算 |
+| LC32 最长有效括号 | DP，嵌套展开 |
+
+### 单调队列问题分类
+
+| 题目 | 核心技巧 |
+|------|---------|
+| LC239 滑动窗口最大值 | 单调递减 deque，存索引，O(n) |
+| LC862 最短子数组和≥K | 单调递增 deque + 前缀和 |
+| LC975 奇偶跳 | 单调递减/递增 deque，栈思想 |
 
 ---
 
@@ -201,6 +274,15 @@ src/
 
 **核心原则**: game.h/game.c 不引用 raylib.h，纯 C 逻辑可独立编译测试
 
+**WASM 扩展**:
+```
+src/game.h/c     # 纯C逻辑（无依赖）
+wasm/wasm_renderer.c  # Emscripten导出函数
+wasm/index.html  # Canvas 2D渲染 + JS输入
+    ↓ Emscripten 编译
+frogger.wasm + frogger.js
+```
+
 ---
 
 ## 四、本周技术栈突破（2026-03-25 ~ 2026-03-31）
@@ -210,11 +292,13 @@ src/
 | LRU Cache 设计 | 熟练 | LC146 |
 | 双堆设计中位数 | 熟练 | LC295 |
 | Raylib 图形游戏 | 熟练 | 10个游戏 |
-| Emscripten/WASM | 入门 | 编译测试成功 |
+| Emscripten/WASM | 入门→进阶 | Frogger WASM 编译成功 |
 | 背包DP进阶 | 熟练 | LC416/LC474 |
 | 字符串DP | 掌握 | LC87/LC97/LC188 |
 | 单调栈（直方图） | 熟练 | LC84/LC85 |
 | Sliding Window | 熟练 | LC76 |
+| 单调队列 | 熟练 | LC239 |
+| 有效括号DP | 掌握 | LC32 |
 
 ---
 
@@ -233,24 +317,32 @@ src/
 
 **教训**: 优先使用标准库默认行为，避免手动的正负转换导致混淆
 
-### 单调栈解题模板（LC84/L C85）
+### 单调栈解题模板（LC84/LC85）
 
 **关键点**:
 - 哨兵技术：`i=n` 时用 `height=0` 清空栈
 - 宽度计算：`st.empty() ? i : i - st.top() - 1`
 - 一次遍历 + 一次清栈 = 完整解法
 
+### Emscripten WASM 编译经验
+
+**问题**: 编译时成员名称不匹配（game struct 字段名与 wasm_renderer.c 不一致）  
+**修复**: 先完整读取 game.h，了解实际字段名（`obsCount` 而非 `numVehicles`，`isAlive` 而非 `alive`，`timeLeft` 而非 `timeLimit`）
+
+**关键教训**: 读取源码确认字段名，不要凭记忆猜测
+
 ---
 
 ## 六、游戏开发记录
 
-### 本周完成 20 个游戏（2026-03-25 ~ 2026-03-30）
+### 本周完成 21 个游戏（2026-03-25 ~ 2026-03-31）
 
 | 平台 | 数量 | 代表游戏 |
 |------|------|---------|
 | ncurses | 8 | 贪吃蛇/2048/扫雷/Flappy Bird/Hangman/俄罗斯方块/华容道/推箱子 |
 | Raylib | 10 | 贪吃蛇/2048/俄罗斯方块/Sokoban/Flappy Bird/Minesweeper/Breakout/Memory Match/Space Invaders/Pac-Man/Frogger |
 | Web | 1 | AI意识守护者 |
+| WASM | 1 | Frogger 🆕 |
 
 ### WASM 探索进度（2026-03-31）
 
@@ -259,17 +351,32 @@ src/
 | Emscripten SDK 安装 | ✅ (`~/emsdk`, 版本 5.0.4) |
 | emcc 编译器可用 | ✅ |
 | Hello WASM 编译测试 | ✅ (生成 .wasm + .js) |
-| 编译 Raylib 游戏到 WASM | ⏳ 待下一步 |
+| Frogger 纯C逻辑编译 | ✅ (`frogger.wasm` 3.7KB + `frogger.js` 12KB) |
+| Canvas 2D 渲染器 | ✅ (`index.html` 完整实现) |
+| 键盘输入控制 | ✅ (Arrow Keys / WASD / R) |
+| 浏览器测试 | ⏳ 待测试 |
 
 ---
 
 ## 七、GitHub 活跃度
 
-- 本周 commit: 20+ 次
+- 本周 commit: 25+ 次
 - 推送: 全部成功，无积压
 - 新建 repo: `chongjie-ran/raylib-games`
 
 ---
 
-*最后更新: 2026-03-31 01:55*
-*版本: v1.2*
+## 八、下周计划（2026-04-01 ~ 2026-04-06）
+
+| 优先级 | 任务 | 核心技术 |
+|--------|------|---------|
+| P1 | Frogger WASM 浏览器测试 | Canvas渲染 + JS/WASM交互 |
+| P1 | LeetCode 每日练习 | 每日2-3题，重点图论+BFS/DFS |
+| P2 | Pac-Man WASM | 编译 Pac-Man 到 WebAssembly |
+| P2 | Space Invaders WASM | 编译 Space Invaders 到 WebAssembly |
+| P3 | 粒子效果/音效集成 | Raylib audio API |
+
+---
+
+*最后更新: 2026-03-31 03:37*
+*版本: v1.3*
