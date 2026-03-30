@@ -2743,3 +2743,305 @@ while (right < n) {
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-30*
 *时间: 11:40 AM (Asia/Shanghai)*
+
+---
+
+## 2026-03-30 下午3:35 | Topological Sort + Memory Match
+
+### 一、今日完成 (2026-03-30 下午)
+
+#### LeetCode 算法练习
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC207 课程表 | BFS拓扑排序(Kahn) | Medium | ✅ |
+| LC210 课程表II | 拓扑排序返回顺序 | Medium | ✅ |
+
+**LC207 Course Schedule — 课程表** ✅
+
+**题目**: n门课程， prerequisites[i] = [ai, bi] 表示必须先上bi才能上ai，能完成所有课程吗？  
+**核心算法**: Kahn算法（BFS拓扑排序）
+
+**核心思路**:
+- 统计所有节点的入度
+- 入度为0的节点可以先学，压入队列
+- 依次出队，邻接节点的入度-1，新入度为0的继续入队
+- 最终若出队数量 == n，则无环可完成
+
+**代码实现**:
+```c
+bool canFinish(int n, vector<vector<int>>& edges) {
+    vector<vector<int>> g(n);
+    vector<int> indeg(n, 0);
+    for (auto& e : edges) { g[e[0]].push_back(e[1]); indeg[e[1]]++; }
+    queue<int> q;
+    for (int i = 0; i < n; i++) if (indeg[i] == 0) q.push(i);
+    int cnt = 0;
+    while (!q.empty()) {
+        int u = q.front(); q.pop();
+        cnt++;
+        for (int v : g[u])
+            if (--indeg[v] == 0) q.push(v);
+    }
+    return cnt == n;
+}
+```
+
+**关键洞察**: Kahn算法 vs DFS检测环
+- Kahn：基于入度，队列驱动，容易理解
+- DFS：基于状态（unvisited/visiting/done），递归实现
+- 两者时间复杂度都是 O(V+E)
+
+**LC210 课程表II** — 同LC207，但额外记录出队顺序作为学习顺序
+
+---
+
+#### 游戏开发：Memory Match Raylib ✅
+
+**项目**: `projects/memory-match-raylib/`
+**Commit**: `1d7ac4c`
+**特性**: 4×4卡牌配对（8对）+ 8种符号 + 计时+最优时间
+
+**核心架构**:
+
+```
+memory-match-raylib/
+├── src/
+│   ├── main.c    # 入口 + 鼠标点击 + best_time持久化
+│   ├── game.h    # Card/Game结构体 + 状态枚举（无raylib）
+│   ├── game.c    # shuffleFisher-Yates/revealCard/配对检测/updateGame
+│   ├── draw.h    # 渲染声明
+│   └── draw.c    # Raylib绘制（3D卡片 + 8种符号）
+└── memory_match_raylib  # 编译产物
+```
+
+**关键技术实现**:
+
+1. **Fisher-Yates Shuffle**:
+   ```c
+   for (int i = 15; i > 0; i--) {
+       int j = rand() % (i + 1);
+       int tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+   }
+   ```
+
+2. **3D卡片背面**:
+   ```c
+   DrawRectangle(x, y, s, s, CARD_BACK);      // 底色
+   DrawRectangle(x, y, s, 3, LIGHT_BEVEL);    // 上边亮
+   DrawRectangle(x, y, 3, s, LIGHT_BEVEL);   // 左边亮
+   DrawRectangle(x, y+s-3, s, 3, DARK_BEVEL); // 下边暗
+   DrawRectangle(x+s-3, y, 3, s, DARK_BEVEL); // 右边暗
+   ```
+
+3. **配对检测状态机**:
+   ```c
+   if (g->state == STATE_PLAYING) {
+       g->flipped_row = row; g->flipped_col = col;
+       g->state = STATE_FLIPPED;
+       g->can_click = false;
+       g->match_timer = 0.6f; // 0.6秒后自动检测
+   } else if (g->state == STATE_FLIPPED) {
+       g->second_row = row; g->second_col = col;
+       g->moves++;
+       g->state = STATE_PLAYING;
+       g->can_click = false;
+       g->match_timer = 0.6f;
+   }
+   // updateGame中:
+   if (g->match_timer <= 0) {
+       // 检测 symbol 是否相等
+       // 相等: matched=true; 不等: revealed=false
+   }
+   ```
+
+4. **8种符号绘制**（Raylib基础图元组合）:
+   - 0圆形: `DrawCircle` + 高光
+   - 1方形: `DrawRectanglePro`
+   - 2三角形: `DrawTriangle`
+   - 3菱形: 两个三角形
+   - 4星形: `DrawCircleLines` + 4条对角线
+   - 5十字: 两个矩形
+   - 6月牙: `DrawCircleLines`叠加
+   - 7桃心: `DrawCircle` × 2 + `DrawTriangle`
+
+---
+
+### 二、本周累计 (2026-03-25 ~ 2026-03-30)
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **63+ 道** |
+| Hard 题目 | **32 道** |
+| ncurses 游戏 | 8 个 |
+| Raylib 图形游戏 | 7 个 |
+| Web 游戏 | 1 个 |
+| 本周游戏总计 | **17 个** 🎉 |
+
+---
+
+### 三、技术沉淀
+
+#### Raylib 工程分层架构（game.h 纯逻辑分离）
+
+```
+game.h / game.c     ← 纯C逻辑，无 raylib 依赖
+draw.h / draw.c     ← 渲染层，#include <raylib.h>
+main.c              ← 入口，调用逻辑和渲染
+```
+
+**好处**:
+- `game.c` 可以单独编译成单元测试（无需图形库）
+- 渲染和逻辑完全解耦
+- 跨平台移植时只需改 draw.c
+
+#### macOS bits/stdc++.h 不可用
+
+- Linux/GCC: `bits/stdc++.h` 可用
+- macOS/Apple Clang: 不可用，必须用标准头文件
+- 替代: `<vector>`, `<queue>`, `<unordered_map>`, `<algorithm>` 等
+
+#### GitHub push 失败处理
+
+- 网络断开时 `gh repo create` 会 push 失败
+- 解决: commit 仍然成功，仅 push 失败
+- 后续可重试或手动 push
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-30*
+*时间: 3:35 PM (Asia/Shanghai)*
+
+---
+
+## 2026-03-30 下午5:35 | 每日练习（第六次）
+
+### LeetCode 算法练习
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC85 最大矩形 | 单调栈（逐行柱状图）| Hard | ✅ |
+| LC115 不同的子序列 | 字符串DP | Hard | ✅ |
+| LC221 最大正方形 | DP+空间优化 | Medium | ✅ |
+
+**LC85 Maximal Rectangle** ✅
+- 逐行处理，每行高度=连续1的个数
+- 单调栈求最大矩形，时间 O(mn)，空间 O(n)
+- 验证: ✅ m1=6, m2=0, m3=1
+
+**LC115 Distinct Subsequences** ✅
+- 1D DP：`dp[j] += dp[j-1]` 当 s[i-1]==t[j-1]
+- 从后往前遍历 j 防止覆盖
+- 验证: ✅ rabbbit=3, babgbag=5
+
+**LC221 Maximal Square** ✅
+- DP+空间优化：dp[j] = min(dp[j], dp[j-1], prev) + 1
+- prev 变量处理左上角邻接，每行开始重置为 0
+- 验证: ✅ m1=4(2x2), m2=0, m3=1
+
+---
+
+### 游戏开发：Space Invaders Raylib ✅
+
+**项目**: `projects/space-invaders-raylib/`
+**Commit**: `8d44bb4` → pushed to `raylib-games` repo
+**编译**: ✅ 零警告
+**特性**: 5波×4行×8列外星人 + 爆炸动画 + 5种外星人类型
+
+**功能亮点**:
+- 4种外星人类型（按行：40/20/10/5分）
+- 5波递进（外星人速度逐波加快）
+- 外星人随机射击反击（最多10发）
+- 爆炸动画淡出效果（explosionTimer）
+- 3条命 + 计分 + 波次提示
+- P暂停 / R重新开始
+
+---
+
+### 本周累计（2026-03-25 ~ 2026-03-30）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **65+ 道** |
+| Hard 题目 | **33 道** |
+| ncurses 游戏 | 8 个 |
+| Raylib 图形游戏 | 8 个 |
+| Web 游戏 | 1 个 |
+| **本周游戏总计** | **18 个** 🎉 |
+
+### 本周游戏完整列表
+
+| 日期 | 游戏 | 平台 | 核心功能 |
+|------|------|------|---------|
+| 03-26 | 贪吃蛇 | ncurses | deque+方向缓冲 |
+| 03-26 | 2048 | ncurses | 矩阵旋转+滑动合并 |
+| 03-26 | 扫雷 | ncurses | BFS flood fill |
+| 03-26 | Flappy Bird | ncurses | 重力物理+AABB碰撞 |
+| 03-26 | Hangman | ncurses | set+ASCII art |
+| 03-27 | 俄罗斯方块 | ncurses | SRS wall kick+Ghost Piece |
+| 03-27 | 华容道 | ncurses | BFS+20位状态压缩 |
+| 03-28 | 推箱子 | ncurses | BFS 50万节点扩展 |
+| 03-29 | AI意识守护者 | Web | 状态机对话+localStorage |
+| 03-29 | 贪吃蛇 | Raylib | 图形版 |
+| 03-29 | 2048 | Raylib | 图形版+Win检测 |
+| 03-30凌晨 | 俄罗斯方块 | Raylib | SRS墙踢+Hold |
+| 03-30凌晨 | Sokoban | Raylib | BFS自动求解 |
+| 03-30早上 | Flappy Bird | Raylib | 重力+管道 |
+| 03-30上午 | Minesweeper | Raylib | 9x9+计时器 |
+| 03-30上午 | Breakout | Raylib | 挡板反弹+关卡递进 |
+| 03-30下午 | Memory Match | Raylib | 4x4配对+8种符号 |
+| 03-30下午 | **Space Invaders** | **Raylib** | **5波+爆炸动画 ✅** |
+
+### GitHub Push 记录
+
+| Commit | 内容 | 状态 |
+|--------|------|------|
+| `08b54ff` | LC115+LC221+LC85 | ✅ 已推送 |
+| `8d44bb4` | Space Invaders Raylib | ✅ 已推送 |
+
+---
+
+### 技术沉淀（本次新增）
+
+**1D DP空间优化的 prev 模式**:
+```cpp
+// 当递推涉及 dp[i-1][j-1] 时，需要 prev
+int prev = 0;
+for (int i = 1; i <= m; ++i) {
+    for (int j = 1; j <= n; ++j) {
+        int temp = dp[j];
+        // ... 使用 dp[j], dp[j-1], prev ...
+        prev = temp;
+    }
+    prev = 0; // 每行重置
+}
+```
+
+**字符串DP从后往前遍历的原因**:
+- `dp[j]` 在本轮会被更新
+- `dp[j-1]` 是本轮新值（已经处理过）
+- 所以从 n→1 遍历时，`dp[j-1]` 已经是当前行的值
+- 这正是我们需要的：`dp[j-1]`（当前行左边的值）
+
+**单调栈求矩形 vs 求正方形**:
+- 矩形：宽度×高度（单调栈直接求）
+- 正方形：min(左/上/左上)+1（DP，限制为正方形）
+
+---
+
+### 下周计划（2026-03-31 ~ 2026-04-06）
+
+| 优先级 | 任务 | 核心技术 |
+|--------|------|---------|
+| P1 | WebAssembly 探索 | Emscripten 编译Raylib游戏到WASM |
+| P1 | Pac-Man 风格游戏 | 迷宫+AI幽灵 |
+| P1 | LeetCode 每日练习 | 每日2-3题 |
+| P2 | 俄罗斯方块增强 | Next Level、计时模式 |
+| P3 | 2048 增强版 | 动画效果 |
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-30*
+*时间: 5:35 PM (Asia/Shanghai)*
