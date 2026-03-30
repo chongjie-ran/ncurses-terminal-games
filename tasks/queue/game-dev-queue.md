@@ -4,8 +4,8 @@
 
 ## 队列状态
 - 队列创建时间: 2026-03-25
-- 最后更新: 2026-03-30 晚
-- **状态**: 进行中（本周队列清空）
+- 最后更新: 2026-03-30 晚11:55
+- **状态**: 🎉 本周队列全部清空
 
 ---
 
@@ -31,20 +31,21 @@
 | 03-30上午 | Breakout | projects/breakout-raylib/ | 打砖块+反弹物理 ✅ |
 | 03-30下午 | Memory Match | projects/memory-match-raylib/ | 4x4卡牌配对+8种符号 ✅ |
 | 03-30下午 | Space Invaders | projects/space-invaders-raylib/ | 5波+4种外星人+爆炸动画 ✅ |
-| **03-30晚** | **Pac-Man** | **projects/pacman-raylib/** | **4 AI幽灵+能量豆+关卡递进 ✅** |
+| 03-30晚 | Pac-Man | projects/pacman-raylib/ | 4 AI幽灵+能量豆+关卡递进 ✅ |
+| 03-30晚 | Frogger | projects/frogger-raylib/ | 5车道交通+5水道原木+3条命+计时 ✅ |
 
-**本周游戏总计: 19 个 🎉**
+**本周游戏总计: 20 个 🎉**
 
 ---
 
-## 下周计划 (2026-04-06 ~ 2026-04-12)
+## 下周计划 (2026-03-31 ~ 2026-04-06)
 
 | 优先级 | 项目 | 类型 | 说明 |
 |--------|------|------|------|
 | P1 | WebAssembly 探索 | 技术 | Emscripten 编译Raylib游戏到WASM |
-| P1 | Pac-Man WASM | 图形 | 编译 Pac-Man 到浏览器 |
-| P2 | 俄罗斯方块增强 | 图形 | Next Level、计时模式 |
-| P3 | 2048 增强版 | 图形 | 动画效果 |
+| P1 | Frogger WASM | 图形 | 编译 Frogger 到浏览器 |
+| P2 | Pac-Man WASM | 图形 | 编译 Pac-Man 到浏览器 |
+| P3 | 图形游戏增强 | 图形 | 粒子效果/音效集成 |
 
 ---
 
@@ -53,30 +54,51 @@
 | 类型 | 数量 |
 |------|------|
 | ncurses 终端游戏 | 8 |
-| Raylib 图形游戏 | 9 |
+| Raylib 图形游戏 | 10 |
 | Web 游戏 | 1 |
-| LeetCode 练习 | 70+ 道 |
-| Hard 题目 | 34 道 |
+| LeetCode 练习 | 75+ 道 |
+| Hard 题目 | 38 道 |
 
 ---
 
-## 今日完成 (2026-03-30 晚)
+## 今日完成 (2026-03-30 晚11:55)
 
 ### LeetCode 练习
 
 | 题目 | 算法 | 结果 |
 |------|------|------|
-| LC139 Word Break | 字符串DP | ✅ |
-| LC1143 最长公共子序列 | DP+prev变量 | ✅ |
-| LC514 自由之路 | DP+贪心选择 | ✅ |
-| LC416 分割等和子集 | 0/1 背包 | ✅ |
-| LC474 01字符串 | 二维背包DP | ✅ |
+| LC146 LRU Cache | 哈希表+双向链表 | ✅ |
+| LC295 Median Finder | 双堆（max-heap+min-heap）| ✅ |
 
-### 游戏开发
+### LeetCode 关键题目（今日新增）
 
-- **Pac-Man Raylib** ✅ — 编译零警告，4种AI幽灵，零警告
-- **Emscripten 安装** ✅ — 版本 5.0.4，WASM 编译测试成功
+| 题目 | 算法 |
+|------|------|
+| LC87 Scramble String | 递归+记忆化+字符集剪枝 |
+| LC188 Best Time Stock IV | k笔交易DP+空间优化 |
+| LC97 Interleaving String | 2D字符串DP→1D空间优化 |
+| LC146 LRU Cache | 哈希表+双向链表 O(1) |
+| LC295 Median Finder | 双堆中位数 O(log n) |
+
+### GitHub Push
+
+| Commit | 内容 | 状态 |
+|--------|------|------|
+| `960fee4` | Frogger Raylib 🆕 | ✅ 已推送 |
+| `98d50d0` | Pac-Man Raylib | ✅ 已补推 |
+| `b945ce4` | LC87+LC188+LC97 | ✅ 已推送 |
 
 ---
 
-*最后更新: 2026-03-30 19:35*
+### 本日累计 (2026-03-30 全天)
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **75+ 道** |
+| Hard 题目 | **38 道** |
+| Raylib 图形游戏 | **10 个** |
+| 本日游戏总计 | **20 个** 🎉 |
+
+---
+
+*最后更新: 2026-03-30 23:55*
