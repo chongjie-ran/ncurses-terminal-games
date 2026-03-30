@@ -2515,3 +2515,231 @@ if (pac[i][j] && atl[i][j]) result.push_back({i,j});
 *记录人: 悟通 (开发者 Agent)*
 *日期: 2026-03-30*
 *时间: 7:40 AM (Asia/Shanghai)*
+
+---
+
+## 2026-03-30 上午练习 | 每日总结（第三次）
+
+### LeetCode 算法练习
+
+| 题目 | 分类 | 难度 | 结果 |
+|------|------|------|------|
+| LC329 最长递增路径 | DFS+记忆化/拓扑排序 | Hard | ✅ |
+
+**LC329 Longest Increasing Path — 最长递增路径** ✅
+
+**题目**: 在矩阵中找到最长的严格递增路径（只能走上下左右，值要更大）  
+**核心算法**: DFS + 记忆化搜索
+
+**核心洞察**: DAG性质
+- 矩阵中每个格子可以扩展到4个邻居，只要邻居值 > 当前值
+- 严格递增意味着不可能形成环 → 图是 DAG
+- 每个格子的最长路径只依赖邻居 → 可用记忆化
+
+**代码实现**:
+```cpp
+int dfs(const vector<vector<int>>& m, int i, int j,
+        vector<vector<int>>& memo, int M, int N) {
+    if (memo[i][j] != 0) return memo[i][j];
+    const int dirs[4][2] = {{-1,0},{1,0},{0,-1},{0,1}};
+    int best = 1;
+    for (auto& d : dirs) {
+        int ni = i+d[0], nj = j+d[1];
+        if (ni<0||ni>=M||nj<0||nj>=N) continue;
+        if (m[ni][nj] <= m[i][j]) continue;
+        best = max(best, 1 + dfs(m, ni, nj, memo, M, N));
+    }
+    memo[i][j] = best;
+    return best;
+}
+```
+- 时间复杂度: O(MN) — 每个格子只计算一次
+- 空间复杂度: O(MN) — memo表
+
+**验证**: ✅ m1={{9,9,4},{6,6,8},{2,1,1}} → 4; m2={{3,4,3},{3,3,3}} → 2
+
+---
+
+### 游戏开发：Minesweeper Raylib ✅
+
+**项目**: `projects/minesweeper-raylib/`
+**Commit**: `942cf17` → pushed to branch `minesweeper-raylib`
+**编译**: ✅ 零警告通过
+**特性**: 经典9x9扫雷 + Raylib图形渲染 + 计时器+最高分
+
+**核心功能**:
+| 功能 | 实现 |
+|------|------|
+| 9x9网格，10个雷 | 经典入门配置 |
+| 左键翻开 | reveal + flood fill |
+| 右键标记旗帜 | toggle flag |
+| 首次点击安全区 | 3x3区域内不放雷 |
+| BFS flood fill | 空白格自动扩展 |
+| 计时器 | 每秒递增 |
+| 最高分持久化 | minesweeper_best.txt |
+| 3D立体格子 | 凸起/凹陷视觉效果 |
+| 地雷爆炸动画 | 圆形+8条辐射线 |
+| 旗帜三角形 | DrawTriangle绘制 |
+| R键重新开始 | 全局重置 |
+| 胜利/失败叠加层 | 半透明遮罩 |
+
+**编译参数**:
+```bash
+gcc src/main.c src/game.c src/draw.c -o minesweeper_raylib \
+    -Wall -Wextra -O2 \
+    -I/opt/homebrew/include -L/opt/homebrew/lib -lraylib -lm
+```
+
+---
+
+### GitHub 推送汇总（第三次）
+
+| Commit | 内容 | 状态 |
+|--------|------|------|
+| `942cf17` | Minesweeper Raylib（pushed to `minesweeper-raylib` branch）| ✅ 已推送 |
+
+---
+
+### 本周累计更新（2026-03-25 ~ 2026-03-30 上午）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **57+ 道** |
+| Hard 题目 | **28 道** |
+| ncurses 游戏 | 8 个 |
+| Raylib 图形游戏 | 5 个 |
+| Web 游戏 | 1 个 |
+| 本周游戏总计 | **15 个** 🎉 |
+
+### 本周新增游戏（Raylib 完整）
+
+| 日期 | 游戏 | 说明 |
+|------|------|------|
+| 03-29 | 贪吃蛇 | Raylib 图形版 ✅ |
+| 03-29 | 2048 | Raylib 图形版 ✅ |
+| 03-30凌晨 | 俄罗斯方块 | Raylib 图形版（SRS墙踢+Ghost Piece）✅ |
+| 03-30凌晨 | Sokoban | Raylib 图形版（BFS自动求解）✅ |
+| 03-30早上 | Flappy Bird | Raylib 图形版（重力物理+碰撞）✅ |
+| 03-30上午 | Minesweeper | Raylib 图形版（flood fill+计时器）✅ |
+
+---
+
+### 技术沉淀
+
+**Raylib 绘图模式**:
+
+1. **3D凸起格子**（隐藏状态）:
+   ```c
+   DrawRectangle(x, y, s, s, CLR_CELL_HIDDEN);
+   DrawRectangle(x, y, s, 3, LIGHT_BEVEL);   // top
+   DrawRectangle(x, y, 3, s, LIGHT_BEVEL);  // left
+   DrawRectangle(x, y+s-3, s, 3, DARK_BEVEL);// bottom
+   DrawRectangle(x+s-3, y, 3, s, DARK_BEVEL);// right
+   ```
+
+2. **3D凹陷格子**（翻开状态）:
+   ```c
+   DrawRectangle(x, y, s, s, CLR_CELL_REVEAL);
+   DrawRectangle(x, y, s, 2, DARKER);  // top → darker
+   DrawRectangle(x, y, 2, s, DARKER);   // left
+   ```
+
+3. **地雷**:
+   ```c
+   DrawCircle(cx, cy, r, MINE_COL);           // body
+   DrawCircle(cx, cy, r*0.6, BRIGHT_COL);     // highlight
+   for (int a=0; a<8; a++) {                   // spokes
+       int ex = cx + cos(a*PI/4)*r*1.3;
+       int ey = cy + sin(a*PI/4)*r*1.3;
+       DrawLine(cx, cy, ex, ey, MINE_COL);
+   }
+   ```
+
+4. **旗帜**:
+   ```c
+   DrawLine(px, top, px, bot, GRAY_POLE);
+   DrawTriangle((Vector2){px, top},
+                (Vector2){px+10, top+6},
+                (Vector2){px, top+12}, FLAG_COL);
+   ```
+
+**Raylib 头文件注意**:
+- `game.h` 需要同时 include `<stdbool.h>` + `<raylib.h>`
+- `draw.c` 需要额外 `#include <stdio.h>` (snprintf)
+- `game.c` 不需要 raylib.h（纯逻辑）
+
+---
+
+### 本日总结（2026-03-30 上午9:40）
+
+| 分类 | 完成 |
+|------|------|
+| LeetCode | LC329（Hard）|
+| 游戏 | Minesweeper Raylib ✅ |
+| 推送 | ✅ branch `minesweeper-raylib` |
+| 编译 | ✅ 零警告 |
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-30*
+*时间: 9:40 AM (Asia/Shanghai)*
+
+---
+
+### 本日总结（2026-03-30 上午11:40）
+
+| 分类 | 完成 |
+|------|------|
+| LeetCode | LC403 + LC410 + LC42 + LC76（全部Hard）|
+| 游戏 | Breakout Raylib ✅ |
+| 推送 | ✅ new repo `raylib-games` |
+| 编译 | ✅ 零警告 |
+| 本周累计 | 61+ LeetCode，32 Hard，16游戏 |
+
+### 新增LeetCode（2026-03-30 11:40 AM）
+
+| 题目 | 算法 |
+|------|------|
+| LC403 青蛙过河 | DFS记忆化+二分查找 |
+| LC410 分割数组最大和 | 二分+贪心验证 |
+| LC42 接雨水 | 双指针 |
+| LC76 最小覆盖子串 | 滑动窗口 |
+
+### 新增游戏（Raylib）
+
+| 日期 | 游戏 | 说明 |
+|------|------|------|
+| 03-30上午11:40 | Breakout | Raylib 图形版（挡板反弹+关卡递进）✅ |
+
+### 技术沉淀
+
+**Breakout 挡板反弹物理**:
+```c
+float hit_pos = (b->x - paddle.x) / PADDLE_W; // 0..1
+float angle = 150.0f + hit_pos * 120.0f; // 150°~270°
+float rad = angle * M_PI / 180.0f;
+b->dx = speed * cosf(rad);
+b->dy = speed * sinf(rad);
+```
+
+**滑动窗口模板（LC76）**:
+```c
+int formed = 0, required = 0;
+for (int i = 0; i < 256; i++) if (need[i] > 0) required++;
+while (right < n) {
+    window[c]++; if (need[c] > 0 && window[c] == need[c]) formed++;
+    while (formed == required) {
+        update_best();
+        if (need[cl] > 0 && window[cl] == need[cl]) formed--;
+        window[cl]--; left++;
+    }
+    right++;
+}
+```
+
+---
+
+*记录人: 悟通 (开发者 Agent)*
+*日期: 2026-03-30*
+*时间: 11:40 AM (Asia/Shanghai)*
