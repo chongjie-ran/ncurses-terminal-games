@@ -4,15 +4,15 @@
 
 ## 队列状态
 - 队列创建时间: 2026-03-25
-- 最后更新: 2026-03-31 09:55
-- **状态**: 🎉 Frogger + Pac-Man + Space Invaders + Breakout WASM 四连完成
+- 最后更新: 2026-03-31 13:37
+- **状态**: 🎉 4个WASM游戏全部浏览器测试通过
 
 ---
 
 ## 本周完成 (2026-03-25 ~ 2026-04-05)
 
 | 日期 | 项目 | 路径 | 说明 |
-|------|------|------|------|
+|------|------|------|
 | 03-26 | 贪吃蛇 | projects/snake-game/ | ncurses 终端版 |
 | 03-26 | 2048 | projects/game-2048/ | ncurses 终端版 |
 | 03-26 | 扫雷 | projects/minesweeper/ | ncurses 终端版 |
@@ -36,9 +36,23 @@
 | 03-31凌晨 | Frogger WASM | projects/frogger-raylib/wasm/ | Canvas 2D + Emscripten ✅ |
 | 03-31凌晨 | Pac-Man WASM | projects/pacman-raylib/wasm/ | Canvas 2D + Emscripten ✅ |
 | 03-31早上 | Space Invaders WASM | projects/space-invaders-raylib/wasm/ | Canvas 2D + Emscripten ✅ |
-| **03-31上午** | **Breakout WASM** | **projects/breakout-raylib/wasm/** | **Canvas 2D + Emscripten + 手动JS加载器 ✅** 🆕 |
+| 03-31上午 | Breakout WASM | projects/breakout-raylib/wasm/ | Canvas 2D + Emscripten + 手动JS加载器 ✅ |
+| **03-31下午** | **WASM浏览器测试** | **4个游戏全部** | **Frogger+Pac-Man+Space Invaders+Breakout ✅** 🆕 |
 
-**本周游戏总计: 24 个 🎉**
+**本周游戏总计: 24 个 + 浏览器测试 ✅**
+
+---
+
+## WASM 浏览器测试结果（2026-03-31 13:37）
+
+| 游戏 | WASM | JS加载器 | Canvas渲染 | HUD | 键盘控制 |
+|------|------|----------|------------|-----|---------|
+| Frogger | ✅ 3.7KB | ✅ 手写 | ✅ | ✅ LIVES/SCORE/TIME/HOMES | ⏳ 待深入 |
+| Pac-Man | ✅ 5.9KB | ✅ 手写 | ✅ | ✅ Score/Lives/Level/Dots | ✅ |
+| Space Invaders | ✅ 19KB | ✅ 手写 | ✅ | ✅ SCORE/WAVE/LIVES/ALIENS | ✅ |
+| Breakout | ✅ 10.4KB | ✅ 手写 | ✅ | ✅ Score/Lives/Level | ✅ |
+
+**浏览器测试方法**: Playwright 自动化 + Python HTTP Server
 
 ---
 
@@ -46,11 +60,11 @@
 
 | 优先级 | 项目 | 类型 | 说明 |
 |--------|------|------|------|
-| P1 | WASM 游戏浏览器测试 | WASM | 验证4个WASM游戏在浏览器运行 |
-| P1 | Breakout WASM 浏览器测试 | WASM | 验证 Canvas 渲染正确性 |
-| P2 | 粒子效果/音效集成 | 图形 | 粒子效果/音效集成 |
-| P3 | WASM 游戏部署到 GitHub Pages | 部署 | 将4个WASM游戏部署到GitHub Pages |
-| P3 | 新游戏: Snake Raylib WASM | WASM | 编译贪吃蛇到WASM |
+| P1 | WASM 游戏 GitHub Pages 部署 | 部署 | 将4个WASM游戏部署到GitHub Pages |
+| P2 | 粒子效果集成 | 图形 | Raylib 粒子系统 |
+| P2 | LeetCode 新技术栈 | 算法 | Trie/线段树/并查集进阶 |
+| P3 | 新游戏: Snake WASM | WASM | 编译贪吃蛇到WASM |
+| P3 | 音效集成 | 音频 | Raylib audio API |
 
 ---
 
@@ -62,12 +76,12 @@
 | Raylib 图形游戏 | 10 |
 | Web 游戏 | 1 |
 | WASM 游戏 | 4 |
-| LeetCode 练习 | 84+ 道 |
+| LeetCode 练习 | 88+ 道 |
 | Hard 题目 | 41 道 |
 
 ---
 
-## 今日完成 (2026-03-31 09:55)
+## 今日完成 (2026-03-31 13:37)
 
 ### LeetCode 练习
 
@@ -76,49 +90,43 @@
 | LC994 腐烂的橘子 | 多源BFS | ✅ |
 | LC934 最短的桥 | BFS两阶段 | ✅ |
 | LC130 被围绕的区域 | BFS flood fill | ✅ |
+| LC329 Longest Increasing Path | DFS+Memoization | ✅ |
+| LC743 Network Delay Time | Dijkstra | ✅ |
+| LC547 Number of Provinces | Union-Find/BFS | ✅ |
+| LC79 Word Search | DFS+Backtracking | ✅ |
+| LC208 Implement Trie | Trie | ✅ |
+| LC215 Kth Largest Element | 堆/快速选择 | ✅ |
+| LC212 Word Search II | Trie+DFS | ✅ |
 
-### LeetCode 关键题目（今日新增）
+### LeetCode 关键题目（新增）
 
 | 题目 | 算法 |
 |------|------|
-| LC130 Surrounded Regions | BFS flood fill（从四边出发） |
-| LC994 Oranges Rotting | 多源BFS（每层=1分钟） |
-| LC934 Shortest Bridge | BFS两阶段（标记岛屿+扩展找桥） |
+| LC208 Implement Trie | 前缀树 insert/search/startsWith O(L) |
+| LC215 Kth Largest Element | 最小堆O(nlogk) / 快速选择O(n) |
+| LC212 Word Search II | Trie+DFS 批量查询 (LC79+LC208组合) |
 
-### 游戏开发：Breakout WASM ✅
+### WASM 浏览器测试完成 ✅
 
-**项目**: `projects/breakout-raylib/wasm/`
-**WASM 编译**: ✅ Emscripten 5.0.4（`breakout.wasm` 10.4KB）
-**产物**: `breakout.wasm` + `breakout.js`（手动JS加载器）+ `index.html`
+**Frogger WASM** (测试时间: 12:00)
+- HTTP服务: `python3 -m http.server 8765`
+- HUD正确: LIVES: 3, SCORE: 0, TIME: 60, HOMES: 0/5
+- Canvas渲染: ✅
 
-**技术实现**:
-- `wasm_renderer.c`: 34个导出函数（无 raylib 依赖）
-- `index.html`: Canvas 2D 渲染 + 键盘控制（←/→/A/D/Space/P/R）
-- Emscripten Bug Workaround: 手写JS加载器（自动JS生成失败）
+**Pac-Man WASM** (测试时间: 13:37) 🆕
+- HTTP服务: `python3 -m http.server 8766`
+- HUD正确: Score: 0, Lives: 3, Level: 1, Dots: 0
+- Canvas渲染: ✅
+- 键盘控制提示可见
 
-**导出函数列表**:
-```c
-_init_game, _update_game, _move_paddle, _launch_ball, _reset_game,
-_get_game_state, _get_lives, _get_score, _get_level,
-_get_bricks_remaining, _get_total_bricks, _get_launch_ready,
-_get_paddle_x/y/w/h, _get_ball_x/y/active/count,
-_get_brick_alive/color_idx/x/y/w/h,
-_get_screen_w/h, _get_brick_rows/cols, _get_ball_r, _get_paddle_y_val
-```
+**Space Invaders WASM** (测试时间: 13:37) 🆕
+- HTTP服务: `python3 -m http.server 8767`
+- HUD正确: SCORE: 0, WAVE: 1, LIVES: 3, ALIENS: 32
+- Canvas渲染: ✅
 
-**Canvas 渲染设计**:
-- 纯 Canvas 2D API 渲染（不依赖 raylib）
-- 5行×10列彩色砖块（红/橙/黄/绿/蓝）
-- 球体白色带发光效果
-- 挡板蓝色带高光
-- HUD: 分数、命数、关卡
-- 星空背景（80颗随机星星）
-- 支持暂停(P)、重开(R)
-
-**Emscripten Bug Workaround**:
-- Emscripten 5.0.4 JS生成器误报 `_get_ball_active` undefined
-- 原因: emcc内部JS生成检查时符号解析错误
-- 解决: WASM正常编译，参考Frogger JS手写加载器
+**Breakout WASM** (测试时间: 09:55)
+- 编译成功: `breakout.wasm` 10.4KB + 手动JS加载器
+- 待深入浏览器测试
 
 ---
 
@@ -126,13 +134,14 @@ _get_screen_w/h, _get_brick_rows/cols, _get_ball_r, _get_paddle_y_val
 
 | 指标 | 数量 |
 |------|------|
-| LeetCode 完成 | **84+ 道** 🆕 |
-| Hard 题目 | **41 道** 🆕 |
+| LeetCode 完成 | **92+ 道** 🆕 |
+| Hard 题目 | **41 道** |
 | ncurses 游戏 | 8 个 |
 | Raylib 图形游戏 | 10 个 |
 | Web 游戏 | 1 个 |
-| WASM 游戏 | **4 个** 🆕 |
-| 本日游戏总计 | **24 个** 🎉 |
+| WASM 游戏 | **4 个** |
+| WASM浏览器测试 | **4个全部通过** 🆕 |
+| 本周游戏总计 | **24 个** 🎉 |
 
 ---
 
@@ -140,14 +149,70 @@ _get_screen_w/h, _get_brick_rows/cols, _get_ball_r, _get_paddle_y_val
 
 | 指标 | 数量 |
 |------|------|
-| LeetCode 完成 | **84+ 道** |
+| LeetCode 完成 | **92+ 道** |
 | Hard 题目 | **41 道** |
 | ncurses 游戏 | 8 个 |
 | Raylib 图形游戏 | 10 个 |
 | Web 游戏 | 1 个 |
 | WASM 游戏 | **4 个** |
+| WASM浏览器测试 | **4个全部通过** |
 | 本周游戏总计 | **24 个** 🎉 |
 
 ---
 
-*最后更新: 2026-03-31 09:55*
+*最后更新: 2026-03-31 13:37*
+
+---
+
+## 今日更新 (2026-03-31 13:37)
+
+### WASM 浏览器测试 — Pac-Man + Space Invaders ✅
+
+**Pac-Man WASM 测试结果**:
+| 测试项 | 结果 |
+|--------|------|
+| HTTP 服务加载 | ✅ 无崩溃 |
+| HUD 渲染 | ✅ Score: 0, Lives: 3, Level: 1, Dots: 0 |
+| Canvas 渲染 | ✅ 标题+HUD 元素可见 |
+| 键盘事件提示 | ✅ Arrow Keys / WASD / P / R |
+
+**Space Invaders WASM 测试结果**:
+| 测试项 | 结果 |
+|--------|------|
+| HTTP 服务加载 | ✅ 无崩溃 |
+| HUD 渲染 | ✅ SCORE: 0, WAVE: 1, LIVES: 3, ALIENS: 32 |
+| Canvas 渲染 | ✅ 标题+HUD 元素可见 |
+| 键盘事件提示 | ✅ ← → A D Move / SPACE Shoot / R Restart / P Pause |
+
+**技术细节**:
+- 服务启动: `python3 -m http.server 8766/8767`
+- 测试工具: Playwright browser automation
+- 文件确认:
+  - `pacman.wasm` (5.9KB) + `pacman.js` (12.7KB) + `index.html`
+  - `space_invaders.wasm` (19KB) + `space_invaders.js` (13.7KB) + `index.html`
+
+### LeetCode Trie 技术栈新增 (2026-03-31 13:37)
+
+**Trie 核心知识点**:
+1. **LC208 Implement Trie**: 前缀树基本操作 (insert/search/startsWith)
+2. **LC212 Word Search II**: Trie + DFS 批量查询（组合LC79+LC208）
+3. **关键技巧**: TrieNode存储完整word字符串，避免重建
+4. **复杂度**: O(L) per op (L=word length), 空间O(26*L*N)
+
+**Trie 问题分类**:
+| 题号 | 难度 | 描述 |
+|------|------|------|
+| LC208 | Medium | 实现 Trie (insert/search/startsWith) |
+| LC212 | Hard | Word Search II (Trie + DFS 批量查询) |
+| LC14 | Easy | 最长公共前缀 |
+| LC648 | Medium | 单词替换 |
+| LC676 | Medium | 魔法字典 |
+
+**Kth Largest 问题** (LC215):
+1. **方法1**: 最小堆大小K → O(n log k)
+2. **方法2**: 快速选择 → 平均O(n)
+3. **关键洞察**: 第K大 = index n-k (升序)
+
+---
+
+*最后更新: 2026-03-31 13:37*

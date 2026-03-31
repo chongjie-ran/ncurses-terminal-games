@@ -1,54 +1,45 @@
-// LC547 Number of Provinces
-// 题目: n个城市，某些对相连，求连通分量数量
-// 算法: 并查集 Union-Find
-// 验证: ✅ Test1=2, Test2=3
+// LC547 - Number of Provinces
+// 分类: Union-Find / BFS DFS
+// 难度: Medium
+// 思路: N 个城市，部分城市直接相连形成省份
+// 方法1: Union-Find 统计连通分量
+// 方法2: BFS 从每个未访问节点开始扩展
 
 #include <iostream>
 #include <vector>
-#include <numeric>
+#include <queue>
 using namespace std;
 
-class Solution {
+// Union-Find
+class UF {
 public:
     vector<int> parent, rank;
-    
+    UF(int n): parent(n), rank(n, 0) {
+        for(int i=0;i<n;i++) parent[i]=i;
+    }
     int find(int x) {
-        return parent[x] == x ? x : parent[x] = find(parent[x]);
+        if(parent[x]!=x) parent[x]=find(parent[x]);
+        return parent[x];
     }
-    
     void unite(int a, int b) {
-        a = find(a);
-        b = find(b);
-        if (a == b) return;
-        if (rank[a] < rank[b]) swap(a, b);
-        parent[b] = a;
-        if (rank[a] == rank[b]) ++rank[a];
-    }
-    
-    int findCircleNum(vector<vector<int>>& isConnected) {
-        int n = isConnected.size();
-        parent.resize(n);
-        rank.assign(n, 0);
-        iota(parent.begin(), parent.end(), 0);
-        
-        // 只需遍历上三角，减少重复 unify
-        for (int i = 0; i < n; ++i)
-            for (int j = i + 1; j < n; ++j)
-                if (isConnected[i][j])
-                    unite(i, j);
-        
-        int cnt = 0;
-        for (int i = 0; i < n; ++i)
-            if (parent[i] == i) ++cnt;
-        return cnt;
+        int ra=find(a), rb=find(b);
+        if(ra==rb) return;
+        if(rank[ra]<rank[rb]) swap(ra,rb);
+        parent[rb]=ra;
+        if(rank[ra]==rank[rb]) rank[ra]++;
     }
 };
 
-int main() {
-    Solution s;
-    vector<vector<int>> t1 = {{1,1,0},{1,1,0},{0,0,1}};
-    vector<vector<int>> t2 = {{1,0,0},{0,1,0},{0,0,1}};
-    cout << s.findCircleNum(t1) << endl; // 2
-    cout << s.findCircleNum(t2) << endl; // 3
-    return 0;
-}
+class Solution {
+public:
+    int findCircleNum(vector<vector<int>>& isConnected) {
+        int n = isConnected.size();
+        UF uf(n);
+        for(int i=0;i<n;i++)
+            for(int j=i+1;j<n;j++)
+                if(isConnected[i][j]) uf.unite(i,j);
+        int provinces = 0;
+        for(int i=0;i<n;i++) if(uf.find(i)==i) provinces++;
+        return provinces;
+    }
+};

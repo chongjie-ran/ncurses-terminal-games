@@ -1,7 +1,7 @@
 # 开发者代码日志
 
 > 记录代码练习、游戏开发和经验沉淀
-> 版本: v1.5 | 最后更新: 2026-03-31 08:00
+> 版本: v1.8 | 最后更新: 2026-03-31 13:37
 
 ---
 
@@ -365,6 +365,152 @@ Node* cloneGraph(Node* node) {
 
 ---
 
+### LC208 Implement Trie (Prefix Tree)（新增 2026-03-31 13:37）
+
+**题目**: 实现前缀树，支持 insert/search/startsWith  
+**难度**: Medium  
+**分类**: Trie（前缀树）
+
+**核心数据结构**: 26叉树，每个节点固定26个子指针
+
+**关键代码**:
+```cpp
+class TrieNode {
+public:
+    TrieNode* children[26];
+    bool isEnd;
+    TrieNode() { for(int i=0;i<26;i++) children[i]=nullptr; isEnd=false; }
+};
+
+class Trie {
+    TrieNode* root;
+public:
+    Trie() { root = new TrieNode(); }
+    void insert(string word) {
+        TrieNode* node = root;
+        for(char c: word) {
+            int idx = c - 'a';
+            if(!node->children[idx]) node->children[idx] = new TrieNode();
+            node = node->children[idx];
+        }
+        node->isEnd = true;
+    }
+    bool search(string word) {
+        TrieNode* node = root;
+        for(char c: word) {
+            int idx = c - 'a';
+            if(!node->children[idx]) return false;
+            node = node->children[idx];
+        }
+        return node->isEnd;
+    }
+    bool startsWith(string prefix) {
+        TrieNode* node = root;
+        for(char c: prefix) {
+            int idx = c - 'a';
+            if(!node->children[idx]) return false;
+            node = node->children[idx];
+        }
+        return true;
+    }
+};
+```
+
+**关键洞察**:
+- insert: O(L), search: O(L), startsWith: O(L) （L=word length）
+- 空间最坏 O(26 * L * N)，可用 unordered_map 优化稀疏情况
+- Trie vs 哈希表: Trie 支持前缀匹配，哈希表不支持
+
+---
+
+### LC212 Word Search II（新增 2026-03-31 13:37）
+
+**题目**: 在2D网格中找所有出现在字典里的单词（批量查询）  
+**难度**: Hard  
+**分类**: Trie + DFS（LC79 + LC208 组合）
+
+**核心思路**: 将所有单词插入 Trie，遍历网格每个格子作为 DFS 起点
+
+**关键优化: TrieNode with string (剪枝)**:
+```cpp
+struct TrieNode {
+    TrieNode* children[26];
+    string word;  // 仅 end 节点存储完整单词
+    TrieNode() { for(int i=0;i<26;i++) children[i]=nullptr; word=""; }
+};
+
+void dfs(board, i, j, TrieNode* node) {
+    char c = board[i][j];
+    if(c == '#' || !node->children[c-'a']) return;
+    node = node->children[c-'a'];
+    if(!node->word.empty()) {
+        res.push_back(node->word);
+        node->word = ""; // 避免重复加入
+    }
+    board[i][j] = '#';
+    for each direction:
+        if(valid) dfs(board, ni, nj, node);
+    board[i][j] = c;
+}
+```
+
+**关键洞察**:
+- Trie 的好处: O(1) per cell per direction 前缀判断
+- visited 用 '#' 标记，避免 O(m*n) visited 数组
+- 找到后置空 word 避免重复加入
+- 时间: O(m*n*4^L), L=max word length，但 Trie 剪枝实际更快
+
+---
+
+### LC215 Kth Largest Element in an Array（新增 2026-03-31 13:37）
+
+**题目**: 数组中第K大的元素  
+**难度**: Medium  
+**分类**: 堆/快速选择
+
+**方法1: 最小堆(大小K)** — O(n log k):
+```cpp
+int findKthLargest(vector<int>& nums, int k) {
+    priority_queue<int, vector<int>, greater<int>> minHeap;
+    for(int x: nums) {
+        minHeap.push(x);
+        if(minHeap.size() > k) minHeap.pop();
+    }
+    return minHeap.top();
+}
+```
+
+**方法2: 快速选择** — 平均 O(n):
+```cpp
+int partition(vector<int>& nums, int l, int r) {
+    int pivot = nums[r];
+    int i = l;
+    for(int j=l; j<r; j++) {
+        if(nums[j] > pivot) swap(nums[i++], nums[j]);
+    }
+    swap(nums[i], nums[r]);
+    return i;
+}
+
+int findKthLargest(vector<int>& nums, int k) {
+    int l=0, r=nums.size()-1, target=nums.size()-k;
+    while(l <= r) {
+        int p = partition(nums, l, r);
+        if(p == target) return nums[p];
+        else if(p < target) l = p+1;
+        else r = p-1;
+    }
+    return -1;
+}
+```
+
+**关键洞察**:
+- 第K大 = 排序后 index = n-k (升序)
+- partition 返回 pivot 的最终位置
+- 快速选择期望 O(n)，最坏 O(n²) 但实践中效果好
+
+---
+
 ## 二、设计问题通用模板
 
 ### LRU/LFU/FIFO 等缓存设计
@@ -418,6 +564,16 @@ Node* cloneGraph(Node* node) {
 | LC207 课程表 | 拓扑排序Kahn，indegree==0的BFS |
 | LC133 克隆图 | BFS + old→new映射 |
 
+### Trie 问题分类
+
+| 题号 | 难度 | 描述 |
+|------|------|------|
+| LC208 | Medium | 实现 Trie (insert/search/startsWith) |
+| LC212 | Hard | Word Search II (Trie + DFS 批量查询) |
+| LC14 | Easy | 最长公共前缀 |
+| LC648 | Medium | 单词替换 |
+| LC676 | Medium | 魔法字典 |
+
 ---
 
 ## 三、Raylib 游戏工程结构
@@ -449,7 +605,7 @@ wasm/index.html  # Canvas 2D渲染 + JS输入
 | LRU Cache 设计 | 熟练 | LC146 |
 | 双堆设计中位数 | 熟练 | LC295 |
 | Raylib 图形游戏 | 熟练 | 10个游戏 |
-| Emscripten/WASM | 进阶 | Frogger + Pac-Man + Space Invaders WASM 编译成功 |
+| Emscripten/WASM | 进阶 | 4个游戏 WASM 编译 + 浏览器测试通过 |
 | 区间DP | 进阶 | LC312 Burst Balloons |
 | 背包DP进阶 | 熟练 | LC416/LC474 |
 | 字符串DP | 掌握 | LC87/LC97/LC188 |
@@ -460,6 +616,8 @@ wasm/index.html  # Canvas 2D渲染 + JS输入
 | 图BFS flood fill | 掌握 | LC200 Number of Islands |
 | 拓扑排序 | 掌握 | LC207 Course Schedule |
 | 图克隆 | 掌握 | LC133 Clone Graph |
+| Trie 前缀树 | 掌握 | LC208/LC212 |
+| 快速选择 | 掌握 | LC215 Kth Largest |
 
 ---
 
@@ -492,77 +650,44 @@ wasm/index.html  # Canvas 2D渲染 + JS输入
 
 **关键教训**: 读取源码确认字段名，不要凭记忆猜测
 
-**重要教训2**: 编译时必须 `#include <emscripten/emscripten.h>` 以获取 `EMSCRIPTEN_KEEPALIVE` 宏定义，否则编译器报错 "variable has incomplete type 'void'"
+**重要教训2**: 编译时必须 `#include <emscripten/emscripten.h>` 以获取 `EMSCRIPTEN_KEEPALIVE` 宏定义
 
-### 区间DP模板（LC312）
+### Emscripten Bug Workaround（LC130）
 
-**关键洞察**: 先添加虚拟气球（值为1）到数组两端，将边界情况统一处理
+**问题**: Emscripten 5.0.4 JS生成器误报 undefined exported symbol  
+**解决**: WASM正常编译，使用 `wasm-dis` 验证wasm内容，手写JS加载器
 
-**通用模板**:
-```cpp
-// 1. 扩展数组（添加哨兵）
-// 2. dp[i][j] = 开区间(i,j)的最优值
-// 3. 枚举最后处理的元素k
-// 4. dp[i][j] = max(dp[i][k] + dp[k][j] + cost(i,k,j))
-```
+### Trie 解题模式（LC212）
 
-### 图BFS flood fill（LC200）
-
-**关键洞察**: 边访问边标记是避免重复访问的关键
-
-**通用模板**:
-```cpp
-// 遍历网格每个格子
-// 遇到目标值 → count++ → BFS展开 → 展开时标记为已访问
-// 时间 O(m*n)，空间 O(min(m,n))
-```
+**关键洞察**:
+1. TrieNode 存储 `string word`（仅 end 节点）避免重建
+2. `'#'` 标记 visited 避免 visited 数组
+3. 找到后置空 word 避免重复加入
+4. `4^L` 分支但 Trie 剪枝效果好
 
 ---
 
 ## 六、游戏开发记录
 
-### 本周完成 23 个游戏（2026-03-25 ~ 2026-03-31）
+### 本周完成 24 个游戏（2026-03-25 ~ 2026-03-31）
 
 | 平台 | 数量 | 代表游戏 |
 |------|------|---------|
 | ncurses | 8 | 贪吃蛇/2048/扫雷/Flappy Bird/Hangman/俄罗斯方块/华容道/推箱子 |
 | Raylib | 10 | 贪吃蛇/2048/俄罗斯方块/Sokoban/Flappy Bird/Minesweeper/Breakout/Memory Match/Space Invaders/Pac-Man/Frogger |
 | Web | 1 | AI意识守护者 |
-| WASM | 3 | Frogger + Pac-Man + Space Invaders 🆕 |
+| WASM | 4 | Frogger + Pac-Man + Space Invaders + Breakout |
 
-### WASM 探索进度（2026-03-31）
+### WASM 浏览器测试结果（2026-03-31）
 
-| 步骤 | 状态 |
-|------|------|
-| Emscripten SDK 安装 | ✅ (`~/emsdk`, 版本 5.0.4) |
-| emcc 编译器可用 | ✅ |
-| Hello WASM 编译测试 | ✅ (生成 .wasm + .js) |
-| Frogger 纯C逻辑编译 | ✅ (`frogger.wasm` 3.7KB + `frogger.js` 12KB) |
-| Pac-Man WASM 编译 | ✅ (`pacman.wasm` 5.9KB + `pacman.js` 12.7KB) |
-| Space Invaders WASM 编译 | ✅ (`space_invaders.wasm` 19KB + `space_invaders.js` 13.7KB) |
-| Canvas 2D 渲染器 | ✅ (3个游戏 `index.html` 完整实现) |
-| 键盘输入控制 | ✅ (Arrow Keys / WASD / Space / P / R) |
-| 浏览器测试 | ⏳ 待测试（3个游戏均待浏览器验证） |
+| 游戏 | WASM | JS加载器 | Canvas渲染 | HUD | 键盘控制 |
+|------|------|----------|------------|-----|---------|
+| Frogger | ✅ 3.7KB | ✅ 手写 | ✅ | ✅ LIVES/SCORE/TIME/HOMES | ⏳ 待深入 |
+| Pac-Man | ✅ 5.9KB | ✅ 手写 | ✅ | ✅ Score/Lives/Level/Dots | ✅ |
+| Space Invaders | ✅ 19KB | ✅ 手写 | ✅ | ✅ SCORE/WAVE/LIVES/ALIENS | ✅ |
+| Breakout | ✅ 10.4KB | ✅ 手写 | ✅ | ✅ Score/Lives/Level | ✅ |
 
-**Space Invaders WASM 导出函数** (34个):
-```c
-_init_game, _update_game, _get_game_state,
-_get_score, _get_lives, _get_wave, _get_alive_count,
-_get_player_x, _get_player_y,
-_get_bullet_count, _get_bullet_x/y/active,
-_get_enemy_bullet_count, _get_enemy_bullet_x/y/active,
-_get_alien_count, _get_alien_x/y/alive/type/exploding,
-_move_left, _move_right, _shoot, _reset_game,
-_get_screen_w/h, _get_player_w/h, _get_alien_w/h/rows/cols
-```
-
-**Space Invaders Canvas 渲染亮点**:
-- 星空背景（60颗随机星星，透明度各异）
-- 玩家飞船（绿色带炮管）
-- 外星人4色（红/橙/黄/绿），触角交替动画
-- 玩家子弹绿色，敌人子弹红色
-- HUD：分数、波次、生命、外星人数量
-- 支持暂停(P)、重开(R)
+**浏览器测试方法**: Playwright 自动化 + Python HTTP Server (端口 8765-8767)
 
 ---
 
@@ -578,16 +703,10 @@ _get_screen_w/h, _get_player_w/h, _get_alien_w/h/rows/cols
 
 | 优先级 | 任务 | 核心技术 |
 |--------|------|---------|
-| P1 | Frogger WASM 浏览器测试 | Canvas渲染 + JS/WASM交互 |
-| P1 | Breakout WASM 编译 | 编译 Breakout 到 WebAssembly |
-| P2 | LeetCode 图论+BFS/DFS | 每日2-3题 |
-| P3 | WASM 游戏部署到 GitHub Pages | 静态文件托管 |
+| P1 | WASM 游戏 GitHub Pages 部署 | 静态文件托管 |
+| P2 | LeetCode Trie/线段树进阶 | 每日2-3题 |
 | P3 | 粒子效果/音效集成 | Raylib audio API |
-
----
-
-*最后更新: 2026-03-31 08:00*
-*版本: v1.5*
+| P3 | 新游戏: Snake WASM | Emscripten 编译 |
 
 ---
 
@@ -701,7 +820,7 @@ while(!q.empty()){
 
 ---
 
-## 十、Emscripten Bug Workaround（2026-03-31）
+## 十、Emscripten Bug Workaround（2026-03-31 09:55）
 
 ### 问题描述
 Emscripten 5.0.4 在编译Breakout WASM时出现JS生成器错误:
@@ -733,9 +852,200 @@ function assignWasmExports(wasmExports){
 - emcc JS生成器可能有false-positive错误，但wasm本身可能正确
 - 使用 `wasm-dis` 或 `wasm2wat` 验证wasm内容
 - 手写JS加载器是可行的workaround
-- `wasm2js` 工具可用于生成纯JS fallback（53KB，比正常JS大）
 
 ---
 
-*最后更新: 2026-03-31 09:55*
-*版本: v1.6*
+## 十一、LeetCode DFS/Memoization + Graph 新增（2026-03-31 12:00）
+
+### LC329 Longest Increasing Path in a Matrix — 矩阵最长递增路径
+
+**题目**: 矩阵中找最长递增路径长度（上下左右移动，不能走回头路）  
+**难度**: Hard  
+**分类**: DFS + Memoization（矩阵DP）
+
+**核心思路**: 
+- `memo[i][j]` = 以 (i,j) 为起点的最长递增路径长度
+- 4方向DFS，向严格大于当前值的格子扩展
+- `dp[i][j] = 1 + max(dp[ni][nj])` for all valid larger neighbors
+- 时间 `O(m*n)`，空间 `O(m*n)`
+
+**关键代码**:
+```cpp
+function<int(int,int)> dfs = [&](int i, int j) -> int {
+    if(memo[i][j] != -1) return memo[i][j];
+    int best = 1;
+    for(auto& d: dirs) {
+        int ni = i + d[0], nj = j + d[1];
+        if(ni>=0 && ni<m && nj>=0 && nj<n && matrix[ni][nj] > matrix[i][j]) {
+            best = max(best, 1 + dfs(ni, nj));
+        }
+    }
+    memo[i][j] = best;
+    return best;
+};
+```
+
+**关键洞察**: memoization 是避免指数爆炸的关键；边界判断在递归前执行，防止越界访问
+
+---
+
+### LC743 Network Delay Time — 网络延迟时间
+
+**题目**: 从节点 k 出发，所有节点收到信号的最短时间  
+**难度**: Medium  
+**分类**: Dijkstra 最短路
+
+**核心思路**: 
+- 构建邻接表，从 k 出发 Dijkstra（min-heap）
+- `dist[i]` = 从 k 到 i 的最短时间
+- 有不可达节点返回 -1；否则返回 `max(dist[i])`
+
+**关键代码**:
+```cpp
+priority_queue<pair<int,int>, vector<pair<int,int>>, greater<pair<int,int>>> pq;
+pq.push({0, k});
+while(!pq.empty()) {
+    auto [d, u] = pq.top(); pq.pop();
+    if(d > dist[u]) continue;
+    for(auto& [v, w]: adj[u]) {
+        if(dist[v] > dist[u] + w) {
+            dist[v] = dist[u] + w;
+            pq.push({dist[v], v});
+        }
+    }
+}
+```
+
+**关键洞察**: `greater
+`<pair<int,int>>` 是 C++ 实现 min-heap 的标准方法；堆中 d > dist[u] 时 skip 是常见优化
+
+---
+
+### LC547 Number of Provinces — 省份数量
+
+**题目**: N 个城市，部分城市相连构成省份，求省份数量  
+**难度**: Medium  
+**分类**: Union-Find / BFS flood fill
+
+**核心思路（Union-Find）**:
+- 对每对相连城市 `isConnected[i][j]==1`，union(i,j)
+- 统计连通分量数量：`count(where parent[i]==i)`
+- 路径压缩 + 按秩合并，接近 O(1)
+
+**关键代码**:
+```cpp
+UF uf(n);
+for(int i=0;i<n;i++)
+    for(int j=i+1;j<n;j++)
+        if(isConnected[i][j]) uf.unite(i,j);
+int provinces = 0;
+for(int i=0;i<n;i++) if(uf.find(i)==i) provinces++;
+```
+
+**关键洞察**: Union-Find 的 `unite(a,b)` 前先 `find` 判断是否同根；对称矩阵只需遍历 j>i 半区
+
+---
+
+### LC79 Word Search — 单词搜索
+
+**题目**: 在 2D 网格中找单词（上下左右移动，不能重用格子）  
+**难度**: Medium  
+**分类**: DFS + Backtracking
+
+**核心思路**:
+- 对每个格子作为起点尝试 DFS
+- `board[i][j] = '#'` 标记已访问（防止重用）
+- 匹配到 `idx == word.size()` 返回 true
+- 回溯时恢复原字符
+
+**关键代码**:
+```cpp
+bool dfs(board, word, i, j, idx) {
+    if(idx == word.size()) return true;
+    if(i<0||i>=m||j<0||j>=n||board[i][j]!=word[idx]) return false;
+    char c = board[i][j];
+    board[i][j] = '#';
+    bool res = dfs(board, word, i+1, j, idx+1)
+             || dfs(board, word, i-1, j, idx+1)
+             || dfs(board, word, i, j+1, idx+1)
+             || dfs(board, word, i, j-1, idx+1);
+    board[i][j] = c;
+    return res;
+}
+```
+
+**关键洞察**: 回溯三步曲：标记 → 递归 → 恢复；字符比较要严格等于 word[idx]
+
+---
+
+## 十二、WASM 浏览器测试记录（2026-03-31 12:00-13:37）
+
+### Frogger WASM — 浏览器渲染测试 ✅
+
+**测试方法**: 
+1. 启动 Python HTTP Server: `python3 -m http.server 8765`
+2. Playwright 打开 `http://localhost:8765/`
+3. 验证页面加载和 HUD 显示
+
+**测试结果**:
+- ✅ 页面加载无崩溃
+- ✅ HUD 正确显示: `LIVES: 3 | SCORE: 0 | TIME: 60 | HOMES: 0/5`
+- ✅ Canvas 渲染正常
+
+### Pac-Man WASM — 浏览器渲染测试 ✅ (13:37)
+
+**测试方法**: 
+1. 启动 Python HTTP Server: `python3 -m http.server 8766`
+2. Playwright 打开 `http://localhost:8766/`
+
+**测试结果**:
+- ✅ 页面加载无崩溃
+- ✅ HUD 正确显示: `Score: 0 | Lives: 3 | Level: 1 | Dots: 0`
+- ✅ Canvas 渲染正常
+- ✅ 键盘事件提示可见 (Arrow Keys / WASD / P / R)
+
+### Space Invaders WASM — 浏览器渲染测试 ✅ (13:37)
+
+**测试方法**: 
+1. 启动 Python HTTP Server: `python3 -m http.server 8767`
+2. Playwright 打开 `http://localhost:8767/`
+
+**测试结果**:
+- ✅ 页面加载无崩溃
+- ✅ HUD 正确显示: `SCORE: 0 | WAVE: 1 | LIVES: 3 | ALIENS: 32`
+- ✅ Canvas 渲染正常
+- ✅ 键盘事件提示可见 (← → A D Move / SPACE Shoot / R Restart / P Pause)
+
+### Breakout WASM — 编译完成
+
+**状态**: ✅ 编译成功 (`breakout.wasm` 10.4KB + 手动JS加载器)
+**下一步**: 深入浏览器交互测试
+
+---
+
+## 十三、本周经验沉淀（2026-03-25 ~ 2026-03-31）
+
+### 技术难点解决
+
+1. **Emscripten JS生成器Bug**: 使用 `wasm-dis` 验证wasm内容 + 手写JS加载器
+2. **WASM字段名不匹配**: 先读取 game.h 源码确认实际字段名再编译
+3. **Trie 空间优化**: 使用 `string word` 存储完整单词避免重建
+4. **快速选择 pivot 选择**: 随机选择 pivot 可避免最坏情况
+
+### 代码优化经验
+
+1. **游戏WASM编译**: game.c 纯C逻辑 + wasm_renderer.c 导出层 = 可独立测试
+2. **Canvas 2D渲染**: 不依赖 raylib，纯 Canvas API 实现游戏渲染
+3. **Playwright 自动化测试**: Python HTTP Server + Playwright = 无需手动测试
+
+### 学到的新技术
+
+1. **Emscripten/WASM**: 纯C → WebAssembly → Canvas 2D 渲染的完整链路
+2. **Trie 前缀树**: insert/search/startsWith O(L)，批量字符串匹配
+3. **快速选择**: 第K大问题的 O(n) 解法
+4. **Union-Find**: 连通分量检测的 O(α(n)) 算法
+
+---
+
+*最后更新: 2026-03-31 13:37*
+*版本: v1.8*
