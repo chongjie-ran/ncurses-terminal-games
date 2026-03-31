@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frogger WASM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #eee;
+  }
+  h1 { color: #4ade80; margin-bottom: 8px; font-size: 1.4rem; }
+  #hud {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 8px;
+    font-size: 1rem;
+    color: #facc15;
+  }
+  canvas {
+    border: 3px solid #4ade80;
+    border-radius: 4px;
+    background: #0f0f1a;
+    image-rendering: pixelated;
+  }
+  #controls {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, 48px);
+    grid-template-rows: repeat(2, 48px);
+    gap: 4px;
+  }
+  .btn {
+    background: #2d2d4a;
+    border: 2px solid #4ade80;
+    border-radius: 6px;
+    color: #4ade80;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+  .btn:active { background: #4ade80; color: #1a1a2e; }
+  #reset-btn { grid-column: 1 / -1; font-size: 0.9rem; }
+  #msg {
+    margin-top: 8px;
+    height: 20px;
+    color: #f97316;
+    font-weight: bold;
+    font-size: 0.95rem;
+  }
+</style>
+</head>
+<body>
+<h1>🐸 Frogger WASM</h1>
+<div id="hud">
+  <span>❤️ <span id="lives">3</span></span>
+  <span>⭐ <span id="score">0</span></span>
+  <span>🏠 <span id="level">1</span></span>
+</div>
+<canvas id="main-canvas"></canvas>
+<div id="controls">
+  <div></div>
+  <button class="btn" id="btn-up">↑</button>
+  <div></div>
+  <button class="btn" id="btn-left">←</button>
+  <button class="btn" id="btn-down">↓</button>
+  <button class="btn" id="btn-right">→</button>
+  <button class="btn" id="reset-btn">RESTART</button>
+</div>
+<div id="msg"></div>
+
+<script src="frogger.js"></script>
+<script>
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d');
+const CELL = 36;
+const GRID_W = 14;
+const GRID_H = 15;
+canvas.width = GRID_W * CELL;
+canvas.height = GRID_H * CELL;
+
+const LANE_TYPES = ['#2d5a2d','#1a4a7a','#1a4a7a','#1a4a7a','#1a4a7a','#2d5a2d','#3a3a5a','#3a3a5a','#3a3a5a','#3a3a5a','#2d5a2d'];
+const LANE_Y = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14];
+
+function drawLane(y, type) {
+  const colors = {
+    0: '#1a3a1a', // grass
+    1: '#1a3a5a', // water
+    2: '#1a3a1a', // grass
+  };
+  ctx.fillStyle = colors[type] || '#1a3a1a';
+  ctx.fillRect(0, y * CELL, canvas.width, CELL);
+}
+
+function drawHomeCell(cx) {
+  // 5 home slots at top row
+  const slotW = canvas.width / 5;
+  ctx.fillStyle = '#0a2010';
+  ctx.fillRect(cx * slotW, 0, slotW, CELL);
+  ctx.strokeStyle = '#2d5a2d';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(cx * slotW, 0, slotW, CELL);
+}
+
+function drawGrassStrip(y) {
+  ctx.fillStyle = '#1a4a1a';
+  ctx.fillRect(0, y * CELL, canvas.width, CELL);
+  // Draw grass texture
+  ctx.fillStyle = '#2d6a2d';
+  for (let x = 0; x < GRID_W; x++) {
+    if ((x + y) % 2 === 0) {
+      ctx.fillRect(x * CELL + 2, y * CELL + 2, CELL - 4, CELL - 4);
+    }
+  }
+}
+
+function drawRoadStrip(y) {
+  ctx.fillStyle = '#2a2a3a';
+  ctx.fillRect(0, y * CELL, canvas.width, CELL);
+  // Road markings
+  ctx.fillStyle = '#facc15';
+  for (let x = 0; x < GRID_W; x += 2) {
+    ctx.fillRect(x * CELL + CELL/2 - 2, y * CELL + CELL/2 - 1, 4, 2);
+  }
+}
+
+function drawWaterStrip(y) {
+  ctx.fillStyle = '#1a3a5a';
+  ctx.fillRect(0, y * CELL, canvas.width, CELL);
+  // Water ripples
+  ctx.fillStyle = '#2a5a8a';
+  const t = Date.now() / 1000;
+  for (let x = 0; x < GRID_W; x++) {
+    const rx = (x * CELL + Math.sin(t + x) * 3) % canvas.width;
+    ctx.fillRect(rx, y * CELL + CELL/2 - 1, 8, 2);
+  }
+}
+
+function drawBackground() {
+  // Home row (row 0) - grass
+  drawGrassStrip(0);
+  for (let i = 0; i < 5; i++) drawHomeCell(i);
+  
+  // Water rows (1-4)
+  for (let y = 1; y <= 4; y++) drawWaterStrip(y);
+  
+  // Median grass (row 5)
+  drawGrassStrip(5);
+  
+  // Road rows (6-9)
+  for (let y = 6; y <= 9; y++) drawRoadStrip(y);
+  
+  // Start grass (row 10)
+  drawGrassStrip(10);
+  
+  // Bottom water/safe rows 11-14
+  for (let y = 11; y <= 13; y++) drawGrassStrip(y);
+  drawGrassStrip(14);
+}
+
+function drawObstacle(idx) {
+  const x = Module._wasm_get_obstacle_x(idx);
+  const y = Module._wasm_get_obstacle_y(idx);
+  const type = Module._wasm_get_obstacle_type(idx);
+  const w = Module._wasm_get_obstacle_width(idx);
+  const dir = Module._wasm_get_obstacle_dir(idx);
+  
+  if (type === 0) {
+    // Log - brown
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(x, y + 4, w * CELL - 2, CELL - 8);
+    ctx.fillStyle = '#A0522D';
+    ctx.fillRect(x + 4, y + 8, w * CELL - 8, CELL - 16);
+  } else {
+    // Turtle
+    ctx.fillStyle = '#2d8a2d';
+    for (let i = 0; i < w; i++) {
+      ctx.beginPath();
+      ctx.arc(x + i * CELL + CELL/2, y + CELL/2, CELL/2 - 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#4aba4a';
+      ctx.beginPath();
+      ctx.arc(x + i * CELL + CELL/2, y + CELL/2, CELL/3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#2d8a2d';
+    }
+  }
+}
+
+function drawPlayer(state) {
+  const gx = Module._wasm_get_player_grid_x();
+  const gy = Module._wasm_get_player_grid_y();
+  const x = gx * CELL;
+  const y = gy * CELL;
+  
+  if (state === 1) { // dead
+    ctx.fillStyle = 'rgba(255,0,0,0.5)';
+    ctx.fillRect(x + 4, y + 4, CELL - 8, CELL - 8);
+    return;
+  }
+  
+  // Frog body
+  ctx.fillStyle = '#4ade80';
+  ctx.beginPath();
+  ctx.arc(x + CELL/2, y + CELL/2, CELL/2 - 4, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(x + CELL/3, y + CELL/3, 4, 0, Math.PI * 2);
+  ctx.arc(x + 2*CELL/3, y + CELL/3, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(x + CELL/3, y + CELL/3, 2, 0, Math.PI * 2);
+  ctx.arc(x + 2*CELL/3, y + CELL/3, 2, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Legs
+  ctx.fillStyle = '#22c55e';
+  ctx.fillRect(x + 2, y + CELL - 8, 6, 8);
+  ctx.fillRect(x + CELL - 8, y + CELL - 8, 6, 8);
+}
+
+function updateHUD() {
+  document.getElementById('lives').textContent = Module._wasm_get_player_lives();
+  document.getElementById('score').textContent = Module._wasm_get_player_score();
+  document.getElementById('level').textContent = Module._wasm_get_player_level();
+}
+
+function showMsg(text) {
+  document.getElementById('msg').textContent = text;
+}
+
+let lastTick = 0;
+const TICK_MS = 1000 / 30; // 30 fps
+
+function gameLoop(ts) {
+  if (ts - lastTick >= TICK_MS) {
+    lastTick = ts;
+    Module._wasm_tick();
+  }
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground();
+  
+  const obsCount = Module._wasm_get_obstacle_count();
+  for (let i = 0; i < obsCount; i++) {
+    drawObstacle(i);
+  }
+  
+  const state = Module._wasm_get_player_state();
+  drawPlayer(state);
+  
+  if (state === 2) showMsg('🏠 Made it home! +100');
+  else if (state === 3) showMsg('💀 Game Over!');
+  else showMsg('');
+  
+  updateHUD();
+  requestAnimationFrame(gameLoop);
+}
+
+function init() {
+  Module._wasm_init();
+  requestAnimationFrame(gameLoop);
+}
+
+FroggerModule().then(mod => {
+  window.Module = mod;
+  init();
+  
+  // Keyboard controls
+  document.addEventListener('keydown', (e) => {
+    const gx = Module._wasm_get_player_grid_x();
+    const gy = Module._wasm_get_player_grid_y();
+    let nx = gx, ny = gy;
+    if (e.key === 'ArrowUp') ny--;
+    else if (e.key === 'ArrowDown') ny++;
+    else if (e.key === 'ArrowLeft') nx--;
+    else if (e.key === 'ArrowRight') nx++;
+    else return;
+    e.preventDefault();
+    Module._wasm_click(nx, ny);
+  });
+  
+  // Button controls
+  document.getElementById('btn-up').addEventListener('click', () => {
+    const gx = Module._wasm_get_player_grid_x();
+    const gy = Module._wasm_get_player_grid_y();
+    Module._wasm_click(gx, gy - 1);
+  });
+  document.getElementById('btn-down').addEventListener('click', () => {
+    const gx = Module._wasm_get_player_grid_x();
+    const gy = Module._wasm_get_player_grid_y();
+    Module._wasm_click(gx, gy + 1);
+  });
+  document.getElementById('btn-left').addEventListener('click', () => {
+    const gx = Module._wasm_get_player_grid_x();
+    const gy = Module._wasm_get_player_grid_y();
+    Module._wasm_click(gx - 1, gy);
+  });
+  document.getElementById('btn-right').addEventListener('click', () => {
+    const gx = Module._wasm_get_player_grid_x();
+    const gy = Module._wasm_get_player_grid_y();
+    Module._wasm_click(gx + 1, gy);
+  });
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    Module._wasm_restart();
+  });
+});
+</script>
+</body>
+</html>
