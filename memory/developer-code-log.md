@@ -588,3 +588,154 @@ _get_screen_w/h, _get_player_w/h, _get_alien_w/h/rows/cols
 
 *最后更新: 2026-03-31 08:00*
 *版本: v1.5*
+
+---
+
+## 九、LeetCode BFS/Flood Fill 新增（2026-03-31 09:55）
+
+### LC130 Surrounded Regions — 被围绕的区域
+
+**题目**: 二维网格中被'X'围绕的'O'变'X'，边角的'O'及相连的'O'保留  
+**难度**: Medium  
+**分类**: BFS flood fill（从边界出发）
+
+**核心思路**: 
+1. 从四边出发BFS，标记所有与边界连通的'O' → visited=1
+2. 遍历整个board，未visited的'O'变为'X'
+
+**关键代码**:
+```cpp
+for (int i = 0; i < m; i++) {
+    for (int j = 0; j < n; j++) {
+        if ((i==0||i==m-1||j==0||j==n-1) && board[i][j]=='O') {
+            q.push({i,j}); visited[i][j]=1;
+            while(!q.empty()){
+                auto [x,y]=q.front();q.pop();
+                for(auto& d:dirs){
+                    int nx=x+d[0],ny=y+d[1];
+                    if(valid && !visited[nx][ny] && grid[nx][ny]=='O'){
+                        visited[nx][ny]=1; q.push({nx,ny});
+                    }
+                }
+            }
+        }
+    }
+}
+for (int i=0;i<m;i++) for(int j=0;j<n;j++)
+    if(board[i][j]=='O' && !visited[i][j]) board[i][j]='X';
+```
+
+**关键洞察**: 先标记保活的O，再统一处理要变X的O。时间O(m*n)，空间O(m*n)
+
+---
+
+### LC994 Oranges Rotting — 腐烂的橘子
+
+**题目**: BFS多源最短路，腐烂橘子每分钟感染上下左右的橘子  
+**难度**: Medium  
+**分类**: BFS多源最短路
+
+**核心思路**: 
+1. 初始队列放入所有rotten(值为2)的橘子
+2. 记录fresh数量，每层扩展minutes++，碰到新鲜橘子就感染
+
+**关键代码**:
+```cpp
+queue<pair<int,int>> q;
+int fresh=0;
+for each cell: if(grid[i][j]==2) q.push({i,j}); else if(grid[i][j]==1) fresh++;
+int minutes=0;
+while(!q.empty()){
+    int sz=q.size();
+    while(sz--){
+        auto [x,y]=q.front();q.pop();
+        for(auto& d:dirs){
+            if(valid && grid[nx][ny]==1){
+                grid[nx][ny]=2; fresh--; q.push({nx,ny});
+            }
+        }
+    }
+    if(!q.empty()) minutes++;
+}
+return fresh==0?minutes:-1;
+```
+
+**关键洞察**: 多源BFS，每层代表一分钟，`sz=q.size()`控制层的边界。时间O(m*n)
+
+---
+
+### LC934 Shortest Bridge — 最短的桥
+
+**题目**: 两岛屿间最短路径（只能走上下左右）  
+**难度**: Medium  
+**分类**: BFS + flood fill
+
+**核心思路**: 
+1. 找到第一个岛屿并BFS标记（值为2）
+2. 从第一个岛屿所有格子BFS展开，第一步碰到第二个岛屿的层数即为答案
+
+**关键代码**:
+```cpp
+// 第一阶段: 找第一个岛屿，BFS标记，加入q队列
+queue<pair<int,int>> q;
+for each cell with grid[i][j]==1:
+    // BFS标记整个岛屿 → grid[i][j]=2
+    // 同时加入q队列用于第二阶段
+
+// 第二阶段: BFS扩展找第二个岛屿
+int steps=0;
+while(!q.empty()){
+    int sz=q.size();
+    while(sz--){
+        auto [x,y]=q.front();q.pop();
+        for(auto& d:dirs){
+            if(grid[nx][ny]==1) return steps; // 碰到第二个岛屿
+            if(grid[nx][ny]==0){ grid[nx][ny]=2; q.push({nx,ny}); }
+        }
+    }
+    steps++;
+}
+```
+
+**关键洞察**: 两阶段BFS，第一阶段标记+初始化队列，第二阶段扩展找桥。时间O(m*n)，空间O(m*n)
+
+---
+
+## 十、Emscripten Bug Workaround（2026-03-31）
+
+### 问题描述
+Emscripten 5.0.4 在编译Breakout WASM时出现JS生成器错误:
+```
+emcc: error: undefined exported symbol: "_get_ball_active" [-Wundefined] [-Werror]
+```
+WASM正常生成（包含所有导出函数），但JS胶水代码生成失败。
+
+### 根本原因
+emcc的JS生成器内部检查导出函数时存在bug，误判存在的符号为undefined。
+`wasm-dis` 验证wasm文件包含 `_get_ball_active` 等所有导出。
+
+### 解决方案: 手写JS加载器
+
+基于Frogger的JS加载器结构，手写Breakout的JS加载器:
+
+```javascript
+function assignWasmExports(wasmExports){
+    _init_game=Module["_init_game"]=wasmExports["_init_game"];
+    _update_game=Module["_update_game"]=wasmExports["_update_game"];
+    _get_ball_active=Module["_get_ball_active"]=wasmExports["_get_ball_active"];
+    // ... 所有导出函数
+}
+```
+
+关键映射: wasm导出的 `_get_ball_active` → `Module._get_ball_active` → JS调用 `Module.ccall('get_ball_active', ...)`
+
+### 经验教训
+- emcc JS生成器可能有false-positive错误，但wasm本身可能正确
+- 使用 `wasm-dis` 或 `wasm2wat` 验证wasm内容
+- 手写JS加载器是可行的workaround
+- `wasm2js` 工具可用于生成纯JS fallback（53KB，比正常JS大）
+
+---
+
+*最后更新: 2026-03-31 09:55*
+*版本: v1.6*

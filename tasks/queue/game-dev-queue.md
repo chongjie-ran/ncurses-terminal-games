@@ -4,8 +4,8 @@
 
 ## 队列状态
 - 队列创建时间: 2026-03-25
-- 最后更新: 2026-03-31 08:00
-- **状态**: 🎉 Frogger + Pac-Man + Space Invaders WASM 三连完成
+- 最后更新: 2026-03-31 09:55
+- **状态**: 🎉 Frogger + Pac-Man + Space Invaders + Breakout WASM 四连完成
 
 ---
 
@@ -35,9 +35,10 @@
 | 03-30晚 | Frogger | projects/frogger-raylib/ | 5车道交通+5水道原木+3条命+计时 ✅ |
 | 03-31凌晨 | Frogger WASM | projects/frogger-raylib/wasm/ | Canvas 2D + Emscripten ✅ |
 | 03-31凌晨 | Pac-Man WASM | projects/pacman-raylib/wasm/ | Canvas 2D + Emscripten ✅ |
-| **03-31早上** | **Space Invaders WASM** | **projects/space-invaders-raylib/wasm/** | **Canvas 2D + Emscripten ✅** |
+| 03-31早上 | Space Invaders WASM | projects/space-invaders-raylib/wasm/ | Canvas 2D + Emscripten ✅ |
+| **03-31上午** | **Breakout WASM** | **projects/breakout-raylib/wasm/** | **Canvas 2D + Emscripten + 手动JS加载器 ✅** 🆕 |
 
-**本周游戏总计: 23 个 🎉**
+**本周游戏总计: 24 个 🎉**
 
 ---
 
@@ -45,10 +46,11 @@
 
 | 优先级 | 项目 | 类型 | 说明 |
 |--------|------|------|------|
-| P1 | Frogger WASM 浏览器测试 | WASM | 验证 Canvas 渲染正确性 |
-| P1 | Breakout WASM | WASM | 编译 Breakout 到浏览器 |
+| P1 | WASM 游戏浏览器测试 | WASM | 验证4个WASM游戏在浏览器运行 |
+| P1 | Breakout WASM 浏览器测试 | WASM | 验证 Canvas 渲染正确性 |
 | P2 | 粒子效果/音效集成 | 图形 | 粒子效果/音效集成 |
-| P3 | WASM 游戏打包/发布 | 部署 | 将3个WASM游戏部署到GitHub Pages |
+| P3 | WASM 游戏部署到 GitHub Pages | 部署 | 将4个WASM游戏部署到GitHub Pages |
+| P3 | 新游戏: Snake Raylib WASM | WASM | 编译贪吃蛇到WASM |
 
 ---
 
@@ -59,61 +61,64 @@
 | ncurses 终端游戏 | 8 |
 | Raylib 图形游戏 | 10 |
 | Web 游戏 | 1 |
-| WASM 游戏 | 3 |
-| LeetCode 练习 | 81+ 道 |
+| WASM 游戏 | 4 |
+| LeetCode 练习 | 84+ 道 |
 | Hard 题目 | 41 道 |
 
 ---
 
-## 今日完成 (2026-03-31 08:00)
+## 今日完成 (2026-03-31 09:55)
 
 ### LeetCode 练习
 
 | 题目 | 算法 | 结果 |
 |------|------|------|
-| LC200 岛屿数量 | BFS flood fill | ✅ |
-| LC207 课程表 | 拓扑排序 BFS | ✅ |
-| LC133 克隆图 | BFS + 哈希表 | ✅ |
+| LC994 腐烂的橘子 | 多源BFS | ✅ |
+| LC934 最短的桥 | BFS两阶段 | ✅ |
+| LC130 被围绕的区域 | BFS flood fill | ✅ |
 
 ### LeetCode 关键题目（今日新增）
 
 | 题目 | 算法 |
 |------|------|
-| LC200 Number of Islands | BFS flood fill（遇到1就展开标记） |
-| LC207 Course Schedule | 拓扑排序Kahn算法 |
-| LC133 Clone Graph | BFS + old→new映射 |
+| LC130 Surrounded Regions | BFS flood fill（从四边出发） |
+| LC994 Oranges Rotting | 多源BFS（每层=1分钟） |
+| LC934 Shortest Bridge | BFS两阶段（标记岛屿+扩展找桥） |
 
-### 游戏开发：Space Invaders WASM ✅
+### 游戏开发：Breakout WASM ✅
 
-**项目**: `projects/space-invaders-raylib/wasm/`
-**WASM 编译**: ✅ 零错误通过（Emscripten 5.0.4）
-**产物**: `space_invaders.js` (13.7KB) + `space_invaders.wasm` (19KB)
+**项目**: `projects/breakout-raylib/wasm/`
+**WASM 编译**: ✅ Emscripten 5.0.4（`breakout.wasm` 10.4KB）
+**产物**: `breakout.wasm` + `breakout.js`（手动JS加载器）+ `index.html`
 
 **技术实现**:
-- `game.h/game.c` 纯C逻辑 → Emscripten 编译到 WASM
-- `wasm_renderer.c`: 34个导出函数，无 raylib 依赖
-- `index.html`: Canvas 2D 渲染 + 键盘控制（Arrow/WASD/Space/P/R）
+- `wasm_renderer.c`: 34个导出函数（无 raylib 依赖）
+- `index.html`: Canvas 2D 渲染 + 键盘控制（←/→/A/D/Space/P/R）
+- Emscripten Bug Workaround: 手写JS加载器（自动JS生成失败）
 
 **导出函数列表**:
 ```c
-_init_game, _update_game, _get_game_state,
-_get_score, _get_lives, _get_wave, _get_alive_count,
-_get_player_x, _get_player_y,
-_get_bullet_count, _get_bullet_x/y/active,
-_get_enemy_bullet_count, _get_enemy_bullet_x/y/active,
-_get_alien_count, _get_alien_x/y/alive/type/exploding,
-_move_left, _move_right, _shoot, _reset_game,
-_get_screen_w/h, _get_player_w/h, _get_alien_w/h/rows/cols
+_init_game, _update_game, _move_paddle, _launch_ball, _reset_game,
+_get_game_state, _get_lives, _get_score, _get_level,
+_get_bricks_remaining, _get_total_bricks, _get_launch_ready,
+_get_paddle_x/y/w/h, _get_ball_x/y/active/count,
+_get_brick_alive/color_idx/x/y/w/h,
+_get_screen_w/h, _get_brick_rows/cols, _get_ball_r, _get_paddle_y_val
 ```
 
 **Canvas 渲染设计**:
 - 纯 Canvas 2D API 渲染（不依赖 raylib）
-- 星空背景（60颗随机星星）
-- 玩家飞船（绿色，带炮管）
-- 外星人按行着色：红/橙/黄/绿，触角动画
-- 玩家子弹绿色，敌人子弹红色
-- HUD显示：分数、波次、生命、外星人数量
+- 5行×10列彩色砖块（红/橙/黄/绿/蓝）
+- 球体白色带发光效果
+- 挡板蓝色带高光
+- HUD: 分数、命数、关卡
+- 星空背景（80颗随机星星）
 - 支持暂停(P)、重开(R)
+
+**Emscripten Bug Workaround**:
+- Emscripten 5.0.4 JS生成器误报 `_get_ball_active` undefined
+- 原因: emcc内部JS生成检查时符号解析错误
+- 解决: WASM正常编译，参考Frogger JS手写加载器
 
 ---
 
@@ -121,12 +126,28 @@ _get_screen_w/h, _get_player_w/h, _get_alien_w/h/rows/cols
 
 | 指标 | 数量 |
 |------|------|
-| LeetCode 完成 | **81+ 道** 🆕 |
+| LeetCode 完成 | **84+ 道** 🆕 |
 | Hard 题目 | **41 道** 🆕 |
+| ncurses 游戏 | 8 个 |
 | Raylib 图形游戏 | 10 个 |
-| WASM 游戏 | **3 个** 🆕 |
-| 本日游戏总计 | **23 个** 🎉 |
+| Web 游戏 | 1 个 |
+| WASM 游戏 | **4 个** 🆕 |
+| 本日游戏总计 | **24 个** 🎉 |
 
 ---
 
-*最后更新: 2026-03-31 08:00*
+## 本周累计（2026-03-25 ~ 2026-03-31）
+
+| 指标 | 数量 |
+|------|------|
+| LeetCode 完成 | **84+ 道** |
+| Hard 题目 | **41 道** |
+| ncurses 游戏 | 8 个 |
+| Raylib 图形游戏 | 10 个 |
+| Web 游戏 | 1 个 |
+| WASM 游戏 | **4 个** |
+| 本周游戏总计 | **24 个** 🎉 |
+
+---
+
+*最后更新: 2026-03-31 09:55*
