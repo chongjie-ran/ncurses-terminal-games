@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Match WASM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Courier New', monospace;
+  color: #fff;
+}
+#hud {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 16px;
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+#hud span { color: #f0c040; }
+#gameCanvas {
+  border: 2px solid #4a4a8a;
+  border-radius: 8px;
+  background: #16213e;
+  display: block;
+  cursor: pointer;
+}
+#overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(22, 33, 62, 0.97);
+  padding: 40px 56px;
+  text-align: center;
+  border: 2px solid #4a4a8a;
+  border-radius: 12px;
+  display: none;
+}
+#overlay h2 { color: #f0c040; margin-bottom: 16px; font-size: 28px; }
+#overlay p { color: #ccc; margin-bottom: 10px; white-space: pre-line; }
+#overlay .keys { margin-top: 20px; color: #888; font-size: 14px; }
+#status { margin-top: 10px; font-size: 13px; color: #555; }
+</style>
+</head>
+<body>
+<div id="hud">
+  MOVES: <span id="moves">0</span>
+  &nbsp;|&nbsp;
+  PAIRS: <span id="pairs">0</span>/8
+  &nbsp;|&nbsp;
+  STATE: <span id="state">LOADING</span>
+</div>
+<canvas id="gameCanvas"></canvas>
+<div id="overlay">
+  <h2 id="overlayTitle">MEMORY MATCH</h2>
+  <p id="overlayMsg">Find all 8 pairs!</p>
+  <div class="keys">Click two cards to flip<br>R to Restart</div>
+</div>
+<div id="status">Loading WASM...</div>
+<script src="memory_match.js"></script>
+<script>
+const GRID_W = 4, GRID_H = 4, TOTAL = 16;
+const CARD_SIZE = 80;
+const GAP = 8;
+const CANVAS_W = GRID_W * CARD_SIZE + (GRID_W + 1) * GAP;
+const CANVAS_H = GRID_H * CARD_SIZE + (GRID_H + 1) * GAP;
+
+const STATE_HIDDEN = 0, STATE_REVEALED = 1, STATE_MATCHED = 2;
+const GAME_PLAYING = 0, GAME_WAITING = 1, GAME_WON = 2;
+
+// Card face colors and symbols
+const CARD_COLORS = [
+  '#e74c3c','#3498db','#2ecc71','#9b59b6',
+  '#f39c12','#1abc9c','#e91e63','#00bcd4'
+];
+const CARD_SYMBOLS = ['♥','♦','♣','♠','★','●','▲','■'];
+
+const canvas = document.getElementById('gameCanvas');
+canvas.width = CANVAS_W;
+canvas.height = CANVAS_H;
+const ctx = canvas.getContext('2d');
+
+let Module = null;
+
+function getCellPos(idx) {
+  const col = idx % GRID_W;
+  const row = Math.floor(idx / GRID_W);
+  return {
+    x: GAP + col * (CARD_SIZE + GAP),
+    y: GAP + row * (CARD_SIZE + GAP)
+  };
+}
+
+function drawCard(idx, state, value) {
+  const pos = getCellPos(idx);
+  const x = pos.x, y = pos.y;
+  
+  // Background
+  if (state === STATE_HIDDEN) {
+    ctx.fillStyle = '#2a2a5a';
+    ctx.strokeStyle = '#4a4a8a';
+  } else if (state === STATE_REVEALED) {
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#f0c040';
+  } else {
+    ctx.fillStyle = '#1e5e2a';
+    ctx.strokeStyle = '#4ade80';
+  }
+  
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x, y, CARD_SIZE, CARD_SIZE, 8);
+  ctx.fill();
+  ctx.stroke();
+  
+  if (state === STATE_REVEALED || state === STATE_MATCHED) {
+    const color = CARD_COLORS[value];
+    ctx.fillStyle = color;
+    ctx.font = 'bold 32px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(CARD_SYMBOLS[value], x + CARD_SIZE/2, y + CARD_SIZE/2 - 8);
+    
+    ctx.font = 'bold 14px Arial';
+    ctx.fillStyle = state === STATE_MATCHED ? '#4ade80' : '#333';
+    ctx.fillText(String(value + 1), x + CARD_SIZE/2, y + CARD_SIZE/2 + 18);
+  } else {
+    // Draw '?' on hidden card
+    ctx.fillStyle = '#4a4a8a';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', x + CARD_SIZE/2, y + CARD_SIZE/2);
+  }
+}
+
+function render() {
+  ctx.fillStyle = '#16213e';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  
+  for (let i = 0; i < TOTAL; i++) {
+    const state = Module._wasm_get_card_state(i);
+    const value = Module._wasm_get_card_value(i);
+    drawCard(i, state, value);
+  }
+}
+
+function updateHUD() {
+  const moves = Module._wasm_get_moves();
+  const matched = Module._wasm_get_matched();
+  const gs = Module._wasm_get_state();
+  document.getElementById('moves').textContent = moves;
+  document.getElementById('pairs').textContent = matched;
+  const stateNames = ['PLAYING', 'WAITING', 'WON!'];
+  document.getElementById('state').textContent = stateNames[gs] || '?';
+}
+
+function updateOverlay() {
+  const gs = Module._wasm_get_state();
+  const overlay = document.getElementById('overlay');
+  if (gs === GAME_WON) {
+    overlay.style.display = 'block';
+    document.getElementById('overlayTitle').textContent = '🎉 YOU WIN!';
+    const moves = Module._wasm_get_moves();
+    document.getElementById('overlayMsg').textContent = `Moves: ${moves}\nPress R to play again`;
+  } else {
+    overlay.style.display = 'none';
+  }
+}
+
+function gameLoop() {
+  if (!Module) return;
+  Module._wasm_tick();
+  render();
+  updateHUD();
+  updateOverlay();
+}
+
+canvas.addEventListener('click', (e) => {
+  if (!Module) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+  
+  for (let i = 0; i < TOTAL; i++) {
+    const pos = getCellPos(i);
+    if (mx >= pos.x && mx <= pos.x + CARD_SIZE &&
+        my >= pos.y && my <= pos.y + CARD_SIZE) {
+      Module._wasm_click(i);
+      break;
+    }
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!Module) return;
+  if (e.code === 'KeyR') {
+    Module._wasm_restart();
+  }
+});
+
+// Load WASM
+MemoryMatchModule().then(mod => {
+  Module = mod;
+  Module._wasm_init();
+  document.getElementById('status').textContent = 'Ready! Click to play.';
+  setInterval(gameLoop, 1000 / 60);
+}).catch(err => {
+  document.getElementById('status').textContent = 'WASM load failed: ' + err;
+});
+</script>
+</body>
+</html>
