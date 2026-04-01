@@ -5,7 +5,7 @@
 ### Completed ✅
 | Game | Status | Notes |
 |------|--------|-------|
-| Snake WASM | ✅ Deployed | Pure C + Emscripten, Canvas 2D |
+| Snake WASM | ✅ Built & Tested (2026-04-01) | Pure C + Emscripten, Canvas 2D, Playwright PASS |
 | **2048 WASM** | ✅ Built & Tested | Pure C + Emscripten, Canvas 2D |
 | **Minesweeper WASM** | ✅ Built & Tested | Pure C + Emscripten, 16x16, flood-fill reveal, flag, safe first-click |
 | **Memory Match WASM** | ✅ Built & Tested (2026-03-31) | Pure C + Emscripten, 4x4 card flip, Playwright PASS |
@@ -26,7 +26,7 @@
 ### Queue (Next Up)
 | Game | Priority | Notes |
 |------|----------|-------|
-| Snake → WASM | P3 | Already has Raylib version |
+| (All planned games complete) | - | WASM games count: 13 |
 
 ### Architecture Note
 - Pure C game logic (game.c/game.h) - no raylib dependency
@@ -45,6 +45,7 @@
 - Space Invaders: bottom-alien shooting, alien movement step-down on wall hit, wave progression
 - Flappy Bird: gravity applied per-frame, pipe spawns at PIPE_INTERVAL spacing, localStorage best score
 - Pong: AI moves toward ball.y, paddle collision changes ball angle based on hit position
+- Snake: grid-based movement, food spawn, wall/self-collision, speed increases with score
 
 ## Raylib Games (C++)
 

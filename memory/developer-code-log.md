@@ -4,6 +4,193 @@
 
 ### 1. 代码练习 (LeetCode)
 
+#### 新增题目: Sliding Window + Backtracking + BST
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC3 Longest Substring Without Repeating | Medium | Sliding Window (HashMap/Array) | seen[c]>=left时shrink,更新left=max(left,seen[c]+1) |
+| LC22 Generate Parentheses | Medium | Backtracking/Recursion | open<n时加'(' , close<open时加')', Catalan数C_n |
+| LC98 Validate Binary Search Tree | Medium | Tree DFS (Range check) | 递归传递(min,max), node.val必须在(min,max)区间 |
+| LC207 Course Schedule | Medium | Topological Sort (Kahn's BFS) | 构建indegree数组,BFS队列弹出0入度节点 |
+| LC684 Redundant Connection | Medium | Union-Find | 路径压缩+按秩合并,检测到cycle的边即为答案 |
+| LC42 Trapping Rain Water | Hard | 单调栈 | 递减栈,维护宽度和高度,类似LC84但更复杂 |
+| LC739 Daily Temperatures | Medium | 单调栈 | 递减栈,找下一个更大元素的下标差 |
+| LC85 Maximal Rectangle | Hard | 单调栈 | 转化为一排柱子求最大矩形,结合LC84 |
+| LC208 Implement Trie | Medium | Trie | 前缀树,26个子指针数组,insert/search/startsWith |
+
+**Sliding Window 核心模式**:
+```c
+int left = 0, maxLen = 0;
+for (int right = 0; right < n; right++) {
+    if (seen[c] >= left) left = seen[c] + 1; // shrink
+    seen[c] = right;
+    maxLen = max(maxLen, right - left + 1);
+}
+```
+
+**Backtracking (LC22 Generate Parentheses) 核心模式**:
+- 递归参数: open数, close数
+- 添加'(': open < n
+- 添加')': close < open
+- 结束: current.size() == 2*n
+- 结果数: Catalan数 C_n = (2n)!/(n!(n+1)!)
+
+**BST Validation 核心模式**:
+- 递归传递合法区间: dfs(node, minVal, maxVal)
+- 左子树: maxVal = node.val (所有节点 < node.val)
+- 右子树: minVal = node.val (所有节点 > node.val)
+- 必须严格小于/大于: <= minVal 或 >= maxVal → false
+
+**Topological Sort (Kahn's BFS) 核心模式**:
+- 构建adjacency list + indegree array
+- 队列初始放入所有indegree==0的节点
+- BFS: 弹出节点,访问邻居,邻居indegree--,入度为0则入队
+- 最后检查visited数量==n,否则存在环
+
+**Union-Find 核心模式**:
+- `find(x)`: 路径压缩,递归找root
+- `union(x,y)`: 按秩合并,返回false表示already connected(检测到环)
+- 路径压缩: `parent[x] = find(parent[x])`
+- 按秩: rank小的挂载到rank大的
+
+---
+
+### 2. 游戏开发: Snake WASM ✅
+
+#### 完成内容
+- 从零创建纯C游戏逻辑 (game.c/game.h/wasm_main.c)
+- 20×15网格蛇形游戏
+- 方向控制: WASD / 方向键
+- 食物随机生成(避开蛇身)
+- 碰撞检测: 撞墙 or 撞自己 → GAME OVER
+- 速度递增: 每50分 speed++, move_interval--
+- 菜单/Playing/Paused/GameOver 四状态
+- Canvas 2D渲染: 绿色渐变蛇身+红色食物+脉冲动画
+- Emscripten编译: snake.js + snake.wasm
+- Playwright自动化测试: PASS ✅ (无Console错误)
+
+#### Playwright测试结果
+- Title: Snake - WASM ✅
+- Canvas: true ✅
+- HUD: SCORE: 0 | SPEED: 1 ✅
+- Console errors: NONE ✅
+- Click to start + Arrow key input: PASS ✅
+
+#### 技术难点 & 解决方案
+
+**难点1: WASM ccall函数实现**
+- 问题: 使用`Function.apply`生成动态函数时语法错误
+- 解决: 改用`Reflect.apply(f, null, argv || [])`直接调用
+```javascript
+mod = {
+  ccall: (name, ret, args, argv) => {
+    const f = exp[name];
+    if (!f) return 0;
+    return Reflect.apply(f, null, argv || []);
+  }
+};
+```
+
+**难点2: 方向180°翻转防止**
+- 问题: 蛇不能直接掉头(从LEFT立即变RIGHT)
+- 解决: dir_timer帧数锁 + next_dir预队列
+```c
+if (dir == DIR_UP    && g_game.dir != DIR_DOWN)  g_game.next_dir = dir;
+if (dir == DIR_DOWN  && g_game.dir != DIR_UP)    g_game.next_dir = dir;
+// ...
+g_game.dir_timer = 3; // 3帧后才能再次改向
+```
+
+**难点3: 速度递增机制**
+- 解决: 每50分 speed++, move_interval = 12 - (speed-1)*2
+- speed 1-5: interval = 12,10,8,6,4帧
+
+#### WASM编译命令
+```bash
+source ~/emsdk/emsdk_env.sh
+emcc -O2 \
+  -s MODULARIZE=1 \
+  -s EXPORT_NAME="SnakeModule" \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -s TOTAL_MEMORY=64MB \
+  -s EXPORTED_FUNCTIONS='["_wasm_init_game","_wasm_start_game","_wasm_tick_game","_wasm_set_dir_game","_wasm_toggle_pause_game","_wasm_restart_game","_wasm_get_state_game","_wasm_get_score_game","_wasm_get_speed_game","_wasm_get_snake_len_game","_wasm_get_snake_x_game","_wasm_get_snake_y_game","_wasm_get_food_x_game","_wasm_get_food_y_game"]' \
+  --no-entry -o snake.js game.c wasm_main.c
+```
+
+#### 文件结构
+```
+projects/snake-wasm/
+├── game.c       (纯C游戏逻辑, ~150行)
+├── game.h       (类型定义+常量)
+├── wasm_main.c  (Emscripten导出)
+├── index.html   (Canvas 2D渲染+输入+WASM加载)
+├── snake.js     (编译产物)
+└── snake.wasm   (编译产物, 2KB)
+```
+
+---
+
+### 3. 经验沉淀
+
+#### 技术难点1: Sliding Window变长窗口
+- 核心: `if (seen[c] >= left) left = seen[c] + 1` 收缩左边界
+- 时间O(n),空间O(min(charset_size, n))
+
+#### 技术难点2: Backtracking括号生成
+- Catalan数增长: n=3→5, n=4→14, n=5→42
+- open<n时加'(' ; close<open时加')'
+
+#### 技术难点3: BST严格边界检查
+- 必须用long long处理int边界值(INT_MIN/INT_MAX)
+- `node->val <= minVal || node->val >= maxVal` → false
+
+#### 技术难点4: Snake方向锁dir_timer
+- 防止一帧内多次改向导致180°翻转
+- 3帧锁定期内忽略方向输入
+
+#### 技术难点5: Reflect.apply替代Function.apply
+- `Function.apply(null, ["return f()"])` 是错误的!
+- 正确: `Reflect.apply(f, null, [])` 直接调用
+
+#### 技术难点6: Emscripten游戏命名一致性
+- game.c: `wasm_init_game()`, `wasm_tick_game()`
+- wasm_main.c: `EMSCRIPTEN_KEEPALIVE void wasm_init_game(void) { wasm_init_game(); }` 陷阱!
+- wasm_main.c中的wrapper函数名不能与game.c中相同!
+
+---
+
+### 4. 技术栈进步
+
+| 领域 | 进步 |
+|------|------|
+| Sliding Window | HashMap+Array双实现, 变长窗口收缩模式 |
+| Backtracking | 括号生成,Catalan数递推 |
+| BST Validation | 递归区间传播, long long边界处理 |
+| Snake WASM | 方向锁, 速度递增, Canvas 2D渲染 |
+| WASM调试 | Reflect.apply替代复杂Function.apply |
+| Emscripten | MODULARIZE+WebAssembly.instantiate直接加载 |
+
+---
+
+### 5. WASM游戏队列状态
+
+**WASM游戏累计**: 13个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders, Breakout, Pac-Man, Flappy Bird, Pong + 1 more)
+
+**队列状态**:
+- ✅ Snake WASM — 2026-04-01 完成, Playwright PASS, 无Console错误
+- ✅ 所有计划WASM游戏已完成!
+
+---
+
+### 6. GitHub提交
+- `05364c7` — feat: Snake WASM - pure C + Canvas 2D (7 files, ~770 lines)
+
+---
+
+## 2026-04-01 💻
+
+### 1. 代码练习 (LeetCode)
+
 #### 重点: Topological Sort + Union-Find
 
 | 题目 | 难度 | 算法 | 核心洞察 |
@@ -350,7 +537,7 @@ emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="MemoryMatchModule" \
 
 ### 3. 游戏开发队列更新
 
-**WASM游戏累计**: 5个 (Snake, 2048, Minesweeper, Frogger, Memory Match)
+**WASM游戏累计**: 5个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban)
 
 **队列状态**:
 - ✅ Memory Match WASM — 今日完成
@@ -375,4 +562,4 @@ emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="MemoryMatchModule" \
 
 ---
 
-*版本: 1.9 | 更新: 2026-04-01*
+*版本: 1.10 | 更新: 2026-04-01*
