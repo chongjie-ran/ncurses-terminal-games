@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breakout - WASM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #eee;
+  }
+  #hud {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    width: 800px;
+    justify-content: space-between;
+  }
+  #hud span { color: #4a9eff; }
+  #gameCanvas {
+    border: 2px solid #4a9eff;
+    background: #000;
+    display: block;
+    border-radius: 4px;
+  }
+  #controls {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #888;
+    text-align: center;
+  }
+  #controls span { color: #4a9eff; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div>SCORE: <span id="score">0</span></div>
+  <div>LIVES: <span id="lives">3</span></div>
+  <div>LEVEL: <span id="level">1</span></div>
+  <div><span id="brick-count">50</span> BRICKS</div>
+</div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="controls">
+  <span>← → / A D</span>: Move Paddle &nbsp;|&nbsp;
+  <span>SPACE / Click</span>: Launch Ball &nbsp;|&nbsp;
+  <span>R</span>: Restart
+</div>
+
+<script src="breakout.js"></script>
+<script>
+var Module = {};
+BreakoutModule().then(mod => {
+  Object.assign(Module, mod);
+
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 600;
+
+  const COLORS = ['#ff4466','#ff8844','#ffcc22','#44ff88','#44aaff'];
+  const STATE = { MENU:0, PLAYING:1, WIN:2, GAMEOVER:3, NEXT_LEVEL:4, PAUSED:5 };
+
+  let paused = false;
+  let lastTime = 0;
+  let keys = {};
+
+  document.addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if (['ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (Module._wasm_get_launch_ready()) Module._wasm_launch();
+    }
+    if (e.key === 'r' || e.key === 'R') {
+      Module._wasm_restart();
+      paused = false;
+    }
+  });
+  document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+  canvas.addEventListener('click', () => {
+    if (Module._wasm_get_launch_ready()) Module._wasm_launch();
+  });
+
+  function drawBG() {
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, W, H);
+    // subtle grid
+    ctx.strokeStyle = 'rgba(74,158,255,0.05)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+  }
+
+  function drawHUD() {
+    document.getElementById('score').textContent = Module._wasm_get_score();
+    document.getElementById('lives').textContent = Module._wasm_get_lives();
+    document.getElementById('level').textContent = Module._wasm_get_level();
+    document.getElementById('brick-count').textContent = Module._wasm_get_bricks_remaining();
+  }
+
+  function drawPaddle() {
+    const px = Module._wasm_get_paddle_x();
+    const py = Module._wasm_get_paddle_y();
+    const pw = Module._wasm_get_paddle_w();
+    const ph = Module._wasm_get_paddle_h();
+    ctx.fillStyle = '#4a9eff';
+    ctx.shadowColor = '#4a9eff';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.roundRect(px, py, pw, ph, 6);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.roundRect(px+4, py+2, pw-8, ph/3, 3);
+    ctx.fill();
+  }
+
+  function drawBall() {
+    const bx = Module._wasm_get_ball_x();
+    const by = Module._wasm_get_ball_y();
+    const br = Module._wasm_get_ball_r();
+    if (!Module._wasm_get_ball_active()) return;
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#4a9eff';
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawBricks() {
+    const rows = Module._wasm_get_brick_rows();
+    const cols = Module._wasm_get_brick_cols();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!Module._wasm_get_brick_alive(r, c)) continue;
+        const bx = Module._wasm_get_brick_x(r, c);
+        const by = Module._wasm_get_brick_y(r, c);
+        const bw = Module._wasm_get_brick_w();
+        const bh = Module._wasm_get_brick_h();
+        const ci = Module._wasm_get_brick_color_idx(r, c);
+        const color = COLORS[ci] || '#fff';
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, 4);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.beginPath();
+        ctx.roundRect(bx+3, by+3, bw-6, bh/3, 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawOverlay(title, sub, color) {
+    ctx.fillStyle = 'rgba(10,10,26,0.88)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = color || '#fff';
+    ctx.font = 'bold 52px Courier New';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = color || '#fff';
+    ctx.shadowBlur = 20;
+    ctx.fillText(title, W/2, H/2 - 20);
+    ctx.shadowBlur = 0;
+    ctx.font = '20px Courier New';
+    ctx.fillStyle = '#4a9eff';
+    ctx.fillText(sub, W/2, H/2 + 30);
+    ctx.textAlign = 'left';
+  }
+
+  function loop(ts) {
+    const dt = Math.min((ts - lastTime) / 1000, 0.05);
+    lastTime = ts;
+
+    const state = Module._wasm_get_state();
+    if (state === STATE.PLAYING || state === STATE.NEXT_LEVEL) {
+      const speed = 500;
+      if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+        Module._wasm_move_paddle(-speed * dt);
+      }
+      if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+        Module._wasm_move_paddle(speed * dt);
+      }
+    }
+
+    if (!paused) {
+      Module._wasm_update(dt);
+    }
+
+    drawBG();
+    drawBricks();
+    drawPaddle();
+    drawBall();
+    drawHUD();
+
+    const gs = Module._wasm_get_state();
+    if (gs === STATE.GAMEOVER) drawOverlay('GAME OVER', 'Press R to restart', '#ef4444');
+    if (gs === STATE.WIN) drawOverlay('YOU WIN!', 'Press R to play again', '#4ade80');
+    if (paused && gs === STATE.PLAYING) drawOverlay('PAUSED', 'Press P to resume', '#4a9eff');
+
+    requestAnimationFrame(loop);
+  }
+
+  Module._wasm_init();
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>
