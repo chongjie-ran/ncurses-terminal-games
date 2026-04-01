@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hextris - WASM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a1a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Courier New', monospace;
+  color: #fff;
+  user-select: none;
+}
+#title { font-size: 20px; color: #8af; margin-bottom: 8px; letter-spacing: 4px; }
+#hud {
+  display: flex; gap: 24px; margin-bottom: 8px;
+  font-size: 13px; color: #aaa;
+}
+#hud span { color: #fff; font-weight: bold; }
+#canvas-wrap { position: relative; }
+canvas {
+  display: block;
+  border: 2px solid #334;
+  border-radius: 4px;
+  background: #0d0d20;
+}
+#overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.75);
+  cursor: pointer;
+}
+#overlay.hidden { display: none; }
+#overlay-title { font-size: 22px; color: #8af; margin-bottom: 8px; }
+#overlay-sub { font-size: 13px; color: #888; }
+#controls {
+  margin-top: 10px; font-size: 11px; color: #555; text-align: center;
+}
+</style>
+</head>
+<body>
+<div id="title">HEXTRIS</div>
+<div id="hud">
+  <div>SCORE: <span id="score">0</span></div>
+  <div>LINES: <span id="lines">0</span></div>
+</div>
+<div id="canvas-wrap">
+  <canvas id="c" width="168" height="420"></canvas>
+  <div id="overlay">
+    <div id="overlay-title">HEXTRIS</div>
+    <div id="overlay-sub">Click to Start</div>
+  </div>
+</div>
+<div id="controls">
+  WASD/Arrows: Move &nbsp;|&nbsp; Q/E/Z/X: Rotate &nbsp;|&nbsp; Space: Hard Drop
+</div>
+
+<script src="hexxtris.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const overlayTitle = document.getElementById('overlay-title');
+const overlaySub = document.getElementById('overlay-sub');
+
+const GRID_W = 7;
+const GRID_H = 13;
+const H = 12;
+const HEX_W = Math.round(Math.sqrt(3) * H);
+const HEX_H = H * 2;
+const HEX_VERT = Math.round(H * 1.5);
+const PAD_X = 0;
+const PAD_Y = 0;
+
+const COLOR_MAP = {
+  0: '#1a1a2e',
+  1: '#e74c3c',
+  2: '#2ecc71',
+  3: '#3498db'
+};
+const GRID_COLOR = '#222244';
+const EMPTY_COLOR = '#111128';
+
+function offsetToPixel(col, row) {
+  const x = PAD_X + col * HEX_W + HEX_W / 2;
+  const y = PAD_Y + row * HEX_VERT + (col % 2 === 1 ? HEX_H / 2 : 0);
+  return { x, y };
+}
+
+function drawHex(cx, cy, color, stroke) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i - Math.PI / 6;
+    const px = cx + H * Math.cos(angle);
+    const py = cy + H * Math.sin(angle);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+
+function drawGrid() {
+  for (let col = 0; col < GRID_W; col++) {
+    for (let row = 0; row < GRID_H; row++) {
+      const { x, y } = offsetToPixel(col, row);
+      drawHex(x, y, EMPTY_COLOR, GRID_COLOR);
+    }
+  }
+}
+
+let Game = null;
+
+async function initWasm() {
+  try {
+    const mod = await HextrisModule({
+      locateFile: (f) => f,
+    });
+    Game = mod;
+    Game._wasm_init_game_ptr();
+    render();
+  } catch(e) {
+    console.error('WASM init failed:', e);
+  }
+}
+
+function updateHUD() {
+  if (!Game) return;
+  document.getElementById('score').textContent = Game._wasm_get_score();
+  document.getElementById('lines').textContent = Game._wasm_get_lines();
+}
+
+function render() {
+  if (!Game) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGrid();
+
+  for (let col = 0; col < GRID_W; col++) {
+    for (let row = 0; row < GRID_H; row++) {
+      const cell = Game._wasm_get_grid_cell(col, row);
+      if (cell > 0) {
+        const { x, y } = offsetToPixel(col, row);
+        drawHex(x, y, COLOR_MAP[cell] || '#fff', '#000');
+      }
+    }
+  }
+
+  if (!Game._wasm_get_game_over()) {
+    const numBlocks = Game._wasm_get_piece_num_blocks();
+    const color = Game._wasm_get_piece_color();
+    for (let i = 0; i < numBlocks; i++) {
+      const col = Game._wasm_get_piece_block_col(i);
+      const row = Game._wasm_get_piece_block_row(i);
+      const { x, y } = offsetToPixel(col, row);
+      drawHex(x, y, COLOR_MAP[color] || '#ff0', '#fff');
+    }
+  }
+
+  updateHUD();
+
+  if (Game._wasm_get_game_over()) {
+    overlayTitle.textContent = 'GAME OVER';
+    overlaySub.textContent = `Score: ${Game._wasm_get_score()} — Click to Restart`;
+    overlay.classList.remove('hidden');
+  }
+}
+
+const KEY_MAP = {
+  'ArrowLeft': 'left', 'KeyA': 'left',
+  'ArrowRight': 'right', 'KeyD': 'right',
+  'ArrowUp': 'up', 'KeyW': 'up',
+  'ArrowDown': 'down', 'KeyS': 'down',
+  'KeyQ': 'rotate', 'KeyE': 'rotate', 'KeyZ': 'rotate', 'KeyX': 'rotate',
+  'Space': 'hard_drop'
+};
+
+document.addEventListener('keydown', (e) => {
+  if (!Game || Game._wasm_get_game_over()) return;
+  const action = KEY_MAP[e.code];
+  if (!action) return;
+  e.preventDefault();
+  switch (action) {
+    case 'left':  Game._wasm_move_left(); break;
+    case 'right': Game._wasm_move_right(); break;
+    case 'down':  Game._wasm_move_down(); break;
+    case 'up':    Game._wasm_move_down(); break;
+    case 'rotate': Game._wasm_rotate(); break;
+    case 'hard_drop': Game._wasm_hard_drop(); break;
+  }
+  render();
+});
+
+overlay.addEventListener('click', () => {
+  if (!Game) return;
+  Game._wasm_start_game_ptr();
+  overlay.classList.add('hidden');
+  gameLoop();
+});
+
+function gameLoop() {
+  if (!Game) return;
+  if (!Game._wasm_get_game_over()) {
+    Game._wasm_tick_game_ptr();
+    render();
+    requestAnimationFrame(gameLoop);
+  } else {
+    render();
+  }
+}
+
+initWasm();
+</script>
+</body>
+</html>
