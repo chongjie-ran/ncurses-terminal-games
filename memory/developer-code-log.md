@@ -13,6 +13,7 @@
 | LC42 Trapping Rain Water | Hard | 单调栈 | 递减栈,维护宽度和高度,类似LC84但更复杂 |
 | LC739 Daily Temperatures | Medium | 单调栈 | 递减栈,找下一个更大元素的下标差 |
 | LC85 Maximal Rectangle | Hard | 单调栈 | 转化为一排柱子求最大矩形,结合LC84 |
+| LC208 Implement Trie | Medium | Trie | 前缀树,26个子指针数组,insert/search/startsWith |
 
 **Topological Sort (Kahn's BFS) 核心模式**:
 - 构建adjacency list + indegree array
@@ -33,6 +34,13 @@
 **Union-Find vs DFS/BFS**:
 - Union-Find: 适合动态加边的场景,O(α(n))接近O(1)
 - DFS: 需要 visited set,每次需要遍历图
+
+**Trie 核心模式**:
+- 每个节点26个子指针(children数组)对应a-z
+- insert: 沿路径走,没有就创建,最后标记is_end=true
+- search: 沿路径走,不存在返回false,是end返回true
+- startsWith: 同search但不检查is_end
+- 时间O(n) per op, 空间O(ALPHABET_SIZE * n)
 
 ---
 
@@ -83,24 +91,12 @@ b->dy = speed * sinf(rad);
 
 **难点3: 砖块碰撞反弹方向**
 - 解决: 比较x/y方向overlap,取较小者决定反弹方向
-```c
-float overlap_left = (bx + BW) - (b->x - BALL_R);
-float overlap_right = (b->x + BALL_R) - bx;
-float overlap_top = (by + BH) - (b->y - BALL_R);
-float overlap_bottom = (b->y + BALL_R) - by;
-if (min(overlap_x, overlap_y) == overlap_x) b->dx = -b->dx;
-else b->dy = -b->dy;
-```
 
 #### WASM编译命令
 ```bash
 source ~/emsdk/emsdk_env.sh
-emcc -O3 \
-  -s MODULARIZE=1 \
-  -s EXPORT_NAME="BreakoutModule" \
-  -s ALLOW_MEMORY_GROWTH=1 \
-  -s TOTAL_MEMORY=64MB \
-  --no-entry -o breakout.js game.c wasm_main.c
+emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="BreakoutModule" \
+  -s ALLOW_MEMORY_GROWTH=1 -s TOTAL_MEMORY=64MB --no-entry -o breakout.js game.c wasm_main.c
 ```
 
 ---
@@ -155,44 +151,6 @@ emcc -O3 \
 - Console errors: NONE ✅
 - Interaction test: PASS ✅
 
-#### 技术难点 & 解决方案
-
-**难点1: 重力物理**
-- 解决: 每帧vy累加gravity, y累加vy,保证vy有正有负(上下)
-```c
-g->bird.vy += GRAVITY;
-g->bird.y += g->bird.vy;
-```
-
-**难点2: 管道碰撞**
-- 解决: rect-circle碰撞, top pipe从y=0到gap_y, bottom pipe从gap_y+PIPE_GAP到ground
-```c
-// Top pipe collision
-if (circle_rect_hit(bird_x, bird_y, R, pipe_x, 0, PIPE_W, gap_y)) ...
-// Bottom pipe collision
-float bottom_top = gap_y + PIPE_GAP;
-if (circle_rect_hit(bird_x, bird_y, R, pipe_x, bottom_top, PIPE_W, ground_y - bottom_top)) ...
-```
-
-**难点3: 管道生成时机**
-- 解决: 检查最后一个管道x位置,当屏幕宽度-last_x >= PIPE_INTERVAL时生成
-```c
-Pipe *last = &g->pipes[g->pipe_count - 1];
-if ((float)SCREEN_W - last->x >= PIPE_INTERVAL) spawn_pipe(g);
-```
-
-#### WASM编译命令
-```bash
-source ~/emsdk/emsdk_env.sh
-emcc -O2 \
-  -s MODULARIZE=1 \
-  -s EXPORT_NAME="Module" \
-  -s ALLOW_MEMORY_GROWTH=1 \
-  -s TOTAL_MEMORY=64MB \
-  -s EXPORTED_FUNCTIONS='["_wasm_init","_wasm_jump","_wasm_update","_wasm_get_state","_wasm_get_bird_x","_wasm_get_bird_y","_wasm_get_bird_vy","_wasm_get_bird_rot","_wasm_get_score","_wasm_get_best_score","_wasm_get_pipe_count","_wasm_get_pipe_x","_wasm_get_pipe_gap_y","_wasm_get_screen_w","_wasm_get_screen_h","_wasm_get_ground_h","_wasm_get_bird_radius","_wasm_get_pipe_width","_wasm_get_pipe_gap"]' \
-  --no-entry -o flappy.js game.c wasm_main.c
-```
-
 #### 文件结构
 ```
 projects/flappy-bird-wasm/
@@ -206,7 +164,73 @@ projects/flappy-bird-wasm/
 
 ---
 
-### 6. 经验沉淀
+### 6. 游戏开发: Pong WASM ✅
+
+#### 完成内容
+- 从零创建纯C游戏逻辑 (game.c/game.h/wasm_main.c)
+- 球拍角度反弹: 根据击中位置计算反弹角度
+- AI对手: 跟踪球y坐标移动
+- 球速递增: 每次击中 paddle speed *= 1.05
+- 7分获胜,得分/游戏结束/重开流程
+- 纯Canvas 2D渲染
+- 编译为WASM (Emscripten MODULARIZE=1)
+- Playwright自动化测试: PASS ✅
+
+#### Playwright测试结果
+- Title: Pong - WASM ✅
+- Canvas: true ✅
+- HUD: 0 : 0 ✅
+- Console errors: NONE ✅
+- TEST: PASS ✅
+
+#### 技术难点 & 解决方案
+
+**难点1: 球拍击中角度反弹**
+- 解决: `hit_pos = (ball.y - paddle.y) / PADDLE_H`, 映射到±60°角
+```c
+float hit_pos = (g->ball.y - g->left.y) / PADDLE_H;
+float angle = (hit_pos - 0.5f) * 60.0f * M_PI / 180.0f;
+float speed = sqrtf(g->ball.dx * g->ball.dx + g->ball.dy * g->ball.dy);
+speed *= 1.05f;
+g->ball.dx = speed * cosf(angle);
+g->ball.dy = speed * sinf(angle);
+```
+
+**难点2: AI移动**
+- 解决: `diff = ball.y - (paddle.y + PADDLE_H/2)`, 按AI_SPEED趋近
+```c
+float diff = target - center;
+if (diff > AI_SPEED) g->right.y += AI_SPEED;
+else if (diff < -AI_SPEED) g->right.y -= AI_SPEED;
+```
+
+**难点3: g_state extern问题**
+- 解决: game.h声明`extern PongGame g_state;`, game.c定义`PongGame g_state;`
+- wasm_main.c include game.h后直接使用g_state
+
+#### WASM编译命令
+```bash
+source ~/emsdk/emsdk_env.sh
+emcc -O2 -s MODULARIZE=1 -s EXPORT_NAME="PongModule" \
+  -s ALLOW_MEMORY_GROWTH=1 -s TOTAL_MEMORY=64MB \
+  -s EXPORTED_FUNCTIONS='["_wasm_init","_wasm_launch","_wasm_update","_wasm_get_state","_wasm_get_left_score","_wasm_get_right_score","_wasm_get_ball_x","_wasm_get_ball_y","_wasm_get_ball_radius","_wasm_get_paddle_y","_wasm_restart","_wasm_paddle_move"]' \
+  --no-entry -o pong.js game.c wasm_main.c
+```
+
+#### 文件结构
+```
+projects/pong-wasm/
+├── game.c       (纯C游戏逻辑)
+├── game.h       (类型定义+常量)
+├── wasm_main.c  (Emscripten导出)
+├── index.html   (Canvas 2D渲染+输入)
+├── pong.js      (编译产物)
+└── pong.wasm    (编译产物)
+```
+
+---
+
+### 7. 经验沉淀
 
 #### 技术难点1: Topological Sort环检测
 - Kahn's BFS: visited计数不等于n则存在环
@@ -222,66 +246,51 @@ projects/flappy-bird-wasm/
 - 判断: `(dx*dx + dy*dy) < (cr*cr)`
 
 #### 技术难点4: 球拍角度反弹
-- 击中位置映射到角度(150°-270°)
+- 击中位置映射到角度(±60°)
 - 用cos/sin重建速度向量
-- 确保dy始终向上(负值)
+- 球速递增: speed *= 1.05
 
-#### 技术难点5: Flappy Bird重力物理
-- 每帧累加重力,速度有正有负(上下飞)
-- 旋转角度与速度挂钩: `bird_rot = fmaxf(-30, fminf(90, vy * 6))`
+#### 技术难点5: Pong AI
+- diff = ball.y - paddle_center
+- 按固定速度趋近: if diff > speed, paddle += speed
+
+#### 技术难点6: C extern g_state共享
+- game.h: `extern PongGame g_state;`
+- game.c: `PongGame g_state;` (非static)
+- wasm_main.c: include game.h后直接使用
 
 ---
 
-### 7. 技术栈进步
+### 8. 技术栈进步
 
 | 领域 | 进步 |
 |------|------|
 | Topological Sort | Kahn's BFS, indegree数组, 环检测 |
 | Union-Find | 路径压缩+按秩合并, 检测cycle |
 | 单调栈 | Trapping Rain Water, Daily Temperatures, Maximal Rectangle |
+| Trie | 前缀树, 26叉节点, insert/search/startsWith O(n) |
 | Breakout WASM | rect-circle碰撞, 角度反弹, 砖块碰撞方向 |
 | Pac-Man WASM | 幽灵AI, frightened模式, 闪烁效果 |
 | Flappy Bird WASM | 重力物理, 管道生成, localStorage |
-| Playwright测试 | MODULARIZE=1 + global Module混用场景测试 |
+| Pong WASM | AI对手, 球速递增, C extern状态共享 |
+| Playwright测试 | file:// CORS → HTTP server解决 |
 | 游戏架构 | 纯C游戏逻辑 + Canvas 2D渲染分离模式 |
 
 ---
 
-### 8. WASM游戏队列状态
+### 9. WASM游戏队列状态
 
-**WASM游戏累计**: 11个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders, Breakout, Pac-Man, Flappy Bird)
+**WASM游戏累计**: 12个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders, Breakout, Pac-Man, Flappy Bird, Pong)
 
 **队列状态**:
-- ✅ Breakout WASM — 2026-04-01 完成, Playwright PASS
-- ✅ Space Invaders WASM — 2026-04-01 验证, Playwright PASS
-- ✅ Pac-Man WASM — 2026-04-01 验证, Playwright PASS
-- ✅ Flappy Bird WASM — 2026-04-01 完成, Playwright PASS
+- ✅ Pong WASM — 2026-04-01 完成, Playwright PASS
 - P3: Snake → WASM
-- P3: Pong WASM
 
 ---
 
-### 9. GitHub提交
-- (Flappy Bird WASM commits pending)
-
----
-
-## 2026-04-01 (续) 💻
-
-### 代码练习 - 每日LeetCode
-
-#### 新增题目记录
-
-| 题目 | 难度 | 算法 | 核心洞察 |
-|------|------|------|----------|
-| LC42 Trapping Rain Water | Hard | 单调栈 | 递减栈,维护宽度和高度,类似LC84但更复杂 |
-| LC739 Daily Temperatures | Medium | 单调栈 | 递减栈,找下一个更大元素的下标差 |
-| LC85 Maximal Rectangle | Hard | 单调栈 | 转化为一排柱子求最大矩形,结合LC84 |
-
-**单调栈 进阶模式 (LC42/LC85)**:
-- LC42: 递减栈,当遇到更高高度时计算能trap的水量
-  - `water += (min(height[left], height[right]) - height[top]) * width`
-- LC85: 把每一行当成直方图底边,累计高度,求最大矩形
+### 10. GitHub提交
+- `eb8295a` — feat: Breakout WASM - pure C + Canvas 2D (6 files, 589 lines)
+- `0ca3e45` — feat: Flappy Bird WASM - pure C + Canvas 2D (8 files, 909 lines)
 
 ---
 
@@ -328,53 +337,11 @@ projects/flappy-bird-wasm/
 - 用 `(i*7+3) % (i+1)` 实现Fisher-Yates风格洗牌
 - 保证每次运行卡片顺序不同但可复现
 
-#### 关键代码片段
-```c
-// 点击处理
-int wasm_click(int card_index) {
-    if (lock_input) return 0;
-    if (card_states[card_index] != STATE_HIDDEN) return 0;
-    card_states[card_index] = STATE_REVEALED;
-    selected[num_selected++] = card_index;
-    if (num_selected == 2) {
-        moves++;
-        if (cards[a] == cards[b]) {
-            card_states[a] = STATE_MATCHED;
-            card_states[b] = STATE_MATCHED;
-            matched_pairs++;
-        } else {
-            game_state = GAME_STATE_WAITING;
-            lock_input = 1;
-            wait_timer = 60; // ~1秒
-        }
-    }
-    return 1;
-}
-
-// Canvas点击检测 (JS)
-canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-    for (let i = 0; i < TOTAL; i++) {
-        const pos = getCellPos(i);
-        if (mx >= pos.x && mx <= pos.x + CARD_SIZE &&
-            my >= pos.y && my <= pos.y + CARD_SIZE) {
-            Module._wasm_click(i);
-            break;
-        }
-    }
-});
-```
-
 #### WASM编译命令
 ```bash
 source ~/emsdk/emsdk_env.sh
-emcc -O3 \
-  -s MODULARIZE=1 \
-  -s EXPORT_NAME="MemoryMatchModule" \
-  -s ALLOW_MEMORY_GROWTH=1 \
-  -s TOTAL_MEMORY=64MB \
+emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="MemoryMatchModule" \
+  -s ALLOW_MEMORY_GROWTH=1 -s TOTAL_MEMORY=64MB \
   -s EXPORTED_FUNCTIONS='["_wasm_init","_wasm_tick","_wasm_click","_wasm_restart","_wasm_get_state","_wasm_get_moves","_wasm_get_matched","_wasm_get_card_state","_wasm_get_card_value","_wasm_get_grid_w","_wasm_get_grid_h","_malloc","_free"]' \
   --no-entry -o memory_match.js wasm_main.c
 ```
@@ -408,4 +375,4 @@ emcc -O3 \
 
 ---
 
-*版本: 1.8 | 更新: 2026-04-01*
+*版本: 1.9 | 更新: 2026-04-01*

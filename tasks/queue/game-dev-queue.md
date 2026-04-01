@@ -16,6 +16,7 @@
 | **Breakout WASM** | ✅ Built & Tested (2026-04-01) | Pure C + Emscripten, 5×10 bricks, ball/paddle physics, angle bounce, Playwright PASS |
 | **Pac-Man WASM** | ✅ Verified (2026-04-01) | 28×31 maze, 4 ghost types, frightened mode, power pellets, Playwright PASS |
 | **Flappy Bird WASM** | ✅ Built & Tested (2026-04-01) | Pure C + Emscripten, gravity physics, pipe gap, score/best tracking, Playwright PASS |
+| **Pong WASM** | ✅ Built & Tested (2026-04-01) | Pure C + Emscripten, AI opponent, angle bounce, Canvas 2D, Playwright PASS |
 
 ### In Progress
 | Game | Priority | Notes |
@@ -25,8 +26,7 @@
 ### Queue (Next Up)
 | Game | Priority | Notes |
 |------|----------|-------|
-| Snake Raylib → WASM | P3 | Already has Raylib version |
-| Pong WASM | P3 | Ball + paddle |
+| Snake → WASM | P3 | Already has Raylib version |
 
 ### Architecture Note
 - Pure C game logic (game.c/game.h) - no raylib dependency
@@ -44,6 +44,7 @@
 - Breakout: paddle angle bounce, rect-circle collision for ball-paddle and ball-brick
 - Space Invaders: bottom-alien shooting, alien movement step-down on wall hit, wave progression
 - Flappy Bird: gravity applied per-frame, pipe spawns at PIPE_INTERVAL spacing, localStorage best score
+- Pong: AI moves toward ball.y, paddle collision changes ball angle based on hit position
 
 ## Raylib Games (C++)
 
@@ -55,7 +56,7 @@
 ### Deferred (WASM first)
 - 2048 Raylib → Replaced by 2048 WASM (lighter, no raylib dependency)
 - Breakout Raylib → Replaced by Breakout WASM (2026-04-01)
-- Pong Raylib → Consider WASM version
+- Pong Raylib → Replaced by Pong WASM (2026-04-01)
 - Flappy Bird Raylib → Replaced by Flappy Bird WASM (2026-04-01)
 - Tetris Raylib → Replaced by Tetris WASM (2026-04-01)
 - Frogger Raylib → Replaced by Frogger WASM (2026-04-01)
