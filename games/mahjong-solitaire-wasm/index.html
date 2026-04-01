@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mahjong Solitaire</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #1a3a2a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+}
+h1 { color: #ffd700; margin-bottom: 10px; font-size: 28px; text-shadow: 2px 2px 4px #000; }
+#hud {
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 30px;
+}
+#hud span { color: #ffd700; }
+#status {
+    color: #fff;
+    font-size: 14px;
+    margin-bottom: 10px;
+    min-height: 20px;
+}
+canvas {
+    border: 3px solid #8b4513;
+    border-radius: 8px;
+    background: #2d5a3d;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+#hint {
+    color: #aaa;
+    font-size: 13px;
+    margin-top: 10px;
+}
+</style>
+</head>
+<body>
+<h1>🀄 Mahjong Solitaire</h1>
+<div id="hud">Score: <span id="score">0</span> | Tiles: <span id="tiles">0</span></div>
+<div id="status">Click two matching free tiles to remove them</div>
+<canvas id="game" width="600" height="420"></canvas>
+<div id="hint">Free tiles: not covered from above, open on left or right side</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TILE_W = 46;
+const TILE_H = 46;
+const LAYER_OFFSET = 4;
+
+const TILE_COLORS = {
+    1: '#2e7d32', 2: '#388e3c', 3: '#43a047',
+    11: '#1565c0', 12: '#1976d2', 13: '#1e88e5',
+    21: '#c62828', 22: '#d32f2f', 23: '#e53935',
+    31: '#5e35b1', 32: '#6a1b9a',
+    41: '#e53935', 42: '#2e7d32'
+};
+
+const TILE_SYMBOLS = {
+    1: '🀐', 2: '🀑', 3: '🀒',
+    11: '🀙', 12: '🀚', 13: '🀛',
+    21: '🀇', 22: '🀈', 23: '🀉',
+    31: '🀀', 32: '🀁',
+    41: '🀄', 42: '🀅'
+};
+
+let game = {};
+
+function updateHUD() {
+    document.getElementById('score').textContent = game.get_score();
+    document.getElementById('tiles').textContent = game.get_tiles_remaining();
+    
+    const state = game.get_game_state();
+    const status = document.getElementById('status');
+    if (state === 3) status.textContent = 'No more moves! Click to restart.';
+    else if (state === 2) status.textContent = '🎉 You Win! Click to play again.';
+    else status.textContent = 'Click two matching free tiles to remove them';
+}
+
+function render() {
+    const W = canvas.width;
+    const H = canvas.height;
+    const GRID_W = game.get_grid_w();
+    const GRID_H = game.get_grid_h();
+    const MAX_LAYERS = game.get_max_layers();
+    
+    ctx.fillStyle = '#2d5a3d';
+    ctx.fillRect(0, 0, W, H);
+    
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 50) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 50) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    
+    const board_x = (W - GRID_W * TILE_W) / 2 - 10;
+    const board_y = (H - GRID_H * TILE_H) / 2 - 10;
+    
+    const selected_layer = game.get_selected_layer();
+    const selected_row = game.get_selected_row();
+    const selected_col = game.get_selected_col();
+    
+    for (let l = 0; l < MAX_LAYERS; l++) {
+        const offset_x = l * LAYER_OFFSET;
+        const offset_y = l * LAYER_OFFSET;
+        
+        for (let r = 0; r < GRID_H; r++) {
+            for (let c = 0; c < GRID_W; c++) {
+                const tile = game.get_tile_at(l, r, c);
+                if (tile === 0) continue;
+                
+                const free = game.tile_is_free(l, r, c);
+                const is_selected = (l === selected_layer && r === selected_row && c === selected_col);
+                
+                const x = board_x + c * TILE_W + offset_x;
+                const y = board_y + r * TILE_H + offset_y;
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(x + 3, y + 3, TILE_W - 2, TILE_H - 2);
+                
+                let bgColor = TILE_COLORS[tile] || '#555';
+                if (!free) bgColor = '#444';
+                if (is_selected) bgColor = '#ffd700';
+                
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(x, y, TILE_W - 2, TILE_H - 2);
+                
+                ctx.strokeStyle = is_selected ? '#fff' : (free ? '#8b4513' : '#333');
+                ctx.lineWidth = is_selected ? 3 : 1;
+                ctx.strokeRect(x, y, TILE_W - 2, TILE_H - 2);
+                
+                ctx.fillStyle = free ? '#fff' : '#666';
+                ctx.font = '22px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(TILE_SYMBOLS[tile] || '?', x + (TILE_W - 2) / 2, y + (TILE_H - 2) / 2);
+            }
+        }
+    }
+}
+
+canvas.addEventListener('click', (e) => {
+    if (game.get_game_state() === 2 || game.get_game_state() === 3) {
+        game.start_game();
+        updateHUD();
+        render();
+        return;
+    }
+    
+    const rect = canvas.getBoundingClientRect();
+    const W = canvas.width;
+    const H = canvas.height;
+    const GRID_W = game.get_grid_w();
+    const GRID_H = game.get_grid_h();
+    const MAX_LAYERS = game.get_max_layers();
+    const board_x = (W - GRID_W * TILE_W) / 2 - 10;
+    const board_y = (H - GRID_H * TILE_H) / 2 - 10;
+    
+    for (let l = MAX_LAYERS - 1; l >= 0; l--) {
+        const offset_x = l * LAYER_OFFSET;
+        const offset_y = l * LAYER_OFFSET;
+        
+        for (let r = 0; r < GRID_H; r++) {
+            for (let c = 0; c < GRID_W; c++) {
+                if (game.get_tile_at(l, r, c) === 0) continue;
+                
+                const x = board_x + c * TILE_W + offset_x;
+                const y = board_y + r * TILE_H + offset_y;
+                
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+                
+                if (clickX >= x && clickX <= x + TILE_W - 2 &&
+                    clickY >= y && clickY <= y + TILE_H - 2) {
+                    game.click_tile(l, r, c);
+                    updateHUD();
+                    render();
+                    return;
+                }
+            }
+        }
+    }
+});
+
+function initGame() {
+    game = {
+        start_game: () => Module._start_game(),
+        get_game_state: () => Module._get_game_state(),
+        get_score: () => Module._get_score(),
+        get_tiles_remaining: () => Module._get_tiles_remaining(),
+        get_selected_tile_idx: () => Module._get_selected_tile_idx(),
+        get_selected_layer: () => Module._get_selected_layer(),
+        get_selected_row: () => Module._get_selected_row(),
+        get_selected_col: () => Module._get_selected_col(),
+        get_tile_at: (l, r, c) => Module._get_tile_at(l, r, c),
+        tile_is_free: (l, r, c) => Module._tile_is_free(l, r, c),
+        click_tile: (l, r, c) => Module._click_tile(l, r, c),
+        get_grid_w: () => Module._get_grid_w(),
+        get_grid_h: () => Module._get_grid_h(),
+        get_max_layers: () => Module._get_max_layers()
+    };
+    
+    game.start_game();
+    updateHUD();
+    render();
+}
+
+var Module = {
+    onRuntimeInitialized: initGame
+};
+</script>
+<script src="mahjong.js"></script>
+</body>
+</html>

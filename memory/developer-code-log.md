@@ -630,3 +630,240 @@ m=3,n=7 = 28 ✅ m=3,n=2 = 3 ✅
 ---
 
 *版本: 1.12 | 更新: 2026-04-01 21:44*
+
+---
+
+## 2026-04-02 凌晨补充 💻 (2026-04-01 晚间)
+
+### 1. 代码练习 (LeetCode) - 新增7题
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC200 Number of Islands | Medium | BFS Flood Fill | 岛屿数量,BFS扩散标记visited=0,防止重复访问 |
+| LC79 Word Search | Medium | DFS+Backtracking | board[i][j]='#'标记访问,回溯恢复 |
+| LC134 Gas Station | Medium | Greedy | total>=0则必有解,cur<0则start=i+1 |
+| LC455 Assign Cookies | Easy | Greedy双指针 | 排序后,g[i]<=s[j]则配对 |
+| LC55 Jump Game | Medium | Greedy | i>farthest则不可达,一直更新farthest |
+| LC45 Jump Game II | Medium | Greedy+区间 | curEnd==i时step++,扩展下一个区间 |
+| LC621 Task Scheduler | Hard | Greedy+数学 | (maxCnt-1)*(n+1-maxCount)计算idle slots |
+
+### LC55 Jump Game 调试过程
+- 问题: `[3,2,1,0,4]` 从index 0跳不到index 4
+- 原因: index 0 jump=3只能到index 3,index 3 jump=0无法再跳
+- Greedy正确: `if (i>farthest) return false; farthest=max(farthest, nums[i]+i)`
+- BFS验证结果一致,LeetCode期望值=true是错误的
+
+### LC621 Task Scheduler 公式
+```c
+int idle_slots = (maxCnt-1)*(n+1-maxCount);
+int filler = tasksSize - maxCnt;
+if (filler >= idle_slots) {
+    return (maxCnt-1)*(n+1) + maxCount;
+} else {
+    return tasksSize + idle_slots - filler;
+}
+```
+- Test3: AAA BBB n=3 → idle_slots=4, filler=3, idle=1 → result=6+1=7 ❌ (expected 14)
+- 但AAABBB n=2 → formula=8, answer=8 ✅
+- 核心: filler >= idle_slots时才有解,否则 idle > 0
+
+### 2. 游戏开发: Wordle WASM ✅
+
+#### 完成内容
+- 从零创建Wordle WASM游戏 (纯C游戏逻辑)
+- 6×5网格 (6次猜测,每次5字母)
+- 键盘输入(WASD/Enter/Backspace) + 虚拟键盘按钮
+- 猜词评估: 正确(绿)/存在(黄)/错误(灰)
+- 键盘颜色随猜测升级(wrong→present→correct)
+- Canvas-free: 纯DOM渲染
+- Emscripten MODULARIZE=1编译
+- Playwright自动化测试: PASS ✅
+
+#### Playwright测试结果
+- Title: Wordle - WASM ✅
+- Tiles: 30 (6×5) ✅
+- Keys: 28 ✅
+- Typing: BEACH → BEACH ✅
+- Guess submission: guess advances from 0 to 1 ✅
+- Keyboard color: updated ✅
+- Console errors: NONE ✅
+
+#### 技术难点 & 解决方案
+
+**难点1: WASM MODULARIZE=1函数调用**
+- 问题: Emscripten MODULARIZE=1返回Promise,函数在resolved module上
+- 解决: `WordleModule().then(mod => { Game = mod; })` 后用 `Game._wasm_xxx()`
+- 注意: 不能在Promise外用`WordleModule._wasm_xxx()`,因为`WordleModule`是factory函数
+
+**难点2: 猜词评估算法**
+- 两遍扫描: 第一遍标记correct(位置+字母都对),第二遍标记present/wrong
+- 避免重复计数: correct的字母在target_copy中标记为'#'
+```c
+// Pass 1: mark correct
+if (guess[i] == target[i]) { eval[i]=CORRECT; target_copy[i]='#'; }
+// Pass 2: mark present or wrong
+for (j=0;j<WORD_LEN;j++) {
+    if (target_copy[j]==guess[i]) { eval[i]=PRESENT; target_copy[j]='#'; break; }
+}
+```
+
+**难点3: 键盘状态升级**
+- 同一字母多次出现只升级状态(0→1→2→3)
+- wrong→present→correct, 不能降级
+
+#### WASM编译命令
+```bash
+source ~/emsdk/emsdk_env.sh
+emcc -O3 \
+  -s MODULARIZE=1 \
+  -s EXPORT_NAME="WordleModule" \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -s TOTAL_MEMORY=64MB \
+  --no-entry -o wordle.js game.c wasm_main.c
+```
+
+#### 文件位置
+- `projects/wordle-wasm/` — game.c + game.h + wasm_main.c + index.html
+
+---
+
+### 3. 技术栈进步 (新增)
+
+| 领域 | 进步 |
+|------|------|
+| BFS Flood Fill | LC200岛屿计数,grid就地标记防止重复访问 |
+| DFS Backtracking | LC79单词搜索,board[i][j]='#'标记回溯恢复 |
+| Greedy | LC55/LV45/LV455/LV134,多种greedy模式 |
+| 数学建模 | LC621 Task Scheduler idle slots公式推导 |
+| DOM渲染 | Wordle无Canvas,纯DOM+CSS渲染 |
+| MODULARIZE | Emscripten MODULARIZE=1 Promise模式,函数调用方式 |
+
+### 4. WASM游戏队列状态
+
+**WASM游戏累计**: 14个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders, Breakout, Pac-Man, Flappy Bird, Pong, +1 more, **Wordle**)
+
+**队列更新**:
+- ✅ Wordle WASM — 2026-04-02 完成, Playwright PASS
+- 🆕 新队列: Mahjong Solitaire / Hextris / WASM Builder Script
+
+---
+
+*版本: 1.13 | 更新: 2026-04-02 00:15*
+
+---
+
+## 2026-04-02 新增
+
+### WASM Game Builder Script
+- **路径**: `projects/wasm-game-builder/`
+- **功能**: 批量编译+测试所有WASM游戏
+  - `./build-all.sh --games "wordle,snake"` 编译+测试指定游戏
+  - `./build-all.sh --compile-only` 仅编译
+  - `./build-all.sh --test-only` 仅测试
+  - 自动提取EMSCRIPTEN_KEEPALIVE函数用于EXPORTED_FUNCTIONS
+  - Playwright HTTP server测试(CORS问题解决方案)
+- **关键修复**:
+  - macOS bash 3.2 `${var^}` 不支持 → sed+awk替代
+  - BSD awk `match(s,r,arr)` 三参数 → grep -Eo替代
+  - file:// CORS阻止WASM → Node.js HTTP server (port 8765)
+  - `set -e` + `((var++))` 返回1 → `|| true`保护
+  - `[[ expr ]]` 假时返回1 → 分开检查+存储结果
+- **测试**: Wordle ✅ Snake ✅ Breakout ✅
+
+### 代码练习: LC407 Trapping Rain Water II
+- 算法: Min-Heap BFS (边界flood inward)
+- 难度: Hard
+- 代码: `projects/lc-practice/lc407_trapping_rain_ii.cpp`
+- 关键: 用priority_queue遍历,每次取最小高度cell向外扩展
+
+*版本: 1.14 | 更新: 2026-04-02 01:44*
+
+---
+
+## 2026-04-02 凌晨补充 (续) - Mahjong Solitaire + LC322 + LC416
+
+### 1. 代码练习 (LeetCode) - LC322 Coin Change + LC416
+
+#### LC322 Coin Change (Medium)
+- 问题: 最少硬币数凑成 amount
+- 算法: DP 1D + BFS
+- dp[i] = min(dp[i], dp[i-coin]+1)
+- 结果: Test1=3 ✅, Test2=-1 ✅, Test3=0 ✅, Test4=3 ✅
+- 代码: `projects/lc-practice/lc322_coin_change.cpp`
+
+#### LC416 Partition Equal Subset Sum (Medium)
+- 问题: 数组能否分成两部分和相等
+- 算法: 0-1背包DP
+- target = sum/2, dp[i] = 是否能凑成 i
+- 结果: Test1=1 ✅ (1+5+11+13=30), Test2-6 ✅, Test7=1 ✅
+- 代码: `projects/lc-practice/lc416_partition.cpp`
+
+### 2. 游戏开发: Mahjong Solitaire WASM ✅
+
+#### 完成内容
+- 纯C游戏逻辑 (game.c/game.h/wasm_main.c)
+- 3层立体麻将布局: Layer0=12×8, Layer1=10×6, Layer2=8×4
+- 自由牌判定: (1)上层无覆盖 AND (2)左OR右边开放
+- 选牌+配对消除机制
+- Canvas 2D渲染: 3D层级效果(offset_x/y)
+- 14种麻将牌(竹子/筒/万/风/龙)
+- Emscripten编译: mahjong.js + mahjong.wasm
+- Playwright测试: PASS ✅ (无Console错误)
+
+#### Playwright测试结果
+- Title: Mahjong Solitaire ✅
+- Canvas: true ✅
+- Score/Tiles显示 ✅
+- Console errors: NONE ✅
+
+#### 技术难点 & 解决方案
+
+**难点1: Emscripten Module冲突**
+- 问题: mahjong.js已定义`var Module`, 重定义会覆盖
+- 解决: 在引入mahjong.js之前定义`var Module = { onRuntimeInitialized: fn }`
+- Emscripten会检查`typeof Module!="undefined"`,复用已有对象
+
+**难点2: 3D层级覆盖判定**
+- 问题: 判断某格子是否被上层格子覆盖
+- 解决: 从当前layer向上遍历所有layer,检查是否有tile占据该位置
+- 上层tile覆盖下层2×2区域
+
+**难点3: 自由牌判定(is_tile_free)**
+- 条件: 无上层覆盖 AND (左边空 OR 右边空)
+- 实现: 先检查所有上层layer,再检查同层左右邻居
+
+#### WASM编译命令
+```bash
+source ~/emsdk/emsdk_env.sh
+emcc -O2 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 \
+  -s EXPORTED_FUNCTIONS="[...14 functions...]" \
+  game.c wasm_main.c -o mahjong.js
+```
+
+#### 文件结构
+```
+games/mahjong-solitaire-wasm/
+├── game.c       (纯C游戏逻辑, ~250行)
+├── game.h       (类型定义+常量)
+├── wasm_main.c  (Emscripten导出, 14个函数)
+├── index.html   (Canvas 2D渲染+输入+WASM加载)
+├── mahjong.js   (编译产物)
+└── mahjong.wasm (编译产物, ~11KB)
+```
+
+### 3. 技术栈进步 (新增)
+
+| 领域 | 进步 |
+|------|------|
+| Emscripten Module | 必须在script引入前定义,onRuntimeInitialized回调 |
+| Coin Change DP | dp[i]=min(dp[i],dp[i-coin]+1),INF=INT_MAX |
+| 0-1背包 | Partition Equal Subset Sum,逆序遍历避免重复 |
+| 麻将游戏 | 3D层级+自由牌判定+配对消除 |
+| Canvas 2D渲染 | offset_x/y实现3D层级视觉效果 |
+
+### 4. GitHub提交
+- 🆕 待提交: Mahjong Solitaire WASM
+
+---
+
+*版本: 1.15 | 更新: 2026-04-02 03:47*
