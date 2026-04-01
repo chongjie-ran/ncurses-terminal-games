@@ -4,42 +4,19 @@
 
 ### 1. 代码练习 (LeetCode)
 
-#### 新增题目: Sliding Window + Backtracking + BST
+#### 重点: Topological Sort + Union-Find + DP
 
 | 题目 | 难度 | 算法 | 核心洞察 |
 |------|------|------|----------|
-| LC3 Longest Substring Without Repeating | Medium | Sliding Window (HashMap/Array) | seen[c]>=left时shrink,更新left=max(left,seen[c]+1) |
-| LC22 Generate Parentheses | Medium | Backtracking/Recursion | open<n时加'(' , close<open时加')', Catalan数C_n |
-| LC98 Validate Binary Search Tree | Medium | Tree DFS (Range check) | 递归传递(min,max), node.val必须在(min,max)区间 |
 | LC207 Course Schedule | Medium | Topological Sort (Kahn's BFS) | 构建indegree数组,BFS队列弹出0入度节点 |
 | LC684 Redundant Connection | Medium | Union-Find | 路径压缩+按秩合并,检测到cycle的边即为答案 |
 | LC42 Trapping Rain Water | Hard | 单调栈 | 递减栈,维护宽度和高度,类似LC84但更复杂 |
 | LC739 Daily Temperatures | Medium | 单调栈 | 递减栈,找下一个更大元素的下标差 |
 | LC85 Maximal Rectangle | Hard | 单调栈 | 转化为一排柱子求最大矩形,结合LC84 |
 | LC208 Implement Trie | Medium | Trie | 前缀树,26个子指针数组,insert/search/startsWith |
-
-**Sliding Window 核心模式**:
-```c
-int left = 0, maxLen = 0;
-for (int right = 0; right < n; right++) {
-    if (seen[c] >= left) left = seen[c] + 1; // shrink
-    seen[c] = right;
-    maxLen = max(maxLen, right - left + 1);
-}
-```
-
-**Backtracking (LC22 Generate Parentheses) 核心模式**:
-- 递归参数: open数, close数
-- 添加'(': open < n
-- 添加')': close < open
-- 结束: current.size() == 2*n
-- 结果数: Catalan数 C_n = (2n)!/(n!(n+1)!)
-
-**BST Validation 核心模式**:
-- 递归传递合法区间: dfs(node, minVal, maxVal)
-- 左子树: maxVal = node.val (所有节点 < node.val)
-- 右子树: minVal = node.val (所有节点 > node.val)
-- 必须严格小于/大于: <= minVal 或 >= maxVal → false
+| LC210 Course Schedule II | Medium | Topological Sort BFS | queue弹出顺序即拓扑序,visited==n有解 |
+| LC300 Longest Increasing Subsequence | Medium | Binary Search O(n log n) | tails数组+二分查找插入位置 |
+| LC1143 Longest Common Subsequence | Medium | DP + 滚动数组 | dp[i][j]=dp[i-1][j-1]+1或max(dp[i-1][j],dp[i][j-1]) |
 
 **Topological Sort (Kahn's BFS) 核心模式**:
 - 构建adjacency list + indegree array
@@ -52,6 +29,34 @@ for (int right = 0; right < n; right++) {
 - `union(x,y)`: 按秩合并,返回false表示already connected(检测到环)
 - 路径压缩: `parent[x] = find(parent[x])`
 - 按秩: rank小的挂载到rank大的
+
+**Topological Sort vs DFS**:
+- BFS Kahn: 需要indegree数组,直观但需要额外空间
+- DFS: 递归标记visited/visiting, visiting状态遇到visited=环
+
+**Union-Find vs DFS/BFS**:
+- Union-Find: 适合动态加边的场景,O(α(n))接近O(1)
+- DFS: 需要 visited set,每次需要遍历图
+
+**Trie 核心模式**:
+- 每个节点26个子指针(children数组)对应a-z
+- insert: 沿路径走,没有就创建,最后标记is_end=true
+- search: 沿路径走,不存在返回false,是end返回true
+- startsWith: 同search但不检查is_end
+- 时间O(n) per op, 空间O(ALPHABET_SIZE * n)
+
+**LIS Binary Search 核心模式**:
+- tails[i] = 长度为i+1的LIS的最小尾元素(递增序列)
+- 二分查找: 找第一个>=nums[i]的位置
+- 如果插入位置==size,说明找到更长的LIS,size++
+- 时间O(n log n), 空间O(n)
+
+**LCS DP 核心模式**:
+- dp[i][j] = text1前i个与text2前j个的LCS长度
+- 字符相等: dp[i][j] = dp[i-1][j-1] + 1
+- 字符不等: dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+- 滚动数组优化: 只用两行,交替使用
+- 时间O(mn), 空间O(min(m,n))
 
 ---
 
@@ -130,108 +135,7 @@ projects/snake-wasm/
 
 ---
 
-### 3. 经验沉淀
-
-#### 技术难点1: Sliding Window变长窗口
-- 核心: `if (seen[c] >= left) left = seen[c] + 1` 收缩左边界
-- 时间O(n),空间O(min(charset_size, n))
-
-#### 技术难点2: Backtracking括号生成
-- Catalan数增长: n=3→5, n=4→14, n=5→42
-- open<n时加'(' ; close<open时加')'
-
-#### 技术难点3: BST严格边界检查
-- 必须用long long处理int边界值(INT_MIN/INT_MAX)
-- `node->val <= minVal || node->val >= maxVal` → false
-
-#### 技术难点4: Snake方向锁dir_timer
-- 防止一帧内多次改向导致180°翻转
-- 3帧锁定期内忽略方向输入
-
-#### 技术难点5: Reflect.apply替代Function.apply
-- `Function.apply(null, ["return f()"])` 是错误的!
-- 正确: `Reflect.apply(f, null, [])` 直接调用
-
-#### 技术难点6: Emscripten游戏命名一致性
-- game.c: `wasm_init_game()`, `wasm_tick_game()`
-- wasm_main.c: `EMSCRIPTEN_KEEPALIVE void wasm_init_game(void) { wasm_init_game(); }` 陷阱!
-- wasm_main.c中的wrapper函数名不能与game.c中相同!
-
----
-
-### 4. 技术栈进步
-
-| 领域 | 进步 |
-|------|------|
-| Sliding Window | HashMap+Array双实现, 变长窗口收缩模式 |
-| Backtracking | 括号生成,Catalan数递推 |
-| BST Validation | 递归区间传播, long long边界处理 |
-| Snake WASM | 方向锁, 速度递增, Canvas 2D渲染 |
-| WASM调试 | Reflect.apply替代复杂Function.apply |
-| Emscripten | MODULARIZE+WebAssembly.instantiate直接加载 |
-
----
-
-### 5. WASM游戏队列状态
-
-**WASM游戏累计**: 13个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders, Breakout, Pac-Man, Flappy Bird, Pong + 1 more)
-
-**队列状态**:
-- ✅ Snake WASM — 2026-04-01 完成, Playwright PASS, 无Console错误
-- ✅ 所有计划WASM游戏已完成!
-
----
-
-### 6. GitHub提交
-- `05364c7` — feat: Snake WASM - pure C + Canvas 2D (7 files, ~770 lines)
-
----
-
-## 2026-04-01 💻
-
-### 1. 代码练习 (LeetCode)
-
-#### 重点: Topological Sort + Union-Find
-
-| 题目 | 难度 | 算法 | 核心洞察 |
-|------|------|------|----------|
-| LC207 Course Schedule | Medium | Topological Sort (Kahn's BFS) | 构建indegree数组,BFS队列弹出0入度节点 |
-| LC684 Redundant Connection | Medium | Union-Find | 路径压缩+按秩合并,检测到cycle的边即为答案 |
-| LC42 Trapping Rain Water | Hard | 单调栈 | 递减栈,维护宽度和高度,类似LC84但更复杂 |
-| LC739 Daily Temperatures | Medium | 单调栈 | 递减栈,找下一个更大元素的下标差 |
-| LC85 Maximal Rectangle | Hard | 单调栈 | 转化为一排柱子求最大矩形,结合LC84 |
-| LC208 Implement Trie | Medium | Trie | 前缀树,26个子指针数组,insert/search/startsWith |
-
-**Topological Sort (Kahn's BFS) 核心模式**:
-- 构建adjacency list + indegree array
-- 队列初始放入所有indegree==0的节点
-- BFS: 弹出节点,访问邻居,邻居indegree--,入度为0则入队
-- 最后检查visited数量==n,否则存在环
-
-**Union-Find 核心模式**:
-- `find(x)`: 路径压缩,递归找root
-- `union(x,y)`: 按秩合并,返回false表示already connected(检测到环)
-- 路径压缩: `parent[x] = find(parent[x])`
-- 按秩: rank小的挂载到rank大的
-
-**Topological Sort vs DFS**:
-- BFS Kahn: 需要indegree数组,直观但需要额外空间
-- DFS: 递归标记visited/visiting, visiting状态遇到visited=环
-
-**Union-Find vs DFS/BFS**:
-- Union-Find: 适合动态加边的场景,O(α(n))接近O(1)
-- DFS: 需要 visited set,每次需要遍历图
-
-**Trie 核心模式**:
-- 每个节点26个子指针(children数组)对应a-z
-- insert: 沿路径走,没有就创建,最后标记is_end=true
-- search: 沿路径走,不存在返回false,是end返回true
-- startsWith: 同search但不检查is_end
-- 时间O(n) per op, 空间O(ALPHABET_SIZE * n)
-
----
-
-### 2. 游戏开发: Breakout WASM ✅
+### 3. 游戏开发: Breakout WASM ✅
 
 #### 完成内容
 - 从零创建纯C游戏逻辑 (game.c/game.h/wasm_main.c)
@@ -288,7 +192,7 @@ emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="BreakoutModule" \
 
 ---
 
-### 3. 游戏验证: Space Invaders WASM ✅
+### 4. 游戏验证: Space Invaders WASM ✅
 
 #### Playwright测试结果
 - Canvas exists: true ✅
@@ -297,7 +201,7 @@ emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="BreakoutModule" \
 
 ---
 
-### 4. 游戏验证: Pac-Man WASM ✅
+### 5. 游戏验证: Pac-Man WASM ✅
 
 #### 完成内容
 - 28×31迷宫, 4种幽灵(Blinky/Pinky/Inky/Clyde)
@@ -320,7 +224,7 @@ emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="BreakoutModule" \
 
 ---
 
-### 5. 游戏开发: Flappy Bird WASM ✅
+### 6. 游戏开发: Flappy Bird WASM ✅
 
 #### 完成内容
 - 从零创建纯C游戏逻辑 (game.c/game.h/wasm_main.c)
@@ -338,20 +242,9 @@ emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="BreakoutModule" \
 - Console errors: NONE ✅
 - Interaction test: PASS ✅
 
-#### 文件结构
-```
-projects/flappy-bird-wasm/
-├── game.c       (纯C游戏逻辑, ~140行)
-├── game.h       (类型定义+常量)
-├── wasm_main.c  (Emscripten导出)
-├── index.html   (Canvas 2D渲染+输入)
-├── flappy.js    (编译产物)
-└── flappy.wasm  (编译产物, 2.6KB)
-```
-
 ---
 
-### 6. 游戏开发: Pong WASM ✅
+### 7. 游戏开发: Pong WASM ✅
 
 #### 完成内容
 - 从零创建纯C游戏逻辑 (game.c/game.h/wasm_main.c)
@@ -368,7 +261,6 @@ projects/flappy-bird-wasm/
 - Canvas: true ✅
 - HUD: 0 : 0 ✅
 - Console errors: NONE ✅
-- TEST: PASS ✅
 
 #### 技术难点 & 解决方案
 
@@ -395,29 +287,9 @@ else if (diff < -AI_SPEED) g->right.y -= AI_SPEED;
 - 解决: game.h声明`extern PongGame g_state;`, game.c定义`PongGame g_state;`
 - wasm_main.c include game.h后直接使用g_state
 
-#### WASM编译命令
-```bash
-source ~/emsdk/emsdk_env.sh
-emcc -O2 -s MODULARIZE=1 -s EXPORT_NAME="PongModule" \
-  -s ALLOW_MEMORY_GROWTH=1 -s TOTAL_MEMORY=64MB \
-  -s EXPORTED_FUNCTIONS='["_wasm_init","_wasm_launch","_wasm_update","_wasm_get_state","_wasm_get_left_score","_wasm_get_right_score","_wasm_get_ball_x","_wasm_get_ball_y","_wasm_get_ball_radius","_wasm_get_paddle_y","_wasm_restart","_wasm_paddle_move"]' \
-  --no-entry -o pong.js game.c wasm_main.c
-```
-
-#### 文件结构
-```
-projects/pong-wasm/
-├── game.c       (纯C游戏逻辑)
-├── game.h       (类型定义+常量)
-├── wasm_main.c  (Emscripten导出)
-├── index.html   (Canvas 2D渲染+输入)
-├── pong.js      (编译产物)
-└── pong.wasm    (编译产物)
-```
-
 ---
 
-### 7. 经验沉淀
+### 8. 经验沉淀
 
 #### 技术难点1: Topological Sort环检测
 - Kahn's BFS: visited计数不等于n则存在环
@@ -446,13 +318,23 @@ projects/pong-wasm/
 - game.c: `PongGame g_state;` (非static)
 - wasm_main.c: include game.h后直接使用
 
+#### 技术难点7: LIS Binary Search O(n log n)
+- tails数组: tails[i]=长度为i+1的LIS的最小尾元素
+- 二分查找第一个>=x的位置
+- 如果位置==size,说明扩展了LIS长度
+
+#### 技术难点8: LCS DP滚动数组
+- dp[i][j]只依赖dp[i-1][j-1], dp[i-1][j], dp[i][j-1]
+- 滚动数组: 只需要两行prev/curr交替
+- 空间从O(mn)降到O(min(m,n))
+
 ---
 
-### 8. 技术栈进步
+### 9. 技术栈进步
 
 | 领域 | 进步 |
 |------|------|
-| Topological Sort | Kahn's BFS, indegree数组, 环检测 |
+| Topological Sort | Kahn's BFS, indegree数组, 环检测, 拓扑序收集 |
 | Union-Find | 路径压缩+按秩合并, 检测cycle |
 | 单调栈 | Trapping Rain Water, Daily Temperatures, Maximal Rectangle |
 | Trie | 前缀树, 26叉节点, insert/search/startsWith O(n) |
@@ -460,22 +342,26 @@ projects/pong-wasm/
 | Pac-Man WASM | 幽灵AI, frightened模式, 闪烁效果 |
 | Flappy Bird WASM | 重力物理, 管道生成, localStorage |
 | Pong WASM | AI对手, 球速递增, C extern状态共享 |
+| Snake WASM | 方向锁, 速度递增, Canvas 2D渲染 |
 | Playwright测试 | file:// CORS → HTTP server解决 |
 | 游戏架构 | 纯C游戏逻辑 + Canvas 2D渲染分离模式 |
+| LIS | Binary Search O(n log n), tails数组 |
+| LCS | 滚动数组DP空间优化 |
 
 ---
 
-### 9. WASM游戏队列状态
+### 10. WASM游戏队列状态
 
-**WASM游戏累计**: 12个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders, Breakout, Pac-Man, Flappy Bird, Pong)
+**WASM游戏累计**: 13个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders, Breakout, Pac-Man, Flappy Bird, Pong, +1 more)
 
 **队列状态**:
-- ✅ Pong WASM — 2026-04-01 完成, Playwright PASS
-- P3: Snake → WASM
+- ✅ Snake WASM — 2026-04-01 完成, Playwright PASS
+- ✅ 所有计划WASM游戏已完成!
 
 ---
 
-### 10. GitHub提交
+### 11. GitHub提交
+- `05364c7` — feat: Snake WASM - pure C + Canvas 2D (7 files, ~770 lines)
 - `eb8295a` — feat: Breakout WASM - pure C + Canvas 2D (6 files, 589 lines)
 - `0ca3e45` — feat: Flappy Bird WASM - pure C + Canvas 2D (8 files, 909 lines)
 
@@ -485,7 +371,7 @@ projects/pong-wasm/
 
 ### 1. 代码练习 (LeetCode)
 
-#### 重点: 滑动窗口 +  Expand Around Center + BFS Flood Fill
+#### 重点: 滑动窗口 + Expand Around Center + BFS Flood Fill
 
 | 题目 | 难度 | 算法 | 核心洞察 |
 |------|------|------|----------|
@@ -524,29 +410,9 @@ projects/pong-wasm/
 - 用 `(i*7+3) % (i+1)` 实现Fisher-Yates风格洗牌
 - 保证每次运行卡片顺序不同但可复现
 
-#### WASM编译命令
-```bash
-source ~/emsdk/emsdk_env.sh
-emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="MemoryMatchModule" \
-  -s ALLOW_MEMORY_GROWTH=1 -s TOTAL_MEMORY=64MB \
-  -s EXPORTED_FUNCTIONS='["_wasm_init","_wasm_tick","_wasm_click","_wasm_restart","_wasm_get_state","_wasm_get_moves","_wasm_get_matched","_wasm_get_card_state","_wasm_get_card_value","_wasm_get_grid_w","_wasm_get_grid_h","_malloc","_free"]' \
-  --no-entry -o memory_match.js wasm_main.c
-```
-
 ---
 
-### 3. 游戏开发队列更新
-
-**WASM游戏累计**: 5个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban)
-
-**队列状态**:
-- ✅ Memory Match WASM — 今日完成
-- P3: Tetris WASM
-- P3: Sokoban WASM
-
----
-
-### 4. 技术栈进步
+### 3. 技术栈进步
 
 | 领域 | 进步 |
 |------|------|
@@ -557,9 +423,210 @@ emcc -O3 -s MODULARIZE=1 -s EXPORT_NAME="MemoryMatchModule" \
 
 ---
 
-### 5. GitHub提交
+### 4. GitHub提交
 - `dcb63b3` — feat: Memory Match WASM - pure C + Canvas 2D (5 files, 441 lines)
 
 ---
 
-*版本: 1.10 | 更新: 2026-04-01*
+*版本: 1.11 | 更新: 2026-04-01*
+
+---
+
+## Segment Tree & Fenwick Tree (BIT) - 2026-04-01 晚间
+
+### 重点: 树状数组 + 坐标压缩
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC307 Range Sum Query - Mutable | Medium | Segment Tree (Iterative) | 叶子在size+idx, 父节点向上更新 |
+| LC315 Count of Smaller Numbers | Hard | BIT + Coordinate Compression | 从右往左, BIT前缀和查比当前小的数 |
+| LC493 Reverse Pairs | Hard | BIT + Coordinate Compression | 从左往右, BIT查询 > 2*nums[i] 的数 |
+
+### BIT (Fenwick Tree) 核心操作
+```
+Update(idx, delta):    while(idx <= n) { bit[idx] += delta; idx += idx & -idx; }
+QueryPrefix(idx):      while(idx > 0)  { sum += bit[idx];    idx -= idx & -idx; }
+RangeSum(l, r):        QueryPrefix(r) - QueryPrefix(l-1)
+```
+- 1-indexed: 输入idx时+1, 查询时处理边界
+- idx & -idx: lowbit, 树状数组核心
+
+### Segment Tree vs BIT
+| 特性 | Segment Tree | BIT |
+|------|-------------|-----|
+| 时间(单点更新+区间查询) | O(log n) | O(log n) |
+| 空间 | 4n | n+1 |
+| 代码复杂度 | 较高 | 极简 |
+| 灵活性 | 任意区间合并 | 仅前缀可合并操作 |
+
+### Coordinate Compression 模式
+```
+1. nums复制到sorted, 排序去重得uniq[]
+2. 二分查找每个nums[i]在uniq中的rank
+3. BIT/rank tree 用 rank (1-indexed) 作为索引
+关键: 确保2*nums[i]也在压缩空间中 (LC493)
+```
+
+### 315 Count of Smaller Numbers (从右往左)
+```
+for i = n-1 to 0:
+    res[i] = BIT.sum(rank(nums[i]) - 1)   // 比nums[i]小的数
+    BIT.add(rank(nums[i]), 1)              // 加入当前数
+```
+
+### 493 Reverse Pairs (从左往右)
+```
+for i = 0 to n-1:
+    res += BIT.sum(m-1) - BIT.sum(rank(2*nums[i]))  // 比2*nums[i]大的数
+    BIT.add(rank(nums[i]), 1)
+```
+
+### Segment Tree 迭代实现 (LC307)
+```
+- size = 下一个2的幂
+- 叶子节点: bit[size + idx] = nums[idx]
+- 父节点:   bit[i] = bit[2*i] + bit[2*i+1]
+- 单点更新: 从叶子上向上更新所有父节点
+- 区间查询: 从左右叶子向上合并
+```
+
+---
+
+## State Compression DP + Interval DP - 2026-04-01 夜间
+
+### 重点: State DP + Interval DP + Catalan
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC91 Decode Ways | Medium | Interval DP | dp[i]=dp[i-1]+dp[i-2],单字符+双字符 |
+| LC96 Unique BSTs | Medium | Catalan DP | G(n)=sum G(i-1)*G(n-i),Catalan数 |
+| LC123 Best Time Buy Sell III | Hard | State DP (4状态) | buy1/sell1/buy2/sell2递推 |
+| LC188 Best Time Buy Sell IV | Hard | State DP (k状态) | k对buy/sell,buy[j]=max(buy[j],sell[j-1]-price) |
+| LC198 House Robber | Medium | State DP | dp[i]=max(dp[i-1],dp[i-2]+nums[i]),空间O(1) |
+| LC213 House Robber II | Medium | State DP + 环形 | skip first vs skip last取max |
+| LC338 Counting Bits | Easy | Bit DP | dp[i]=dp[i>>1]+(i&1), O(n) popcount |
+| LC322 Coin Change | Medium | DP | dp[i]=min(dp[i],dp[i-coin]+1), INF=amount+1 |
+| LC377 Combination Sum IV | Medium | DP | dp[i]=sum(dp[i-nums[j]]),正序遍历 |
+| LC416 Partition Equal Subset | Medium | DP | target=sum/2, 0-1背包,逆序遍历 |
+| LC62 Unique Paths | Medium | DP | dp[i][j]=dp[i-1][j]+dp[i][j-1],空间O(n) |
+| LC64 Minimum Path Sum | Medium | DP | dp[j]=min(dp[j],dp[j-1])+grid[i][j] |
+| LC131 Palindrome Partitioning | Hard | Interval DP | isPal预计算+dp递推 |
+| LC174 Dungeon Game | Hard | DP (逆序) | dp[i][j]=max(1,min(dp[i+1][j],dp[i][j+1])-dungeon[i][j]) |
+
+### State DP 核心模式
+
+**House Robber (打家劫舍)**:
+```
+dp[i] = max(dp[i-1], dp[i-2] + nums[i])
+空间优化: prev2=nums[0], prev1=max(nums[0],nums[1])
+```
+
+**House Robber II (环形)**:
+```
+两种情况:
+1. 偷第一间, 不偷最后一间 → houses[0..n-2]
+2. 不偷第一间, 偷最后一间 → houses[1..n-1]
+取max(情况1, 情况2)
+```
+
+**Stock Sell Buy 系列 (多状态)**:
+```
+k=2时4状态:
+buy1  = max(buy1,  -price[i])
+sell1 = max(sell1, buy1  + price[i])
+buy2  = max(buy2,  sell1 - price[i])
+sell2 = max(sell2, buy2  + price[i])
+
+k=任意时:
+buy[j]  = max(buy[j],  sell[j-1] - price[i])
+sell[j] = max(sell[j], buy[j]   + price[i])
+```
+
+### Interval DP 核心模式
+
+**Decode Ways**:
+```
+dp[0]=1 (空字符串=1)
+dp[1]=1 if s[0]!='0' else 0
+dp[i] += dp[i-1] if s[i-1]!='0'
+dp[i] += dp[i-2] if s[i-2..i-1] in [10,26]
+```
+
+**Unique BSTs (Catalan)**:
+```
+C_0=1, C_1=1, C_2=2, C_3=5, C_4=14, C_5=42
+C_n = sum_{i=0}^{n-1} C_i * C_{n-1-i}
+```
+
+**Palindrome Partitioning**:
+```
+1. 预计算isPal[i][j]: s[i]==s[j] && (j-i<2 || isPal[i+1][j-1])
+2. dp[i] = 0 if isPal[0][i]
+3. dp[i] = min(dp[j] + 1) for j in [0,i) where isPal[j+1][i]
+```
+
+**Dungeon Game (逆序DP)**:
+```
+从右下角向左上角推导:
+need = min(next_row, next_col)
+dp[i][j] = max(1, need - dungeon[i][j])
+最终答案: dp[0][0]
+```
+
+### 验证结果
+```
+=== LC91 Decode Ways ===
+"12" = 2 ✅ "226" = 3 ✅ "06" = 0 ✅
+
+=== LC96 Unique BSTs (Catalan) ===
+n=1: 1 ✅ n=3: 5 ✅ n=4: 14 ✅ n=5: 42 ✅
+
+=== LC198 House Robber ===
+[1,2,3,1] = 4 ✅ [2,7,9,3,1] = 12 ✅
+
+=== LC213 House Robber II (circular) ===
+[2,3,2] = 3 ✅ [1,2,3] = 3 ✅ [1,2,3,4] = 6 ✅
+
+=== LC123 Best Time Buy Sell III ===
+[3,3,5,0,0,3,1,4] = 6 ✅ [1,2,3,4,5] = 4 ✅
+
+=== LC338 Counting Bits ===
+countBits(5): [0,1,1,2,1,2] ✅
+
+=== LC322 Coin Change ===
+[1,2,5] amount=11 = 3 ✅ [2] amount=3 = -1 ✅
+
+=== LC377 Combination Sum IV ===
+[1,2,3] target=4 = 7 ✅
+
+=== LC416 Partition Equal Subset ===
+[1,5,11,5] = true ✅ [1,2,3,5] = false ✅
+
+=== LC62 Unique Paths ===
+m=3,n=7 = 28 ✅ m=3,n=2 = 3 ✅
+
+=== LC64 Minimum Path Sum ===
+[[1,3,1],[1,5,1]] = 6 ✅
+
+=== LC131 Palindrome Partitioning ===
+"aab" minCut = 1 ✅
+
+=== LC174 Dungeon Game ===
+[[-2,-3,3],[-5,-10,1]] = 6 ✅
+```
+
+### 代码位置
+- `lc-practice/evening_2026-04-01.c` — 14题完整实现+测试
+
+### 技术栈新进步
+| 领域 | 进步 |
+|------|------|
+| State DP | 多状态递推(buy/sell), 环形化简为两次线性DP |
+| Interval DP | isPal预计算+dp递推, Dungeon逆序DP |
+| Catalan数 | BST计数,组合数学应用 |
+| Bit DP | dp[i]=dp[i>>1]+(i&1) O(n) popcount |
+| 0-1背包 | Partition Equal Subset Sum,逆序遍历防止重复 |
+
+---
+
+*版本: 1.12 | 更新: 2026-04-01 21:44*
