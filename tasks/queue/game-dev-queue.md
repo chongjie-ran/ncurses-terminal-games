@@ -21,6 +21,8 @@
 | **Mahjong Solitaire WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 3层立体麻将, 自由牌判定, Playwright PASS |
 | **Hextris WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, odd-q offset hex grid, 3-piece types, Playwright PASS |
 | **Gomoku WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 15×15 board, 5-in-a-row win, star points, last-stone marker, Playwright PASS |
+| **Connect Four WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 7x6 grid, gravity drop, 4-in-a-row win, 2-player, Playwright PASS |
+| **Sudoku WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 9x9 grid, backtracking solver, candidates, hints, 4 difficulty levels, Playwright PASS |
 | **WASM Game Builder Script** | ✅ Built & Tested (2026-04-02) | 批量编译+测试所有WASM游戏, 支持--games过滤, HTTP server测试, Playwright集成 |
 
 ### In Progress
@@ -31,7 +33,8 @@
 ### Queue (Next Up)
 | Game | Priority | Notes |
 |------|----------|-------|
-| TBD | P1 | Suggest next game |
+| Battleship WASM | P1 | 10x10 grid, ship placement, hit/miss tracking |
+| Connect Four (AI) WASM | P2 | Add AI opponent to existing Connect Four |
 
 ### Architecture Note
 - Pure C game logic (game.c/game.h) - no raylib dependency
@@ -53,22 +56,7 @@
 - WASM Builder: grep+sed提取EMSCRIPTEN_KEEPALIVE函数, JSON格式EXPORTED_FUNCTIONS, HTTP server解决CORS
 - Hextris: odd-q offset hex coordinates, 6-direction movement, flat-topped hex rendering
 - Gomoku: 15×15 board, 4-direction win check (horizontal/vertical/diag), 5-in-a-row win detection
+- Connect Four: 7x6 grid, gravity drop, 4-direction win detection, win line rendering
+- Sudoku: 9×9 grid, backtracking solver, candidate bitmask, puzzle generation with solvability check, 4 difficulty levels
 
-## Raylib Games (C++)
-
-### Completed ✅
-| Game | Status | Notes |
-|------|--------|-------|
-| Snake Raylib | ✅ Deployed | 5 deployed locations |
-
-### Deferred (WASM first)
-- 2048 Raylib → Replaced by 2048 WASM
-- Breakout Raylib → Replaced by Breakout WASM (2026-04-01)
-- Pong Raylib → Replaced by Pong WASM (2026-04-01)
-- Flappy Bird Raylib → Replaced by Flappy Bird WASM (2026-04-01)
-- Tetris Raylib → Replaced by Tetris WASM (2026-04-01)
-- Frogger Raylib → Replaced by Frogger WASM (2026-04-01)
-- Sokoban Raylib → Replaced by Sokoban WASM (2026-04-01)
-- Space Invaders Raylib → Replaced by Space Invaders WASM (2026-04-01)
-
-*Last updated: 2026-04-02 (Gomoku WASM added)*
+*Last updated: 2026-04-02 (Sudoku WASM added)*
