@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connect Four - WASM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  color: #fff;
+  user-select: none;
+}
+h1 { color: #e94560; font-size: 2.2rem; margin-bottom: 8px; text-shadow: 0 0 20px #e94560; }
+#status {
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+  min-height: 1.5em;
+  color: #eef;
+}
+#canvas {
+  border: 4px solid #e94560;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 30px rgba(233,69,96,0.3);
+  background: #16213e;
+}
+</style>
+</head>
+<body>
+<h1>Connect Four</h1>
+<div id="status"></div>
+<canvas id="canvas"></canvas>
+<script>
+const COLS = 7, ROWS = 6;
+const CELL = 70;
+const GAP = 8;
+const W = COLS * CELL + GAP * 2;
+const H = ROWS * CELL + GAP * 2 + 30;
+const R = CELL * 0.4;
+
+let Game = {};
+let state = 0; // 0=menu, 1=playing, 2=gameover
+let player = 1;
+let winner = 0;
+let winLine = { x1:0,y1:0,x2:0,y2:0,type:0};
+let hoverCol = -1;
+let lastDrop = {col:-1, row:-1};
+
+const canvas = document.getElementById('canvas');
+canvas.width = W; canvas.height = H;
+const ctx = canvas.getContext('2d');
+
+const CELL_EMPTY = 0, CELL_P1 = 1, CELL_P2 = 2;
+
+function drawBoard() {
+  ctx.clearRect(0, 0, W, H);
+  // Background
+  ctx.fillStyle = '#16213e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Column hover highlight
+  if (hoverCol >= 0 && state === 1 && Game.cf_can_drop) {
+    if (Game.cf_can_drop(hoverCol)) {
+      ctx.fillStyle = 'rgba(233,69,96,0.15)';
+      ctx.fillRect(GAP + hoverCol * CELL, GAP, CELL, ROWS * CELL);
+    }
+  }
+
+  // Draw cells
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      let x = GAP + c * CELL + CELL / 2;
+      let y = GAP + 30 + r * CELL + CELL / 2;
+
+      // Cell background (empty slot)
+      ctx.beginPath();
+      ctx.arc(x, y, R, 0, Math.PI * 2);
+      ctx.fillStyle = '#0f3460';
+      ctx.fill();
+
+      // Disc
+      let val = Game.cf_get_cell ? Game.cf_get_cell(r, c) : 0;
+      if (val === CELL_P1) {
+        ctx.beginPath();
+        ctx.arc(x, y, R - 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#e94560';
+        ctx.fill();
+        // Shine
+        ctx.beginPath();
+        ctx.arc(x - R*0.25, y - R*0.25, R*0.2, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fill();
+      } else if (val === CELL_P2) {
+        ctx.beginPath();
+        ctx.arc(x, y, R - 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#f9d923';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x - R*0.25, y - R*0.25, R*0.2, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fill();
+      }
+    }
+  }
+
+  // Draw winning line
+  if (state === 2 && winner !== 3) {
+    let x1 = GAP + winLine.x1 * CELL + CELL / 2;
+    let y1 = GAP + 30 + winLine.y1 * CELL + CELL / 2;
+    let x2 = GAP + winLine.x2 * CELL + CELL / 2;
+    let y2 = GAP + 30 + winLine.y2 * CELL + CELL / 2;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 10;
+    ctx.globalAlpha = 0.3;
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
+  }
+}
+
+function updateStatus() {
+  let el = document.getElementById('status');
+  if (state === 0) {
+    el.textContent = 'Click canvas to start!';
+  } else if (state === 1) {
+    let msg = player === 1 ? '🔴 Red\'s turn' : '🟡 Yellow\'s turn';
+    el.textContent = msg;
+  } else if (state === 2) {
+    if (winner === 3) el.textContent = '🤝 Draw! Click to restart.';
+    else el.textContent = (winner === 1 ? '🔴 Red' : '🟡 Yellow') + ' wins! Click to restart.';
+  }
+}
+
+function getCol(x) {
+  return Math.floor((x - GAP) / CELL);
+}
+
+function handleClick(e) {
+  let rect = canvas.getBoundingClientRect();
+  let x = e.clientX - rect.left;
+  let y = e.clientY - rect.top;
+
+  if (state === 0 || state === 2) {
+    if (Game.cf_start_game) Game.cf_start_game();
+    state = 1; player = 1; winner = 0;
+    drawBoard(); updateStatus();
+    return;
+  }
+
+  let col = getCol(x);
+  if (col < 0 || col >= COLS) return;
+  if (Game.cf_can_drop && !Game.cf_can_drop(col)) return;
+
+  let row = -1;
+  if (Game.cf_drop_disc) row = Game.cf_drop_disc(col);
+  if (row < 0) return;
+
+  lastDrop = {col, row};
+
+  state = Game.cf_get_state ? Game.cf_get_state() : 1;
+  player = Game.cf_get_player ? Game.cf_get_player() : 1;
+  winner = Game.cf_get_winner ? Game.cf_get_winner() : 0;
+
+  if (winner !== 0 && winner !== 3) {
+    winLine.x1 = Game.cf_get_win_x1 ? Game.cf_get_win_x1() : 0;
+    winLine.y1 = Game.cf_get_win_y1 ? Game.cf_get_win_y1() : 0;
+    winLine.x2 = Game.cf_get_win_x2 ? Game.cf_get_win_x2() : 0;
+    winLine.y2 = Game.cf_get_win_y2 ? Game.cf_get_win_y2() : 0;
+  }
+
+  drawBoard();
+  updateStatus();
+}
+
+canvas.addEventListener('click', handleClick);
+
+canvas.addEventListener('mousemove', (e) => {
+  let rect = canvas.getBoundingClientRect();
+  hoverCol = getCol(e.clientX - rect.left);
+  drawBoard();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoverCol = -1;
+  drawBoard();
+});
+
+canvas.addEventListener('click', handleClick);
+
+// WASM init
+function initWasm() {
+  Game = {
+    cf_start_game: Module._cf_start_game,
+    cf_drop_disc: Module._cf_drop_disc,
+    cf_get_cell: Module._cf_get_cell,
+    cf_can_drop: Module._cf_can_drop,
+    cf_get_state: Module._cf_get_state,
+    cf_get_player: Module._cf_get_player,
+    cf_get_winner: Module._cf_get_winner,
+    cf_get_win_x1: Module._cf_get_win_x1,
+    cf_get_win_y1: Module._cf_get_win_y1,
+    cf_get_win_x2: Module._cf_get_win_x2,
+    cf_get_win_y2: Module._cf_get_win_y2,
+  };
+  if (Game.cf_start_game) Game.cf_start_game();
+  state = 1;
+  player = 1;
+  drawBoard();
+  updateStatus();
+}
+
+function init() {
+  drawBoard();
+  updateStatus();
+}
+
+init();
+</script>
+<script src="connect4.js"></script>
+</body>
+</html>

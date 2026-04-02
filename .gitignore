@@ -60,9 +60,10 @@ projects/lc124_max_path_sum
 **/sokoban-raylib/sokoban-raylib
 **/sokoban-raylib/*.o
 node_modules
-projects/
 memory/
 SOUL.md
 TOOLS.md
 USER.md
 AGENTS.md
+projects/test-results/
+projects/node_modules/
