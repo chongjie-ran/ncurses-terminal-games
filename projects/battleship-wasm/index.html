@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battleship WASM</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1b2a;
+    color: #e0e6ed;
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 { color: #4cc9f0; margin-bottom: 8px; font-size: 2rem; }
+  .subtitle { color: #8899a6; margin-bottom: 20px; font-size: 0.9rem; }
+  .status-bar {
+    display: flex; gap: 16px; margin-bottom: 16px;
+    background: #1b2838; padding: 10px 20px; border-radius: 8px;
+    font-size: 0.85rem;
+  }
+  .status-item { display: flex; gap: 6px; }
+  .status-label { color: #8899a6; }
+  .status-value { color: #4cc9f0; font-weight: bold; }
+  .phase-banner {
+    background: #1b4fcc; color: #fff; padding: 8px 24px;
+    border-radius: 6px; margin-bottom: 16px; font-weight: bold;
+    font-size: 1rem;
+  }
+  .ship-selector {
+    display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center;
+  }
+  .ship-btn {
+    padding: 6px 14px; border: 2px solid #4cc9f0; background: transparent;
+    color: #4cc9f0; border-radius: 6px; cursor: pointer; font-size: 0.8rem;
+    transition: all 0.15s;
+  }
+  .ship-btn:hover { background: #4cc9f033; }
+  .ship-btn.selected { background: #4cc9f0; color: #0d1b2a; font-weight: bold; }
+  .ship-btn.placed { border-color: #52b788; color: #52b788; text-decoration: line-through; }
+  .ship-btn.placed.selected { background: #52b788; color: #0d1b2a; }
+  .controls { display: flex; gap: 8px; margin-bottom: 16px; }
+  .ctrl-btn {
+    padding: 8px 20px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 0.85rem; font-weight: bold; transition: all 0.15s;
+  }
+  .ctrl-btn.primary { background: #4cc9f0; color: #0d1b2a; }
+  .ctrl-btn.primary:hover { background: #3ab8e0; }
+  .ctrl-btn.danger { background: #e63946; color: #fff; }
+  .ctrl-btn.danger:hover { background: #c5303c; }
+  .ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .orient-btn {
+    padding: 6px 14px; border: 2px solid #f4a261; background: transparent;
+    color: #f4a261; border-radius: 6px; cursor: pointer; font-size: 0.8rem;
+    transition: all 0.15s;
+  }
+  .orient-btn.selected { background: #f4a261; color: #0d1b2a; }
+  .game-container { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
+  .board-section { display: flex; flex-direction: column; align-items: center; }
+  .board-title { color: #4cc9f0; margin-bottom: 8px; font-size: 1rem; font-weight: bold; }
+  .board-labels { display: flex; padding-left: 28px; margin-bottom: 2px; }
+  .col-label { width: 36px; text-align: center; color: #8899a6; font-size: 0.75rem; }
+  .board-row { display: flex; align-items: center; }
+  .row-label { width: 28px; text-align: center; color: #8899a6; font-size: 0.75rem; }
+  .board-grid {
+    display: grid; grid-template-columns: repeat(10, 36px);
+    grid-template-rows: repeat(10, 36px); border: 2px solid #4cc9f044;
+  }
+  .cell {
+    width: 36px; height: 36px; border: 1px solid #4cc9f022;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; cursor: pointer; transition: background 0.1s;
+  }
+  .cell:hover:not(.disabled) { background: #4cc9f022; }
+  .cell.disabled { cursor: default; }
+  /* Enemy board cell states */
+  .cell.miss { background: #2a3f5f; }
+  .cell.miss::after { content: '·'; color: #4a6fa5; font-size: 1.4rem; }
+  .cell.hit { background: #e6394633; }
+  .cell.hit::after { content: '💥'; font-size: 0.9rem; }
+  /* Player board cell states */
+  .cell.ship { background: #4cc9f022; }
+  .cell.ship-here { background: #4cc9f055; }
+  .cell.ship-hit { background: #e6394666; }
+  .cell.ship-hit::after { content: '💥'; font-size: 0.9rem; }
+  .cell.placement-valid { background: #52b78833; }
+  .cell.placement-invalid { background: #e6394633; }
+  .result-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #0d1b2aee; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  .result-overlay.hidden { display: none; }
+  .result-title { font-size: 3rem; margin-bottom: 16px; }
+  .result-title.win { color: #52b788; }
+  .result-title.lose { color: #e63946; }
+  .result-stats { color: #8899a6; font-size: 1.1rem; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<h1>🚢 Battleship WASM</h1>
+<div class="subtitle">Pure C + Emscripten — Place your fleet and sink the enemy!</div>
+
+<div class="status-bar">
+  <div class="status-item"><span class="status-label">Hits:</span><span class="status-value" id="hits">0</span></div>
+  <div class="status-item"><span class="status-label">Misses:</span><span class="status-value" id="misses">0</span></div>
+  <div class="status-item"><span class="status-label">Sunk:</span><span class="status-value" id="sunk">0</span></div>
+</div>
+
+<div class="phase-banner" id="phase-banner">🚢 Phase 1: Place Your Ships</div>
+
+<div id="placement-ui">
+  <div class="ship-selector" id="ship-selector"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+    <button class="orient-btn selected" id="orient-h" onclick="setOrientation(1)">→ Horizontal</button>
+    <button class="orient-btn" id="orient-v" onclick="setOrientation(0)">↓ Vertical</button>
+    <button class="ctrl-btn primary" onclick="autoPlace()">🚀 Auto Place</button>
+    <button class="ctrl-btn danger" onclick="resetGame()">🔄 Reset</button>
+  </div>
+</div>
+
+<div class="game-container">
+  <div class="board-section">
+    <div class="board-title">🛡️ Your Fleet</div>
+    <div class="board-labels" id="player-col-labels"></div>
+    <div id="player-board"></div>
+  </div>
+  <div class="board-section">
+    <div class="board-title">🎯 Enemy Waters</div>
+    <div class="board-labels" id="enemy-col-labels"></div>
+    <div id="enemy-board"></div>
+  </div>
+</div>
+
+<div class="result-overlay hidden" id="result-overlay">
+  <div class="result-title" id="result-title">YOU WIN!</div>
+  <div class="result-stats" id="result-stats"></div>
+  <button class="ctrl-btn primary" onclick="resetGame()">🔄 Play Again</button>
+</div>
+
+<script>
+var Module = {};
+var gameReady = false;
+var horizontal = 1;
+var selectedShip = -1;
+var placingMode = false;
+var hoverCell = null;
+
+const SHIPS = [
+  { name: 'Carrier (5)', size: 5 },
+  { name: 'Battleship (4)', size: 4 },
+  { name: 'Cruiser (3)', size: 3 },
+  { name: 'Submarine (3)', size: 3 },
+  { name: 'Destroyer (2)', size: 2 }
+];
+const BOARD_SIZE = 10;
+
+function initUI() {
+  // Column labels
+  const cols = 'ABCDEFGHIJ';
+  ['player-col-labels','enemy-col-labels'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const span = document.createElement('div');
+      span.className = 'col-label';
+      span.textContent = cols[c];
+      el.appendChild(span);
+    }
+  });
+
+  // Ship selector
+  const sel = document.getElementById('ship-selector');
+  sel.innerHTML = '';
+  SHIPS.forEach((s, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'ship-btn';
+    btn.id = 'ship-btn-' + i;
+    btn.textContent = s.name;
+    btn.onclick = () => selectShip(i);
+    sel.appendChild(btn);
+  });
+
+  // Player board
+  const pb = document.getElementById('player-board');
+  pb.innerHTML = '';
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'board-row';
+    const rl = document.createElement('div');
+    rl.className = 'row-label';
+    rl.textContent = r + 1;
+    rowDiv.appendChild(rl);
+
+    const grid = document.createElement('div');
+    grid.className = 'board-grid';
+    grid.id = 'player-grid';
+    grid.style.display = 'grid';
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.id = 'p-' + r + '-' + c;
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      cell.onclick = () => onPlayerBoardClick(r, c);
+      cell.onmouseenter = () => onPlayerBoardHover(r, c);
+      cell.onmouseleave = () => onPlayerBoardLeave(r, c);
+      grid.appendChild(cell);
+    }
+    rowDiv.appendChild(grid);
+    pb.appendChild(rowDiv);
+  }
+
+  // Enemy board
+  const eb = document.getElementById('enemy-board');
+  eb.innerHTML = '';
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'board-row';
+    const rl = document.createElement('div');
+    rl.className = 'row-label';
+    rl.textContent = r + 1;
+    rowDiv.appendChild(rl);
+
+    const grid = document.createElement('div');
+    grid.className = 'board-grid';
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.id = 'e-' + r + '-' + c;
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      cell.onclick = () => onEnemyBoardClick(r, c);
+      grid.appendChild(cell);
+    }
+    rowDiv.appendChild(grid);
+    eb.appendChild(rowDiv);
+  }
+
+  Module._battleship_init();
+  gameReady = true;
+}
+
+function selectShip(idx) {
+  if (!gameReady) return;
+  if (Module._battleship_get_ship_count() > idx) return; // already placed
+  selectedShip = idx;
+  placingMode = true;
+  document.querySelectorAll('.ship-btn').forEach((b, i) => {
+    b.classList.toggle('selected', i === idx);
+  });
+}
+
+function setOrientation(h) {
+  horizontal = h ? 1 : 0;
+  document.getElementById('orient-h').classList.toggle('selected', h);
+  document.getElementById('orient-v').classList.toggle('selected', !h);
+  if (hoverCell && placingMode) previewPlacement(hoverCell.r, hoverCell.c);
+}
+
+function getShipCount() { return Module._battleship_get_ship_count(); }
+
+function updateShipButtons() {
+  const count = getShipCount();
+  SHIPS.forEach((s, i) => {
+    const btn = document.getElementById('ship-btn-' + i);
+    if (!btn) return;
+    const isPlaced = i < count;
+    btn.classList.toggle('placed', isPlaced);
+    btn.classList.toggle('selected', i === selectedShip && !isPlaced);
+    if (isPlaced && i === selectedShip) selectedShip = -1;
+  });
+  // Update phase banner
+  const banner = document.getElementById('phase-banner');
+  const state = Module._battleship_get_game_state();
+  if (state === 0) {
+    banner.textContent = '🚢 Phase 1: Place Your Ships (' + count + '/' + SHIPS.length + ')';
+    document.getElementById('placement-ui').style.display = '';
+  } else if (state === 1) {
+    banner.textContent = '⚔️ Phase 2: Battle! Fire at Enemy Waters!';
+    document.getElementById('placement-ui').style.display = 'none';
+  } else {
+    document.getElementById('placement-ui').style.display = 'none';
+  }
+}
+
+function onPlayerBoardClick(r, c) {
+  if (!gameReady) return;
+  const state = Module._battleship_get_game_state();
+  if (state !== 0) return; // Only in placing phase
+  if (selectedShip < 0) return;
+
+  const result = Module._battleship_place_ship(selectedShip, r, c, horizontal);
+  if (result) {
+    placingMode = false;
+    selectedShip = -1;
+    clearPreview();
+    renderBoards();
+    updateShipButtons();
+    updateStatusBar();
+  }
+}
+
+function onPlayerBoardHover(r, c) {
+  if (!gameReady) return;
+  hoverCell = { r, c };
+  if (placingMode && selectedShip >= 0) {
+    previewPlacement(r, c);
+  }
+}
+
+function onPlayerBoardLeave(r, c) {
+  if (!gameReady) return;
+  if (hoverCell && hoverCell.r === r && hoverCell.c === c) hoverCell = null;
+  clearPreview();
+}
+
+function previewPlacement(r, c) {
+  clearPreview();
+  const size = SHIPS[selectedShip].size;
+  const cells = getShipCells(r, c, size, horizontal);
+  const valid = isValidPlacement(r, c, size, horizontal);
+  cells.forEach(([cr, cc]) => {
+    if (cr >= 0 && cr < BOARD_SIZE && cc >= 0 && cc < BOARD_SIZE) {
+      const el = document.getElementById('p-' + cr + '-' + cc);
+      if (el) el.classList.add(valid ? 'placement-valid' : 'placement-invalid');
+    }
+  });
+}
+
+function clearPreview() {
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const el = document.getElementById('p-' + r + '-' + c);
+      if (el) {
+        el.classList.remove('placement-valid', 'placement-invalid');
+      }
+    }
+  }
+}
+
+function getShipCells(r, c, size, horiz) {
+  const cells = [];
+  for (let i = 0; i < size; i++) {
+    if (horiz) cells.push([r, c + i]);
+    else cells.push([r + i, c]);
+  }
+  return cells;
+}
+
+function isValidPlacement(r, c, size, horiz) {
+  if (horiz) {
+    if (c + size > BOARD_SIZE) return false;
+  } else {
+    if (r + size > BOARD_SIZE) return false;
+  }
+  const cells = getShipCells(r, c, size, horiz);
+  for (const [cr, cc] of cells) {
+    if (cr < 0 || cr >= BOARD_SIZE || cc < 0 || cc >= BOARD_SIZE) return false;
+    const cell = Module._battleship_get_cell_impl(1, cr, cc);
+    if (cell === 1) return false; // CELL_SHIP
+  }
+  return true;
+}
+
+function autoPlace() {
+  if (!gameReady) return;
+  Module._battleship_reset();
+  for (let i = 0; i < SHIPS.length; i++) {
+    let placed = false;
+    let attempts = 0;
+    while (!placed && attempts < 200) {
+      const r = Math.floor(Math.random() * BOARD_SIZE);
+      const c = Math.floor(Math.random() * BOARD_SIZE);
+      const h = Math.random() < 0.5 ? 1 : 0;
+      placed = Module._battleship_place_ship(i, r, c, h);
+      attempts++;
+    }
+  }
+  renderBoards();
+  updateShipButtons();
+  updateStatusBar();
+}
+
+function onEnemyBoardClick(r, c) {
+  if (!gameReady) return;
+  const state = Module._battleship_get_game_state();
+  if (state !== 1) return;
+
+  const result = Module._battleship_shoot(r, c);
+  if (result === -1) return; // Already shot or invalid
+
+  renderBoards();
+  updateStatusBar();
+
+  const newState = Module._battleship_get_game_state();
+  if (newState === 2) { // WIN
+    showResult(true);
+  }
+}
+
+function renderBoards() {
+  // Player board (view = board type 1 = real_board)
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const real = Module._battleship_get_cell_impl(1, r, c);
+      const view = Module._battleship_get_cell_impl(0, r, c);
+      const el = document.getElementById('p-' + r + '-' + c);
+      if (!el) continue;
+      el.className = 'cell';
+
+      if (view === 2) { // CELL_HIT on player board = ship was hit
+        el.classList.add('ship-hit');
+      } else if (real === 1) { // CELL_SHIP on real board
+        el.classList.add('ship-here');
+      }
+    }
+  }
+
+  // Enemy board (view = board type 0)
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const view = Module._battleship_get_cell_impl(0, r, c);
+      const el = document.getElementById('e-' + r + '-' + c);
+      if (!el) continue;
+      el.className = 'cell';
+      if (view === 2) el.classList.add('hit');
+      else if (view === 3) el.classList.add('miss');
+    }
+  }
+}
+
+function updateStatusBar() {
+  document.getElementById('hits').textContent = Module._battleship_get_hit_count();
+  document.getElementById('misses').textContent = Module._battleship_get_miss_count();
+  document.getElementById('sunk').textContent = Module._battleship_get_ships_sunk();
+}
+
+function showResult(win) {
+  const overlay = document.getElementById('result-overlay');
+  const title = document.getElementById('result-title');
+  const stats = document.getElementById('result-stats');
+  title.textContent = win ? '🏆 YOU WIN!' : '💀 GAME OVER';
+  title.className = 'result-title ' + (win ? 'win' : 'lose');
+  const hits = Module._battleship_get_hit_count();
+  const misses = Module._battleship_get_miss_count();
+  const sunk = Module._battleship_get_ships_sunk();
+  stats.textContent = 'Hits: ' + hits + ' | Misses: ' + misses + ' | Ships Sunk: ' + sunk + '/' + SHIPS.length;
+  overlay.classList.remove('hidden');
+}
+
+function resetGame() {
+  document.getElementById('result-overlay').classList.add('hidden');
+  selectedShip = -1;
+  placingMode = false;
+  Module._battleship_reset();
+  renderBoards();
+  updateShipButtons();
+  updateStatusBar();
+}
+
+// Emscripten WASM load
+var script = document.createElement('script');
+script.src = 'battleship.js';
+script.onload = function() {
+  Module = typeof Module !== 'undefined' ? Module : {};
+  Module.onRuntimeInitialized = function() {
+    initUI();
+  };
+};
+document.head.appendChild(script);
+</script>
+</body>
+</html>
