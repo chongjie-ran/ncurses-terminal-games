@@ -867,3 +867,171 @@ games/mahjong-solitaire-wasm/
 ---
 
 *版本: 1.15 | 更新: 2026-04-02 03:47*
+
+---
+
+## 2026-04-02 早间补充 💻 (2026-04-02 05:50)
+
+### 1. 代码练习 (LeetCode) - 新增4题
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC239 Sliding Window Maximum | Hard | Monotonic Deque | 递减deque存索引,front=最大,超出窗口弹出 |
+| LC295 Find Median from Data Stream | Hard | Two Heaps | maxHeap小半,minHeap大半,平衡后中位数 |
+| LC224 Basic Calculator | Hard | Stack | signStack括号上下文,+-*和括号 |
+| LC227 Basic Calculator II | Medium | Stack | 上个数入栈,* /立即计算压回,最后求和 |
+
+### LC239 Sliding Window Maximum 核心模式
+```
+deque 存 INDEX (不是值!)
+while nums[dq.back()] <= nums[i]: dq.pop_back()
+dq.push_back(i)
+if dq.front() <= i-k: dq.pop_front()
+i >= k-1: res.push_back(nums[dq.front()])
+时间O(n),每个元素最多push/pop一次
+```
+
+### LC295 Find Median 核心模式
+```
+maxHeap: 存较小的一半 (max-heap,顶部=最大值)
+minHeap: 存较大的一半 (min-heap,顶部=最小值)
+平衡规则: maxHeap.size() >= minHeap.size()
+中位数: size不等→maxHeap.top(),相等→(maxHeap.top()+minHeap.top())/2
+```
+
+### LC224 Basic Calculator 调试过程
+- "1 + 1" = 1 (expected 2) → 原实现在遇到操作符时没累积前面的数字
+- 修复: 在 `+`/`-`) 处理前先 `result += sign * num`
+- "(1-(3-4)+(5+6)-(7-8-(9-1)))" = 22 (Python验证正确, expected 18错误)
+
+### 2. 游戏开发: Hextris WASM ✅
+
+#### 完成内容
+- 7×13 odd-q offset hex grid, flat-topped hexagons
+- 3种下落块: 水平条/对角条(DR)/对角条(UR)
+- 6方向旋转系统
+- Canvas 2D渲染 (HEX_W=24, HEX_VERT=42)
+- Emscripten MODULARIZE=1, async initWasm()
+- Playwright PASS ✅ (无Console错误)
+
+#### Playwright测试结果
+- Title: Hextris - WASM ✅
+- Canvas: true (172×424) ✅
+- Overlay click → Game starts ✅
+- Hard drop score update: 4 ✅
+- Console errors: NONE ✅
+
+#### 技术难点 & 解决方案
+
+**难点1: odd-q offset坐标6方向**
+- EVEN列row_offset=0, ODD列row_offset=1
+- 方向增量表:
+  ```
+  even col: R(+1,0), UR(0,-1), UL(-1,-1), L(-1,0), DL(-1,+1), DR(0,+1)
+  odd col:  R(+1,0), UR(+1,-1),UL(0,-1),  L(-1,0), DL(0,+1),  DR(+1,+1)
+  ```
+
+**难点2: Hextris旋转**
+- 不能简单`dir++`,因为每个block位置需要围绕anchor旋转
+- 解决: 预先计算6个方向的block位置数组,碰撞检测后应用
+- 每次旋转: 对每个block沿anchor旋转new_dir步
+
+**难点3: flat-topped hex渲染**
+- 顶点角度: `(Math.PI/3)*i - Math.PI/6`, i=0..5
+- odd列Y偏移: HEX_H/2
+- Canvas: 7*24=168宽, 13*42=546高
+
+**难点4: Emscripten MODULARIZE Promise**
+- `HextrisModule({locateFile: f=>f})` 返回Promise
+- `await HextrisModule(...)` 后才能调用Game._wasm_xxx()
+- initWasm() async函数在页面底部调用
+
+#### 文件位置
+- `games/hexxtris-wasm/` — game.c + game.h + wasm_main.c + index.html + hexxtris.js + hexxtris.wasm
+
+### 3. 技术栈进步 (新增)
+
+| 领域 | 进步 |
+|------|------|
+| Monotonic Deque | LC239, O(n)滑动窗口最大,每元素最多入出一次 |
+| Two Heaps | LC295, 中位数流式计算, maxHeap/minHeap平衡 |
+| Calculator Stack | LC224括号嵌套, signStack上下文 |
+| Hexagonal Grid | odd-q offset坐标,6方向旋转,flat-top渲染 |
+| Emscripten Promise | async/await初始化, MODULARIZE=1工厂函数 |
+
+### 4. WASM游戏队列状态
+
+**WASM游戏累计**: 15个 (Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders, Breakout, Pac-Man, Flappy Bird, Pong, Wordle, Mahjong Solitaire, **Hextris**)
+
+### 5. GitHub提交
+- `9ac0ef5` — feat: Hextris WASM - pure C + Canvas 2D hex grid game
+
+---
+
+*版本: 1.16 | 更新: 2026-04-02 05:50*
+
+---
+
+## 2026-04-02 💻
+
+### 1. 代码练习 (LeetCode) - Graph BFS/DFS
+
+#### 重点: Graph Flood Fill 模式
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC200 Number of Islands | Medium | BFS/DFS Flood Fill | 遍历格子,遇'1'则BFS flood fill岛屿数+1,标记为0 |
+| LC695 Max Area of Island | Medium | DFS/BFS | 同LC200但累加面积取最大值,return 1+递归(四个方向) |
+| LC547 Number of Provinces | Medium | Union-Find / DFS | 邻接矩阵,UnionFind或DFS遍历,数root数量 |
+| LC133 Clone Graph | Medium | BFS/DFS + HashMap | HashMap记录已克隆节点,避免重复克隆 |
+
+#### Graph BFS Flood Fill 核心模式
+
+```cpp
+int bfs(vector<vector<int>>& grid, int i, int j) {
+    int m=grid.size(), n=grid[0].size(), area=0;
+    queue<pair<int,int>> q;
+    q.emplace(i, j);
+    grid[i][j] = 0; // 标记已访问
+    while (!q.empty()) {
+        auto [x, y] = q.front(); q.pop();
+        area++;
+        for (auto& d : dirs) {
+            int nx = x+d[0], ny = y+d[1];
+            if (nx>=0 && nx<m && ny>=0 && ny<n && grid[nx][ny]==1) {
+                grid[nx][ny] = 0;
+                q.emplace(nx, ny);
+            }
+        }
+    }
+    return area;
+}
+```
+
+#### Graph BFS vs DFS 对比
+
+| 方面 | BFS | DFS |
+|------|-----|-----|
+| 实现 | 队列 | 递归或栈 |
+| 空间 | O(n)队列 worst case | O(n)递归栈 worst case |
+| 适用 | 最短路径、层级遍历 | 连通分量、岛屿计数 |
+| 栈溢出 | 无 | 有风险(大树/深图) |
+
+### 2. 游戏开发: Gomoku WASM (进行中)
+
+- **状态**: 子Agent正在构建
+- **规则**: 15×15棋盘,黑白棋交替,连五胜
+- **技术**: Pure C + Emscripten + Canvas 2D
+
+### 3. 今日汇总
+
+- **代码练习**: 4道Graph题(LC200/LC695/LC547/LC133),全部编译测试通过
+- **游戏开发**: Gomoku WASM 正在构建中
+- **新增文件**: `lc-practice/lc200_num_islands.cpp`, `lc695_max_area_island.cpp`, `lc547_num_provinces.cpp`
+
+### 4. GitHub提交
+- 待 Gomoku WASM 完成后提交
+
+---
+
+*版本: 1.17 | 更新: 2026-04-02 08:10*

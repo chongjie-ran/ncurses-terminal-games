@@ -17,26 +17,29 @@
 | **Pac-Man WASM** | ✅ Verified (2026-04-01) | 28×31 maze, 4 ghost types, frightened mode, power pellets, Playwright PASS |
 | **Flappy Bird WASM** | ✅ Built & Tested (2026-04-01) | Pure C + Emscripten, gravity physics, pipe gap, score/best tracking, Playwright PASS |
 | **Pong WASM** | ✅ Built & Tested (2026-04-01) | Pure C + Emscripten, AI opponent, angle bounce, Canvas 2D, Playwright PASS |
+| **Wordle WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, DOM渲染, 猜词评估, 键盘颜色, Playwright PASS |
+| **Mahjong Solitaire WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 3层立体麻将, 自由牌判定, Playwright PASS |
+| **Hextris WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, odd-q offset hex grid, 3-piece types, Playwright PASS |
+| **Gomoku WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 15×15 board, 5-in-a-row win, star points, last-stone marker, Playwright PASS |
+| **WASM Game Builder Script** | ✅ Built & Tested (2026-04-02) | 批量编译+测试所有WASM游戏, 支持--games过滤, HTTP server测试, Playwright集成 |
 
 ### In Progress
 | Game | Priority | Notes |
 |------|----------|-------|
-| - | - | - |
+| — | — | — |
 
 ### Queue (Next Up)
 | Game | Priority | Notes |
 |------|----------|-------|
-| (All planned games complete) | - | WASM games count: 13 |
+| TBD | P1 | Suggest next game |
 
 ### Architecture Note
 - Pure C game logic (game.c/game.h) - no raylib dependency
 - wasm_main.c - Emscripten wrapper exports C functions
-- index.html - Canvas 2D rendering + WASM loader
+- index.html - Canvas 2D or DOM rendering + WASM loader
 - Key fix: ALLOW_MEMORY_GROWTH=1 required for dynamic memory
 - Key fix: GameModule loaded AFTER game.js (script order critical!)
-- Key fix: MemoryMatchModule Promise `.then()` after init
-- Key fix: MODULARIZE=1 needs `window.Module = mod` in `.then()` callback
-- Key fix: Don't mix C syntax (int, typedef) in JS code
+- Key fix: MODULARIZE=1 exports functions as Module._wasm_xxx()
 - DAS input: DELAY=150ms, ARR=50ms for smooth keyboard repeat
 - Wall Kick: SRS-style 4-position kick table for rotation
 - Frogger: water zone needs player to ride with log (player.x += direction * speed)
@@ -46,6 +49,10 @@
 - Flappy Bird: gravity applied per-frame, pipe spawns at PIPE_INTERVAL spacing, localStorage best score
 - Pong: AI moves toward ball.y, paddle collision changes ball angle based on hit position
 - Snake: grid-based movement, food spawn, wall/self-collision, speed increases with score
+- Wordle: DOM rendering (no Canvas), keyboard color upgrade, 2-pass evaluation (correct→present→wrong)
+- WASM Builder: grep+sed提取EMSCRIPTEN_KEEPALIVE函数, JSON格式EXPORTED_FUNCTIONS, HTTP server解决CORS
+- Hextris: odd-q offset hex coordinates, 6-direction movement, flat-topped hex rendering
+- Gomoku: 15×15 board, 4-direction win check (horizontal/vertical/diag), 5-in-a-row win detection
 
 ## Raylib Games (C++)
 
@@ -55,7 +62,7 @@
 | Snake Raylib | ✅ Deployed | 5 deployed locations |
 
 ### Deferred (WASM first)
-- 2048 Raylib → Replaced by 2048 WASM (lighter, no raylib dependency)
+- 2048 Raylib → Replaced by 2048 WASM
 - Breakout Raylib → Replaced by Breakout WASM (2026-04-01)
 - Pong Raylib → Replaced by Pong WASM (2026-04-01)
 - Flappy Bird Raylib → Replaced by Flappy Bird WASM (2026-04-01)
@@ -64,4 +71,4 @@
 - Sokoban Raylib → Replaced by Sokoban WASM (2026-04-01)
 - Space Invaders Raylib → Replaced by Space Invaders WASM (2026-04-01)
 
-*Last updated: 2026-04-01*
+*Last updated: 2026-04-02 (Gomoku WASM added)*

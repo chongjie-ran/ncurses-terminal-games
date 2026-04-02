@@ -1,0 +1,12 @@
+_init_game_wasm
+_place_stone_wasm
+_check_winner_wasm
+_get_cell_wasm
+_get_current_player_wasm
+_get_game_over_wasm
+_get_win_start_x_wasm
+_get_win_start_y_wasm
+_get_win_end_x_wasm
+_get_win_end_y_wasm
+_get_last_x_wasm
+_get_last_y_wasm

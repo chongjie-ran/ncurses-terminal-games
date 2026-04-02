@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gomoku (五子棋) - WASM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #eee;
+  }
+  #hud {
+    font-size: 16px;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+  #player-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #stone-preview {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #555;
+  }
+  canvas {
+    border: 3px solid #8b7355;
+    display: block;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  }
+  #controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+  }
+  button {
+    padding: 8px 20px;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    background: #2d2d44;
+    color: #eee;
+    border: 2px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover { background: #3d3d5c; }
+  #hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #666;
+  }
+  #message {
+    font-size: 18px;
+    margin-bottom: 8px;
+    min-height: 24px;
+    color: #aaa;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="player-indicator">
+    <span>Current:</span>
+    <div id="stone-preview"></div>
+    <span id="player-text">Black</span>
+  </div>
+  <div id="message"></div>
+</div>
+<canvas id="c"></canvas>
+<div id="controls">
+  <button id="restart-btn">Restart</button>
+</div>
+<div id="hint">Click on board intersections to place stones</div>
+
+<script src="gomoku.js"></script>
+<script>
+var Module = {};
+// GameModule will be set when WASM loads
+</script>
+<script>
+const BOARD_SIZE = 15;
+const CELL = 32;
+const BOARD_PX = BOARD_SIZE * CELL;
+const PADDING = CELL;
+
+// Cell values
+const CELL_EMPTY = 0;
+const CELL_BLACK = 1;
+const CELL_WHITE = 2;
+
+// Colors
+const COLORS = {
+  board: '#deb887',
+  grid: '#8b7355',
+  black: '#111111',
+  white: '#f0f0f0',
+  lastDot: '#ff4444',
+  winLine: '#ff0',
+};
+
+const canvas = document.getElementById('c');
+canvas.width = BOARD_PX + PADDING * 2;
+canvas.height = BOARD_PX + PADDING * 2;
+const ctx = canvas.getContext('2d');
+
+const stonePreview = document.getElementById('stone-preview');
+const playerText = document.getElementById('player-text');
+const messageEl = document.getElementById('message');
+const restartBtn = document.getElementById('restart-btn');
+
+// WASM module
+let mod = null;
+
+function updatePlayerUI(player) {
+  if (player === CELL_BLACK) {
+    stonePreview.style.background = '#111';
+    stonePreview.style.borderColor = '#444';
+    playerText.textContent = 'Black';
+  } else {
+    stonePreview.style.background = '#f0f0f0';
+    stonePreview.style.borderColor = '#ccc';
+    playerText.textContent = 'White';
+  }
+}
+
+function drawBoard() {
+  // Board background
+  ctx.fillStyle = COLORS.board;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw grid lines
+  ctx.strokeStyle = COLORS.grid;
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    const pos = PADDING + i * CELL;
+
+    // Vertical
+    ctx.beginPath();
+    ctx.moveTo(PADDING + i * CELL, PADDING);
+    ctx.lineTo(PADDING + i * CELL, PADDING + BOARD_PX);
+    ctx.stroke();
+
+    // Horizontal
+    ctx.beginPath();
+    ctx.moveTo(PADDING, PADDING + i * CELL);
+    ctx.lineTo(PADDING + BOARD_PX, PADDING + i * CELL);
+    ctx.stroke();
+  }
+
+  // Draw star points (traditional markers at 3,3; 3,7; 3,11; 7,3; 7,7; 7,11; 11,3; 11,7; 11,11)
+  const starPoints = [[3,3],[3,7],[3,11],[7,3],[7,7],[7,11],[11,3],[11,7],[11,11]];
+  ctx.fillStyle = COLORS.grid;
+  for (const [sx, sy] of starPoints) {
+    ctx.beginPath();
+    ctx.arc(PADDING + sx * CELL, PADDING + sy * CELL, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawStone(x, y, player, isLast) {
+  const px = PADDING + x * CELL;
+  const py = PADDING + y * CELL;
+  const r = CELL / 2 - 3;
+
+  // Radial gradient for 3D effect
+  const gradient = ctx.createRadialGradient(px - r * 0.3, py - r * 0.3, r * 0.1, px, py, r);
+  if (player === CELL_BLACK) {
+    gradient.addColorStop(0, '#444');
+    gradient.addColorStop(1, '#000');
+  } else {
+    gradient.addColorStop(0, '#fff');
+    gradient.addColorStop(1, '#ccc');
+  }
+
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI * 2);
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = player === CELL_BLACK ? '#555' : '#999';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Last move marker
+  if (isLast) {
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.lastDot;
+    ctx.fill();
+  }
+}
+
+function drawWinLine(x1, y1, x2, y2) {
+  const px1 = PADDING + x1 * CELL;
+  const py1 = PADDING + y1 * CELL;
+  const px2 = PADDING + x2 * CELL;
+  const py2 = PADDING + y2 * CELL;
+
+  ctx.strokeStyle = COLORS.winLine;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(px1, py1);
+  ctx.lineTo(px2, py2);
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+}
+
+function render() {
+  if (!mod) return;
+
+  drawBoard();
+
+  // Draw all stones
+  for (let y = 0; y < BOARD_SIZE; y++) {
+    for (let x = 0; x < BOARD_SIZE; x++) {
+      const cell = mod.ccall('get_cell_wasm', 'number', ['number', 'number'], [x, y]);
+      if (cell !== CELL_EMPTY) {
+        const last_x = mod.ccall('get_last_x_wasm', 'number');
+        const last_y = mod.ccall('get_last_y_wasm', 'number');
+        const isLast = (x === last_x && y === last_y);
+        drawStone(x, y, cell, isLast);
+      }
+    }
+  }
+
+  // Draw win line
+  const gameOver = mod.ccall('get_game_over_wasm', 'number');
+  if (gameOver) {
+    const winner = mod.ccall('check_winner_wasm', 'number');
+    if (winner === 1 || winner === 2) {
+      const sx = mod.ccall('get_win_start_x_wasm', 'number');
+      const sy = mod.ccall('get_win_start_y_wasm', 'number');
+      const ex = mod.ccall('get_win_end_x_wasm', 'number');
+      const ey = mod.ccall('get_win_end_y_wasm', 'number');
+      if (sx >= 0 && ex >= 0) {
+        drawWinLine(sx, sy, ex, ey);
+      }
+    }
+  }
+}
+
+function updateHUD() {
+  if (!mod) return;
+
+  const player = mod.ccall('get_current_player_wasm', 'number');
+  const gameOver = mod.ccall('get_game_over_wasm', 'number');
+  const winner = mod.ccall('check_winner_wasm', 'number');
+
+  updatePlayerUI(player);
+
+  if (gameOver) {
+    if (winner === 1) {
+      messageEl.textContent = '🎉 Black Wins!';
+      messageEl.style.color = '#111';
+    } else if (winner === 2) {
+      messageEl.textContent = '🎉 White Wins!';
+      messageEl.style.color = '#f0f0f0';
+    } else if (winner === 3) {
+      messageEl.textContent = '🤝 Draw!';
+      messageEl.style.color = '#aaa';
+    }
+    playerText.textContent = 'Game Over';
+  } else {
+    messageEl.textContent = '';
+  }
+}
+
+function gameLoop() {
+  render();
+  updateHUD();
+  requestAnimationFrame(gameLoop);
+}
+
+// Click handler - place stone at board intersection
+canvas.addEventListener('click', (e) => {
+  if (!mod) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mouseX = (e.clientX - rect.left) * scaleX;
+  const mouseY = (e.clientY - rect.top) * scaleY;
+
+  // Convert to board coordinates
+  const bx = Math.round((mouseX - PADDING) / CELL);
+  const by = Math.round((mouseY - PADDING) / CELL);
+
+  if (bx < 0 || bx >= BOARD_SIZE || by < 0 || by >= BOARD_SIZE) return;
+
+  const result = mod.ccall('place_stone_wasm', 'number', ['number', 'number'], [bx, by]);
+
+  if (result === 1) {
+    // Cell occupied - could flash the cell or play sound
+  } else if (result === 2) {
+    // Game over
+  }
+});
+
+restartBtn.addEventListener('click', () => {
+  if (!mod) return;
+  mod.ccall('init_game_wasm');
+  messageEl.textContent = '';
+});
+
+// Load WASM via game.js (gomoku.js)
+fetch('gomoku.wasm')
+  .then(r => r.arrayBuffer())
+  .then(buf => {
+    WebAssembly.instantiate(buf, {})
+      .then(({instance}) => {
+        const exp = instance.exports;
+        mod = {
+          ccall: (name, ret, args, argv) => {
+            const f = exp[name];
+            if (!f) return 0;
+            return Reflect.apply(f, null, argv || []);
+          }
+        };
+        mod.ccall('init_game_wasm');
+        requestAnimationFrame(gameLoop);
+      });
+  })
+  .catch(e => console.error('WASM load failed:', e));
+</script>
+</body>
+</html>
