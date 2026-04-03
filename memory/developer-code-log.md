@@ -605,3 +605,256 @@ int minimax(int board[6][7], int depth, int alpha, int beta, bool maximizing) {
 - 完成Connect Four AI的Hard模式测试
 - 继续LeetCode DP专项练习
 - 尝试Space Invaders游戏开发
+
+## 2026-04-03 💻
+
+### 1. 代码练习 (LeetCode)
+
+#### 重点: Bellman-Ford 图论最短路
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC787 Cheapest Flights Within K Stops | Medium | Bellman-Ford (边数限制) | dp[city]=最少票价,K+1轮迭代,提前终止优化 |
+
+**Bellman-Ford 核心模式 (边数限制版)**:
+```python
+dp = [INF] * n
+dp[src] = 0
+for i in range(K + 1):  # 最多K+1条边
+    tmp = dp[:]
+    for u, v, price in flights:
+        if dp[u] != INF and dp[u] + price < tmp[v]:
+            tmp[v] = dp[u] + price
+    dp = tmp
+    if not updated: break  # 提前终止
+```
+- 每轮只考虑多一条边
+- 复制数组保证只用K+1条边
+- 无更新时提前终止
+
+**Bellman-Ford vs Dijkstra**:
+- Bellman-Ford: O(VE), 支持负权边, 原生边数限制
+- Dijkstra: O((V+E)logV), 不支持负权边, 无边数限制
+- 选择依据: 有无负权边? 有无边数限制?
+
+---
+
+### 2. 游戏开发: Battleship WASM ✅
+
+#### 完成内容
+- 纯C游戏逻辑 + Emscripten编译
+- 10x10网格, 船只: Carrier(5), Battleship(4), Cruiser(3), Submarine(3), Destroyer(2)
+- 命中/未命中追踪, 击沉检测
+- 随机船只部署算法
+- Playwright自动化测试: PASS ✅
+
+#### 技术难点 & 解决方案
+**难点: 船只随机部署冲突检测**
+- 解决: 方向+长度验证, 边界检查, 重叠检测
+
+---
+
+### 3. 游戏开发: Connect Four AI WASM ✅
+
+#### 完成内容
+- 纯C游戏逻辑 + Emscripten编译
+- 7x6网格, 重力下落, 4连赢检测
+- 3级AI: Minimax + Alpha-Beta剪枝
+- 窗口评分启发式函数
+- 即时胜负/阻断检测
+
+#### 技术难点 & 解决方案
+
+**难点1: Minimax高效剪枝**
+- 解决: Alpha-Beta剪枝, 深度限制
+- 窗口评分启发式: 评估4格窗口得分
+
+**难点2: AI决策速度**
+- 解决: 深度3限制, 立即胜负检测优先
+
+```c
+// 窗口评分示例
+int score = 0;
+if (window_count(player, 4) > 0) score += 100;
+else if (window_count(player, 3) > 0 && window_count(player, 1) > 0) score += 10;
+```
+
+---
+
+### 4. 经验沉淀
+
+#### Connect Four AI 架构
+1. **Game Logic**: 7x6 board, gravity drop, 4-direction win check
+2. **AI Engine**: Minimax(depth=3) + Alpha-Beta pruning
+3. **Heuristic**: 窗口评分(4格滑动窗口)
+4. **Optimization**: 立即赢/挡检测优先
+
+#### WASM游戏批量测试脚本
+- `build_all.sh`: 编译所有WASM游戏
+- `test_all.sh`: Playwright集成测试
+- `--games filter`: 支持按名称过滤
+
+---
+
+*最后更新: 2026-04-03*
+
+## 2026-04-04 💻
+
+### 1. 代码练习 (LeetCode)
+
+#### 重点: DFS/BFS 二维网格遍历
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC200 Number of Islands | Medium | DFS/BFS/Union-Find | "淹没"技巧,in-place标记避免重复 |
+
+**DFS 二维网格遍历 核心模式**:
+```python
+def dfs(grid, i, j, m, n):
+    if i < 0 or i >= m or j < 0 or j >= n or grid[i][j] == '0':
+        return
+    grid[i][j] = '0'  # 淹没
+    dfs(grid, i+1, j, m, n)
+    dfs(grid, i-1, j, m, n)
+    dfs(grid, i, j+1, m, n)
+    dfs(grid, i, j-1, m, n)
+```
+
+**BFS 二维网格遍历 核心模式**:
+```python
+from collections import deque
+def bfs(grid, start_i, start_j):
+    queue = deque([(start_i, start_j)])
+    grid[start_i][start_j] = '0'
+    while queue:
+        i, j = queue.popleft()
+        for di, dj in [(1,0),(-1,0),(0,1),(0,-1)]:
+            ni, nj = i+di, j+dj
+            if 0<=ni<m and 0<=nj<n and grid[ni][nj]=='1':
+                grid[ni][nj] = '0'
+                queue.append((ni, nj))
+```
+
+**"淹没"技巧要点**:
+- 访问过的格子标记为'0'或visited
+- 避免重复访问和计数
+- in-place修改节省额外空间
+
+**网格遍历注意事项**:
+- 边界检查在递归/入队前进行
+- 4方向: 上下左右 (不包括对角线除非题目要求)
+- 使用m,n缓存grid尺寸避免重复计算
+
+**DFS vs BFS 选择**:
+- DFS: 代码简洁, 递归实现, 小岛屿
+- BFS: 迭代实现, 避免栈溢出, 大岛屿
+
+**扩展: Union-Find 实现**:
+```python
+class UnionFind:
+    def __init__(self, grid):
+        m, n = len(grid), len(grid[0])
+        self.parent = list(range(m*n))
+        self.count = 0
+        for i in range(m):
+            for j in range(n):
+                if grid[i][j] == '1':
+                    self.count += 1
+    
+    def find(self, x):
+        while self.parent[x] != x:
+            self.parent[x] = self.parent[self.parent[x]]
+            x = self.parent[x]
+        return x
+    
+    def union(self, x, y):
+        px, py = self.find(x), self.find(y)
+        if px == py: return False
+        self.parent[px] = py
+        self.count -= 1
+        return True
+```
+
+---
+
+### 2. 游戏开发: Raylib Games (规划)
+
+#### 任务目标
+- 使用raylib替代Canvas 2D开发经典游戏
+- 学习现代游戏开发框架
+
+#### Raylib 核心API
+```c
+#include "raylib.h"
+
+int main() {
+    InitWindow(800, 600, "Game");
+    SetTargetFPS(60);
+    
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+        
+        // Game logic
+        DrawText("Hello", 100, 100, 20, BLACK);
+        
+        EndDrawing();
+    }
+    CloseWindow();
+    return 0;
+}
+```
+
+#### 编译命令
+```bash
+gcc game.c -o game -lraylib -lm -lpthread
+```
+
+#### Raylib vs Canvas 2D
+| 特性 | Raylib | Canvas 2D |
+|------|--------|-----------|
+| 平台 | 桌面/嵌入式 | Web浏览器 |
+| 渲染 | OpenGL/WebGL | 软件渲染 |
+| 3D支持 | 原生 | 需WebGL |
+| 打包 | 原生 | HTML+JS |
+
+---
+
+### 3. 经验沉淀
+
+#### 本周算法学习总结 (2026-04-01 ~ 2026-04-04)
+| 日期 | 主题 | 题目数 |
+|------|------|--------|
+| 04-01 | Topological Sort + Union-Find + DP | 9题 |
+| 04-02 | Wordle/Mahjong/Hextris/Gomoku | 5游戏 |
+| 04-03 | Bellman-Ford + Battleship/Connect4AI | 1题+2游戏 |
+| 04-04 | DFS/BFS网格遍历 + Raylib规划 | 1题 |
+
+#### 技术栈进步
+- ✅ 图论算法 (Topological Sort, Union-Find, Bellman-Ford)
+- ✅ 游戏AI (Minimax + Alpha-Beta)
+- ✅ WASM游戏开发 (21个游戏完成)
+- 🔲 Raylib游戏开发 (规划中)
+
+---
+
+### 4. 下周计划 (2026-04-05 ~ 2026-04-11)
+
+#### 代码练习
+- [ ] 完成DFS/BFS专项 (LC695, LC463, LC694)
+- [ ] 学习回溯算法 (LC79, LC212)
+- [ ] 复习图论高级算法
+
+#### 游戏开发
+- [ ] Space Invaders (raylib版)
+- [ ] Breakout (raylib版)
+- [ ] 开始Raylib游戏库建设
+
+#### GitHub贡献
+- [ ] 整理WASM游戏代码仓库
+- [ ] 提交Raylib游戏代码
+- [ ] 完善README文档
+
+---
+
+*最后更新: 2026-04-04*
