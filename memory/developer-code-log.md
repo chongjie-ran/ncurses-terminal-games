@@ -426,3 +426,182 @@ Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders
 ---
 
 *版本: 1.19 | 更新: 2026-04-02 23:40*
+
+---
+
+## 2026-04-03 晚间 💻
+
+### 1. 代码练习 (LeetCode) - 股票DP + 环形DP
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC213 House Robber II | Medium | 环形DP | 拆分为两个线性: max(rob(0..n-2), rob(1..n-1)) |
+| LC122 Best Time to Buy and Sell Stock II | Medium | Greedy | 累加所有正差值 = 最大利润 |
+| LC121 Best Time to Buy and Sell Stock | Easy | 单调扫描 | 维护min_price和max_profit,O(n) |
+
+**House Robber II 核心模式**:
+```c
+// 环形: house[0]和house[n-1]不能同时偷
+max(robLinear(nums, 0, n-1), robLinear(nums, 1, n))
+// robLinear: dp[i]=max(dp[i-1], dp[i-2]+nums[i])
+```
+
+**Stock II Greedy 核心洞察**:
+- 等价于累加所有正差值: profit += max(0, prices[i]-prices[i-1])
+- 为什么正确: 可以当天买卖,所以任何上升段都可以分解
+
+---
+
+### 2. 游戏调试: Battleship WASM 全部4个Playwright测试通过 ✅
+
+#### 问题排查过程
+
+**测试1-3失败** → WASM函数不可用
+- 根因: MODULARIZE=1返回Promise, script标签加载方式不兼容
+- 修复: 重新编译 `-s MODULARIZE=0`
+
+**测试3失败** → PAGE ERROR: `Module._battleship_get_cell_impl is not a function`
+- 根因: JS调用 `_battleship_get_cell_impl` 但导出的函数是 `_battleship_get_cell`
+- 修复: `battleship_get_cell_impl` → `battleship_get_cell`
+
+**测试2失败** → Banner不更新到Phase 2
+- 根因: banner.textContent更新只在`if(state===0)`分支内
+- 修复: banner更新独立于placement-ui显示控制
+
+**测试4失败** → Reset按钮不可见
+- 根因: Reset在placement-ui内,Battle阶段placement-ui隐藏
+- 修复: 将Reset按钮移到placement-ui外部
+
+**最终**: 4/4 Playwright测试全部通过 ✅
+
+#### 技术栈进步
+
+| 领域 | 进步 |
+|------|------|
+| Emscripten MODULARIZE | MODULARIZE=0 vs MODULARIZE=1的差异和适用场景 |
+| WASM调试 | 使用Playwright evaluate逐步验证函数存在性和返回值 |
+| UI状态机 | 状态转换时banner更新必须在所有state分支处理 |
+
+---
+
+### 3. GitHub提交
+
+- `3be7906` — fix: Battleship WASM - fix MODULARIZE issue, banner update bug, and reset button visibility
+
+---
+
+### 4. WASM游戏队列状态 (2026-04-03)
+
+**WASM游戏累计**: 19个
+Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders, Breakout, Pac-Man, Flappy Bird, Pong, Wordle, Mahjong Solitaire, Hextris, Gomoku, Connect Four, Sudoku, **Battleship**
+
+**队列**:
+- P1: Connect Four (AI) WASM ← 下一个开发目标
+
+---
+
+### 5. 经验沉淀
+
+#### MODULARIZE=0 vs MODULARIZE=1
+- MODULARIZE=0: `var Module = ...` 全局对象,script标签直接加载
+- MODULARIZE=1: 返回Promise,需要`.then()`处理
+- 小型游戏项目 → MODULARIZE=0更简单
+- 需要ES6 import的项目 → MODULARIZE=1
+
+#### WASM调试方法论
+1. 检查console错误 → 确认WASM是否加载
+2. `Object.keys(Module).filter(k=>typeof Module[k]==='function')` → 列出所有可用函数
+3. `Module._xxx_get_game_state()` → 验证状态
+4. 逐步验证UI交互
+
+#### 状态转换UI更新原则
+- 状态切换时: banner/按钮等UI更新不要放在特定state的if分支内
+- 正确: 所有state分支都更新对应UI
+- 或: 每个分支只更新状态相关的UI,共用部分放在分支外
+
+---
+
+*版本: 1.20 | 更新: 2026-04-03 21:30*
+
+## 2026-04-03 💻
+
+### 1. 代码练习 (LeetCode)
+
+#### 重点: 1D DP + 2D DP (Pick/Skip Pattern)
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC198 House Robber | Easy | 1D DP | dp[i]=max(dp[i-1],dp[i-2]+nums[i]),空间O(1) |
+| LC213 House Robber II | Medium | 1D DP (环形) | 首尾不能同时rob,分两种情况[0..n-2]和[1..n-1] |
+| LC64 Minimum Path Sum | Medium | 2D DP | in-place: grid[i][j]+=min(up,left),空间O(1) |
+| LC322 Coin Change | Medium | DP Unbounded Knapsack | dp[j]=min(dp[j],dp[j-coin]+1),INT_MAX哨兵 |
+| LC518 Coin Change 2 | Medium | DP (组合数) | 外层循环coins,内层循环amount,顺序重要 |
+
+**DP通用模式**:
+- 1D pick/skip: `dp[i] = max(dp[i-1], dp[i-2] + val)`
+- 2D grid: `dp[i][j] = min(dp[i-1][j], dp[i][j-1]) + cost`
+- Unbounded: 外层循环物品,内层循环容量
+
+### 2. 游戏开发: Connect Four vs AI (C/WASM)
+
+#### 项目: `projects/connect-four-ai-wasm/`
+
+**功能**:
+- 6x7棋盘,支持2P和AI模式
+- AI三级难度: Easy/Medium/Hard
+- Minimax + Alpha-Beta剪枝
+- 窗口评分启发函数
+
+**AI核心实现**:
+```c
+// 评分窗口: 4连=10000, 3连+开放端=50, 2连+双开放=10
+// 防御优先: 检测对手必胜立即阻挡
+// Minimax深度: Easy=1, Medium=2, Hard=3
+// Alpha-Beta剪枝加速搜索
+```
+
+**技术难点**:
+- Emscripten MODULARIZE=1 异步加载: 需要`Connect4AIModule({totalMemory}).then(...)`
+- WASM和JS分离: 需要正确加载路径
+- 状态恢复: Minimax需要保存/恢复board state和game state
+
+**WASM加载模式**:
+```javascript
+// HTML中:
+var Module = null;
+function initGame() {
+  Module = Connect4AIModule({ totalMemory: 64 * 1024 * 1024 });
+  Module.then(function(M) { Module = M; gameLoaded = true; });
+}
+// 使用 onload="initGame()" 在 script 标签上
+```
+
+### 3. 技术沉淀
+
+#### Emscripten WASM加载调试技巧
+- `window.Module` vs `Connect4AIModule()`: 前者是空对象,后者是异步工厂函数
+- `MODULARIZE=1` 必须显式调用: `Connect4AIModule(config).then(...)`
+- `onRuntimeInitialized` 回调确保WASM函数就绪
+
+#### Minimax + Alpha-Beta 核心模式
+```c
+int minimax(int board[6][7], int depth, int alpha, int beta, bool maximizing) {
+  if (depth == 0 || gameOver) return evaluate(board);
+  if (maximizing) {
+    int value = -INF;
+    for each valid move {
+      make move; value = max(value, minimax(..., depth-1, alpha, beta, false));
+      undo move; alpha = max(alpha, value);
+      if (beta <= alpha) break; // Beta cutoff
+    }
+    return value;
+  } else {
+    // symmetric for minimizing
+  }
+}
+```
+
+### 4. 下周计划
+- 完成Connect Four AI的Hard模式测试
+- 继续LeetCode DP专项练习
+- 尝试Space Invaders游戏开发

@@ -23,18 +23,18 @@
 | **Gomoku WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 15×15 board, 5-in-a-row win, star points, last-stone marker, Playwright PASS |
 | **Connect Four WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 7x6 grid, gravity drop, 4-in-a-row win, 2-player, Playwright PASS |
 | **Sudoku WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 9x9 grid, backtracking solver, candidates, hints, 4 difficulty levels, Playwright PASS |
+| **Battleship WASM** | ✅ Built & Tested (2026-04-03) | Pure C + Emscripten, 10x10 grid, ship placement, hit/miss tracking, Playwright PASS |
+| **Connect Four AI WASM** | ✅ Built & Tested (2026-04-03) | Pure C + Emscripten, 3级AI(Minimax+Alpha-Beta), 防御优先, Playwright PASS |
 | **WASM Game Builder Script** | ✅ Built & Tested (2026-04-02) | 批量编译+测试所有WASM游戏, 支持--games过滤, HTTP server测试, Playwright集成 |
 
 ### In Progress
 | Game | Priority | Notes |
 |------|----------|-------|
-| Connect Four (AI) WASM | P1 | Add AI opponent to existing Connect Four |
 
 ### Queue (Next Up)
 | Game | Priority | Notes |
 |------|----------|-------|
-| **Battleship WASM** | ✅ **Built & Tested (2026-04-03)** | 10x10 grid, ship placement, hit/miss tracking, fixed MODULARIZE=0, banner update bug |
-| Connect Four (AI) WASM | P2 | Add AI opponent to existing Connect Four |
+| **Raylib Games** | P1 | Space Invaders, Breakout using raylib instead of Canvas |
 
 ### Architecture Note
 - Pure C game logic (game.c/game.h) - no raylib dependency
@@ -58,5 +58,6 @@
 - Gomoku: 15×15 board, 4-direction win check (horizontal/vertical/diag), 5-in-a-row win detection
 - Connect Four: 7x6 grid, gravity drop, 4-direction win detection, win line rendering
 - Sudoku: 9×9 grid, backtracking solver, candidate bitmask, puzzle generation with solvability check, 4 difficulty levels
+- Connect Four AI: Minimax + Alpha-Beta pruning, window scoring heuristic, immediate win/block detection, 3 difficulty depths
 
-*Last updated: 2026-04-02 (Sudoku WASM added)*
+*Last updated: 2026-04-03 (Connect Four AI WASM added)*
