@@ -28,12 +28,12 @@
 ### In Progress
 | Game | Priority | Notes |
 |------|----------|-------|
-| — | — | — |
+| Connect Four (AI) WASM | P1 | Add AI opponent to existing Connect Four |
 
 ### Queue (Next Up)
 | Game | Priority | Notes |
 |------|----------|-------|
-| Battleship WASM | P1 | 10x10 grid, ship placement, hit/miss tracking |
+| **Battleship WASM** | ✅ **Built & Tested (2026-04-03)** | 10x10 grid, ship placement, hit/miss tracking, fixed MODULARIZE=0, banner update bug |
 | Connect Four (AI) WASM | P2 | Add AI opponent to existing Connect Four |
 
 ### Architecture Note

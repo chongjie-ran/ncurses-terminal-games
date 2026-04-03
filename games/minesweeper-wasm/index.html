@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minesweeper WASM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e; color: #eee;
+    font-family: 'Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center; padding: 20px;
+  }
+  h1 { color: #e94560; margin-bottom: 8px; }
+  #info { display: flex; gap: 24px; margin-bottom: 12px; font-size: 14px; }
+  #info span { color: #aaa; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-weight: bold; color: #fff; background: #e94560;
+  }
+  canvas { border: 2px solid #e94560; cursor: pointer; display: block; }
+  #msg { margin-top: 12px; font-size: 20px; font-weight: bold; height: 28px; color: #4ecca3; }
+  button {
+    margin-top: 10px; padding: 8px 24px; font-size: 14px;
+    background: #e94560; color: #fff; border: none; border-radius: 4px; cursor: pointer;
+  }
+  button:hover { background: #ff6b6b; }
+  #loading { color: #4ecca3; font-size: 18px; }
+  #hint { font-size: 12px; color: #555; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>Minesweeper WASM</h1>
+<div id="loading">Loading WASM...</div>
+<div id="game" style="display:none">
+  <div id="info">
+    <span>🚩 <span class="badge" id="flags">0</span></span>
+    <span>Status: <span class="badge" id="state">Playing</span></span>
+    <span>⏱ <span id="timer">0</span>s</span>
+  </div>
+  <canvas id="canvas"></canvas>
+  <div id="msg"></div>
+  <button onclick="doNewGame()">New Game</button>
+  <div id="hint">Left-click: reveal | Right-click: flag</div>
+</div>
+
+<script src="game.js"></script>
+<script>
+const ROWS = 16, COLS = 16, CELL = 30;
+var canvas, ctx, mod;
+var timerInterval = null;
+var timer = 0;
+
+const NCOLORS = ['','#3498db','#27ae60','#e74c3c','#8e44ad','#f39c12','#1abc9c','#2c3e50','#7f8c8d','#c0392b'];
+
+// Load module once globally
+MineSweeperModule().then(m => {
+  mod = m;
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('game').style.display = 'block';
+  canvas = document.getElementById('canvas');
+  ctx = canvas.getContext('2d');
+  canvas.addEventListener('click', onCanvasClick);
+  canvas.addEventListener('contextmenu', onCanvasRightClick);
+  doNewGame();
+});
+
+function doNewGame() {
+  if (!mod) return;
+  if (timerInterval) clearInterval(timerInterval);
+  timer = 0;
+  document.getElementById('timer').textContent = '0';
+  document.getElementById('msg').textContent = '';
+  document.getElementById('state').textContent = 'Playing';
+  document.getElementById('state').style.background = '#e94560';
+  mod.ccall('ms_init', null, [], []);
+  timerInterval = setInterval(() => {
+    timer++;
+    document.getElementById('timer').textContent = timer;
+  }, 1000);
+  render();
+}
+
+function gc(r, c) { return mod.ccall('ms_get_cell', 'number', ['number','number'], [r, c]); }
+function gr(r, c) { return mod.ccall('ms_is_revealed', 'number', ['number','number'], [r, c]); }
+function rv(r, c) { return mod.ccall('ms_reveal', 'number', ['number','number'], [r, c]); }
+function fl(r, c) { return mod.ccall('ms_toggle_flag', 'number', ['number','number'], [r, c]); }
+function gs() { return mod.ccall('ms_get_state', 'number', [], []); }
+
+function drawCell(r, c, val) {
+  const x = c * CELL, y = r * CELL;
+  if (val === 10) {
+    ctx.fillStyle = '#16213e';
+    ctx.fillRect(x+1, y+1, CELL-2, CELL-2);
+    ctx.font = `${CELL-6}px Arial`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🚩', x + CELL/2, y + CELL/2);
+  } else if (val >= 1 && val <= 8) {
+    ctx.fillStyle = '#0a1628';
+    ctx.fillRect(x+1, y+1, CELL-2, CELL-2);
+    ctx.fillStyle = NCOLORS[val];
+    ctx.font = `bold ${CELL-6}px Courier New`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(val, x + CELL/2, y + CELL/2);
+  } else if (val === 9) {
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(x+1, y+1, CELL-2, CELL-2);
+    ctx.font = `${CELL-6}px Arial`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('💣', x + CELL/2, y + CELL/2);
+  } else {
+    ctx.fillStyle = '#0a1628';
+    ctx.fillRect(x+1, y+1, CELL-2, CELL-2);
+  }
+}
+
+function render() {
+  canvas.width = COLS * CELL;
+  canvas.height = ROWS * CELL;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (gr(r, c)) {
+        drawCell(r, c, gc(r, c));
+      } else {
+        const x = c * CELL, y = r * CELL;
+        ctx.fillStyle = '#16213e';
+        ctx.fillRect(x+1, y+1, CELL-2, CELL-2);
+      }
+    }
+  }
+  ctx.strokeStyle = '#0f3460';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= ROWS; i++) {
+    ctx.beginPath(); ctx.moveTo(0, i*CELL); ctx.lineTo(COLS*CELL, i*CELL); ctx.stroke();
+  }
+  for (let i = 0; i <= COLS; i++) {
+    ctx.beginPath(); ctx.moveTo(i*CELL, 0); ctx.lineTo(i*CELL, ROWS*CELL); ctx.stroke();
+  }
+  updateFlags();
+}
+
+function updateFlags() {
+  let f = 0;
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (gc(r, c) === 10) f++;
+  document.getElementById('flags').textContent = f;
+}
+
+function onCanvasClick(e) {
+  if (!mod || gs() !== 0) return;
+  const rect = canvas.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left) / CELL);
+  const r = Math.floor((e.clientY - rect.top) / CELL);
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+  if (gr(r, c)) return;
+  rv(r, c);
+  render();
+  updateState(gs());
+}
+
+function onCanvasRightClick(e) {
+  e.preventDefault();
+  if (!mod || gs() !== 0) return;
+  const rect = canvas.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left) / CELL);
+  const r = Math.floor((e.clientY - rect.top) / CELL);
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+  if (gr(r, c)) return;
+  fl(r, c);
+  render();
+}
+
+function updateState(st) {
+  const el = document.getElementById('state');
+  if (st === 1) {
+    el.textContent = 'WIN! 🎉'; el.style.background = '#27ae60';
+    document.getElementById('msg').textContent = 'You WIN! 🎉';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  } else if (st === 2) {
+    el.textContent = 'BOOM! 💥'; el.style.background = '#c0392b';
+    document.getElementById('msg').textContent = 'BOOM! Game Over 💥';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    // Reveal all mines
+    render();
+  }
+}
+</script>
+</body>
+</html>

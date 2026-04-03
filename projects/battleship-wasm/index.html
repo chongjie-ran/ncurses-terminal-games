@@ -119,8 +119,10 @@
     <button class="orient-btn selected" id="orient-h" onclick="setOrientation(1)">→ Horizontal</button>
     <button class="orient-btn" id="orient-v" onclick="setOrientation(0)">↓ Vertical</button>
     <button class="ctrl-btn primary" onclick="autoPlace()">🚀 Auto Place</button>
-    <button class="ctrl-btn danger" onclick="resetGame()">🔄 Reset</button>
   </div>
+</div>
+<div id="controls-bar" style="display:flex;gap:8px;justify-content:center;margin-bottom:8px;">
+  <button class="ctrl-btn danger" onclick="resetGame()">🔄 Reset</button>
 </div>
 
 <div class="game-container">
@@ -279,13 +281,10 @@ function updateShipButtons() {
   const state = Module._battleship_get_game_state();
   if (state === 0) {
     banner.textContent = '🚢 Phase 1: Place Your Ships (' + count + '/' + SHIPS.length + ')';
-    document.getElementById('placement-ui').style.display = '';
   } else if (state === 1) {
     banner.textContent = '⚔️ Phase 2: Battle! Fire at Enemy Waters!';
-    document.getElementById('placement-ui').style.display = 'none';
-  } else {
-    document.getElementById('placement-ui').style.display = 'none';
   }
+  document.getElementById('placement-ui').style.display = (state === 0) ? '' : 'none';
 }
 
 function onPlayerBoardClick(r, c) {
@@ -361,7 +360,7 @@ function isValidPlacement(r, c, size, horiz) {
   const cells = getShipCells(r, c, size, horiz);
   for (const [cr, cc] of cells) {
     if (cr < 0 || cr >= BOARD_SIZE || cc < 0 || cc >= BOARD_SIZE) return false;
-    const cell = Module._battleship_get_cell_impl(1, cr, cc);
+    const cell = Module._battleship_get_cell(1, cr, cc);
     if (cell === 1) return false; // CELL_SHIP
   }
   return true;
@@ -407,8 +406,8 @@ function renderBoards() {
   // Player board (view = board type 1 = real_board)
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
-      const real = Module._battleship_get_cell_impl(1, r, c);
-      const view = Module._battleship_get_cell_impl(0, r, c);
+      const real = Module._battleship_get_cell(1, r, c);
+      const view = Module._battleship_get_cell(0, r, c);
       const el = document.getElementById('p-' + r + '-' + c);
       if (!el) continue;
       el.className = 'cell';
@@ -424,7 +423,7 @@ function renderBoards() {
   // Enemy board (view = board type 0)
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
-      const view = Module._battleship_get_cell_impl(0, r, c);
+      const view = Module._battleship_get_cell(0, r, c);
       const el = document.getElementById('e-' + r + '-' + c);
       if (!el) continue;
       el.className = 'cell';
@@ -464,15 +463,17 @@ function resetGame() {
 }
 
 // Emscripten WASM load
-var script = document.createElement('script');
-script.src = 'battleship.js';
-script.onload = function() {
-  Module = typeof Module !== 'undefined' ? Module : {};
+// Load WASM module (MODULARIZE=0 - global Module)
+var __wasmReady = false;
+var __wasmScript = document.createElement('script');
+__wasmScript.src = 'battleship.js';
+__wasmScript.onload = function() {
   Module.onRuntimeInitialized = function() {
+    __wasmReady = true;
     initUI();
   };
 };
-document.head.appendChild(script);
+document.head.appendChild(__wasmScript);
 </script>
 </body>
 </html>

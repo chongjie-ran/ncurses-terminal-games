@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2048 WASM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #faf8ef;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 100vh; font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+#header { display:flex; align-items:center; justify-content:space-between; width:480px; margin-bottom:12px; }
+#title { font-size:64px; font-weight:700; color:#776e65; }
+#scores { display:flex; gap:8px; }
+.score-box { background:#bbada0; color:#eee4da; border-radius:6px; padding:4px 16px; text-align:center; min-width:80px; }
+.score-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+.score-value { font-size:22px; font-weight:700; color:#fff; }
+#canvas-wrap { position:relative; background:#bbada0; border-radius:8px; padding:12px; }
+canvas { display:block; border-radius:4px; }
+#overlay {
+  position:absolute; top:12px; left:12px; right:12px; bottom:12px;
+  background:rgba(238,228,218,0.73); border-radius:4px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-size:48px; font-weight:700; color:#776e65; pointer-events:none;
+}
+#overlay .sub { font-size:16px; margin-top:12px; font-weight:400; }
+#hint { margin-top:10px; color:#776e65; font-size:14px; }
+</style>
+</head>
+<body>
+<div id="header">
+  <div id="title">2048</div>
+  <div id="scores">
+    <div class="score-box"><div class="score-label">Score</div><div class="score-value" id="score">0</div></div>
+    <div class="score-box"><div class="score-label">Best</div><div class="score-value" id="best">0</div></div>
+  </div>
+</div>
+<div id="canvas-wrap">
+  <canvas id="c" width="480" height="480"></canvas>
+  <div id="overlay" style="display:none">
+    <div id="msg"></div><div class="sub" id="submsg"></div>
+  </div>
+</div>
+<div id="hint">Arrow Keys / WASD to move | R to restart</div>
+
+<script src="game2048.js"></script>
+<script>
+let Module = null;
+
+function tileColor(v) {
+  const C={0:'#cdc1b4',2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',
+           32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',
+           512:'#edc850',1024:'#edc53f',2048:'#edc22e',4096:'#3c3a32'};
+  return C[v]||'#3c3a32';
+}
+function textColor(v){return(v<=4)?'#776e65':'#f9f6f2';}
+function fontSize(v){if(v>=10000)return 26;if(v>=1000)return 36;return 48;}
+
+const CELL_SIZE=120,GAP=8,GRID=4;
+const W=GRID*CELL_SIZE+(GRID+1)*GAP;
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+canvas.width=W; canvas.height=W;
+
+function drawGame(){
+  ctx.clearRect(0,0,W,W);
+  ctx.fillStyle='#bbada0'; ctx.fillRect(0,0,W,W);
+  for(let r=0;r<GRID;r++)for(let c=0;c<GRID;c++){
+    const x=GAP+c*(CELL_SIZE+GAP),y=GAP+r*(CELL_SIZE+GAP);
+    const v=wasm_get_cell(r,c);
+    ctx.fillStyle=tileColor(v);
+    ctx.beginPath();ctx.roundRect(x,y,CELL_SIZE,CELL_SIZE,6);ctx.fill();
+    if(v!==0){
+      ctx.fillStyle=textColor(v);
+      ctx.font=`700 ${fontSize(v)}px Helvetica Neue,Arial,sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(v,x+CELL_SIZE/2,y+CELL_SIZE/2);
+    }
+  }
+}
+
+function updateHUD(){
+  document.getElementById('score').textContent=wasm_get_score();
+  document.getElementById('best').textContent=wasm_get_best_score();
+  const st=wasm_get_state();
+  const ov=document.getElementById('overlay');
+  if(st===2){ov.style.display='flex';
+    document.getElementById('msg').textContent='Game Over';
+    document.getElementById('submsg').textContent='Press R to restart';}
+  else if(st===3){ov.style.display='flex';
+    document.getElementById('msg').textContent='You Win!';
+    document.getElementById('submsg').textContent='Press R to continue';}
+  else ov.style.display='none';
+}
+
+function render(){if(Module){drawGame();updateHUD();}requestAnimationFrame(render);}
+function doMove(dir){if(Module)wasm_move(dir);}
+
+document.addEventListener('keydown',e=>{
+  if(!Module)return;
+  const st=wasm_get_state();
+  if(e.key==='r'||e.key==='R'){wasm_start_game();render();return;}
+  if(st!==1)return;
+  switch(e.key){
+    case'ArrowUp':case'w':case'W':doMove(0);e.preventDefault();break;
+    case'ArrowDown':case's':case'S':doMove(1);e.preventDefault();break;
+    case'ArrowLeft':case'a':case'A':doMove(2);e.preventDefault();break;
+    case'ArrowRight':case'd':case'D':doMove(3);e.preventDefault();break;
+  }
+});
+
+canvas.addEventListener('touchstart',e=>{
+  window._tx=e.touches[0].clientX;window._ty=e.touches[0].clientY;e.preventDefault();
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-window._tx;
+  const dy=e.changedTouches[0].clientY-window._ty;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<30)return;
+  if(Math.abs(dx)>Math.abs(dy))doMove(dx>0?3:2);else doMove(dy>0?1:0);
+  e.preventDefault();
+},{passive:false});
+
+// Bootstrap - Game2048Module is defined after game2048.js loads
+Game2048Module({locateFile:f=>f}).then(m=>{
+  Module=m;
+  window.wasm_init=()=>m._wasm_init();
+  window.wasm_start_game=()=>m._wasm_start_game();
+  window.wasm_move=(dir)=>m._wasm_move(dir);
+  window.wasm_get_state=()=>m._wasm_get_state();
+  window.wasm_get_score=()=>m._wasm_get_score();
+  window.wasm_get_best_score=()=>m._wasm_get_best_score();
+  window.wasm_set_best_score=(s)=>m._wasm_set_best_score(s);
+  window.wasm_get_won=()=>m._wasm_get_won();
+  window.wasm_get_cell=(r,c)=>m._wasm_get_cell(r,c);
+  wasm_init();
+  wasm_start_game();
+  render();
+}).catch(e=>{
+  console.error('2048 WASM load failed:',e);
+  document.getElementById('msg').textContent='Load Error';
+  document.getElementById('submsg').textContent=e.message;
+  document.getElementById('overlay').style.display='flex';
+});
+</script>
+</body>
+</html>

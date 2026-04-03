@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tetris WASM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #fff;
+    user-select: none;
+  }
+  #title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #00e5ff;
+    text-shadow: 0 0 20px #00e5ff80;
+    margin-bottom: 12px;
+    letter-spacing: 4px;
+  }
+  #game-container {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  #canvas-wrap {
+    position: relative;
+    border: 3px solid #00e5ff;
+    box-shadow: 0 0 30px #00e5ff40, inset 0 0 20px #00000080;
+  }
+  #main-canvas {
+    display: block;
+    background: #000;
+  }
+  #side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 140px;
+  }
+  .panel-box {
+    background: #0d0d2a;
+    border: 2px solid #333;
+    padding: 10px 14px;
+  }
+  .panel-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+  .panel-value {
+    font-size: 22px;
+    color: #00e5ff;
+    text-shadow: 0 0 10px #00e5ff80;
+  }
+  #next-canvas {
+    display: block;
+    background: #000;
+    margin-top: 4px;
+  }
+  #controls-info {
+    font-size: 10px;
+    color: #555;
+    line-height: 1.6;
+  }
+  #controls-info span { color: #888; }
+  #game-over-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #ff3366;
+  }
+  #game-over-overlay.show { display: flex; }
+  #game-over-text {
+    font-size: 32px;
+    font-weight: bold;
+    text-shadow: 0 0 20px #ff3366;
+    margin-bottom: 16px;
+  }
+  #restart-btn {
+    background: #ff3366;
+    color: #fff;
+    border: none;
+    padding: 10px 28px;
+    font-size: 16px;
+    font-family: inherit;
+    cursor: pointer;
+    letter-spacing: 2px;
+  }
+  #restart-btn:hover { background: #ff5588; }
+</style>
+</head>
+<body>
+
+<div id="title">TETRIS</div>
+<div id="game-container">
+  <div id="canvas-wrap">
+    <canvas id="main-canvas" width="320" height="640"></canvas>
+    <div id="game-over-overlay">
+      <div id="game-over-text">GAME OVER</div>
+      <button id="restart-btn">RESTART</button>
+    </div>
+  </div>
+  <div id="side-panel">
+    <div class="panel-box">
+      <div class="panel-label">Score</div>
+      <div class="panel-value" id="score-val">0</div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Lines</div>
+      <div class="panel-value" id="lines-val">0</div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Level</div>
+      <div class="panel-value" id="level-val">1</div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Next</div>
+      <canvas id="next-canvas" width="128" height="128"></canvas>
+    </div>
+    <div id="controls-info">
+      <span>←→</span> Move<br>
+      <span>↑</span> Rotate<br>
+      <span>↓</span> Soft Drop<br>
+      <span>Space</span> Hard Drop<br>
+      <span>P</span> Pause
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d');
+const nextCanvas = document.getElementById('next-canvas');
+const nextCtx = nextCanvas.getContext('2d');
+const overlay = document.getElementById('game-over-overlay');
+const restartBtn = document.getElementById('restart-btn');
+
+const CELL = 32;
+const GRID_W = 10;
+const GRID_H = 20;
+
+// 颜色: 0=空, 1=I青, 2=O黄, 3=T紫, 4=S绿, 5=Z红, 6=J蓝, 7=L橙
+const COLORS = [
+  null,
+  '#00e5ff', // I
+  '#ffeb3b', // O
+  '#e040fb', // T
+  '#76ff03', // S
+  '#ff1744', // Z
+  '#2979ff', // J
+  '#ff9100', // L
+];
+
+// 形状预览尺寸
+const PREVIEW_CELL = 32;
+
+// 键盘状态
+let keyDown = {};
+let lastDownTime = {};
+const DAS = 150; // 延迟后重复间隔(ms)
+const ARR = 50;  // 重复间隔(ms)
+
+let Module = null;
+let gameReady = false;
+let lastFrame = 0;
+let accumulator = 0;
+const TICK_MS = 1000 / 60;
+
+function loadWASM() {
+  return new Promise((resolve, reject) => {
+    // 动态加载编译后的wasm文件
+    const script = document.createElement('script');
+    script.src = 'tetris.js';
+    script.onload = () => {
+      TetrisModule().then(m => {
+        Module = m;
+        gameReady = true;
+        resolve();
+      });
+    };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+function drawCell(c, x, y, colorId, size) {
+  if (!colorId) return;
+  c.fillStyle = COLORS[colorId];
+  c.fillRect(x + 1, y + 1, size - 2, size - 2);
+  // 高光
+  c.fillStyle = 'rgba(255,255,255,0.3)';
+  c.fillRect(x + 2, y + 2, size - 6, 3);
+  // 阴影
+  c.fillStyle = 'rgba(0,0,0,0.4)';
+  c.fillRect(x + size - 4, y + 5, 2, size - 7);
+  c.fillRect(x + 5, y + size - 4, size - 7, 2);
+}
+
+function drawNext() {
+  nextCtx.fillStyle = '#000';
+  nextCtx.fillRect(0, 0, 128, 128);
+  if (!gameReady) return;
+  
+  const shapeId = Module._wasm_get_next_shape();
+  const shapeGrid = getShapeGridLocal(shapeId, 0);
+  
+  // 计算形状边界
+  let minR = 99, maxR = -1, minC = 99, maxC = -1;
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (shapeGrid[r][c]) {
+        if (r < minR) minR = r;
+        if (r > maxR) maxR = r;
+        if (c < minC) minC = c;
+        if (c > maxC) maxC = c;
+      }
+    }
+  }
+  const rows = maxR - minR + 1;
+  const cols = maxC - minC + 1;
+  const cs = Math.min(28, 100 / Math.max(rows, cols));
+  const offsetX = (128 - cols * cs) / 2;
+  const offsetY = (128 - rows * cs) / 2;
+  
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (shapeGrid[r][c]) {
+        drawCell(nextCtx, offsetX + (c - minC) * cs, offsetY + (r - minR) * cs, shapeId + 1, cs);
+      }
+    }
+  }
+}
+
+// 本地形状数据(用于预览和ghost)
+const SHAPES_LOCAL = [
+  [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  [[0,0,0,0],[0,2,2,0],[0,2,2,0],[0,0,0,0]],
+  [[0,0,0,0],[0,3,0,0],[3,3,3,0],[0,0,0,0]],
+  [[0,0,0,0],[0,4,4,0],[4,4,0,0],[0,0,0,0]],
+  [[0,0,0,0],[5,5,0,0],[0,5,5,0],[0,0,0,0]],
+  [[0,0,0,0],[6,0,0,0],[6,6,6,0],[0,0,0,0]],
+  [[0,0,0,0],[0,0,7,0],[7,7,7,0],[0,0,0,0]],
+];
+
+function getShapeGridLocal(shapeId, rot) {
+  rot = rot % 4;
+  const shape = SHAPES_LOCAL[shapeId];
+  if (rot === 0) return shape;
+  // 旋转矩阵
+  const result = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (rot === 1) result[c][3-r] = shape[r][c];       // 90度
+      if (rot === 2) result[3-r][3-c] = shape[r][c];    // 180度
+      if (rot === 3) result[3-c][r] = shape[r][c];       // 270度
+    }
+  }
+  return result;
+}
+
+function drawGhost() {
+  if (!gameReady) return;
+  let gy = 0;
+  const shapeId = Module._wasm_get_next_shape();
+  const shape = getShapeGridLocal(Module._wasm_get_current_shape ? 
+    0 : 0, 0); // 获取当前形状
+  // 找ghost位置: 不断下落直到碰撞
+  // 从当前y开始下落
+  // 使用game state获取当前形状信息
+  // 简化: 直接从画布状态获取
+}
+
+function render() {
+  // 清屏
+  ctx.fillStyle = '#050510';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 绘制网格线
+  ctx.strokeStyle = '#1a1a3a';
+  ctx.lineWidth = 1;
+  for (let r = 0; r <= GRID_H; r++) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * CELL);
+    ctx.lineTo(canvas.width, r * CELL);
+    ctx.stroke();
+  }
+  for (let c = 0; c <= GRID_W; c++) {
+    ctx.beginPath();
+    ctx.moveTo(c * CELL, 0);
+    ctx.lineTo(c * CELL, canvas.height);
+    ctx.stroke();
+  }
+  
+  if (!gameReady) {
+    ctx.fillStyle = '#888';
+    ctx.font = '14px Courier New';
+    ctx.fillText('Loading WASM...', 10, 30);
+    return;
+  }
+  
+  // 绘制游戏区格子
+  for (let r = 0; r < GRID_H; r++) {
+    for (let c = 0; c < GRID_W; c++) {
+      const v = Module._wasm_get_grid(r, c);
+      if (v) drawCell(ctx, c * CELL, r * CELL, v, CELL);
+    }
+  }
+  
+  // 绘制活动方块
+  for (let r = 0; r < GRID_H; r++) {
+    for (let c = 0; c < GRID_W; c++) {
+      const v = Module._wasm_get_active(r, c);
+      if (v) drawCell(ctx, c * CELL, r * CELL, v, CELL);
+    }
+  }
+  
+  // 绘制预览
+  drawNext();
+  
+  // 更新UI
+  document.getElementById('score-val').textContent = Module._wasm_get_score();
+  document.getElementById('lines-val').textContent = Module._wasm_get_lines();
+  document.getElementById('level-val').textContent = Module._wasm_get_level() + 1;
+  
+  // 游戏结束
+  const state = Module._wasm_get_state();
+  if (state === 2) {
+    overlay.classList.add('show');
+  } else {
+    overlay.classList.remove('show');
+  }
+}
+
+function handleInput(now) {
+  if (!gameReady) return;
+  const state = Module._wasm_get_state();
+  if (state === 2) return; // 游戏结束不处理
+  
+  // 旋转
+  if (keyDown['ArrowUp'] || keyDown['KeyX']) {
+    if (!lastDownTime['rotate']) {
+      Module._wasm_rotate(1);
+      lastDownTime['rotate'] = now;
+    }
+  }
+  // 左右移动 (DAS)
+  for (const k of ['ArrowLeft', 'ArrowRight']) {
+    if (keyDown[k]) {
+      if (!lastDownTime[k]) {
+        Module._wasm_move(k === 'ArrowRight' ? 1 : -1);
+        lastDownTime[k] = now;
+      } else if (now - lastDownTime[k] > DAS) {
+        const elapsed = now - lastDownTime[k] - DAS;
+        const reps = Math.floor(elapsed / ARR) + 1;
+        const newTime = lastDownTime[k] + DAS + reps * ARR;
+        if (newTime <= now) {
+          Module._wasm_move(k === 'ArrowRight' ? 1 : -1);
+          lastDownTime[k] = now - (elapsed % ARR);
+        }
+      }
+    } else {
+      lastDownTime[k] = 0;
+    }
+  }
+  // 软降
+  if (keyDown['ArrowDown']) {
+    if (!lastDownTime['down'] || now - lastDownTime['down'] > 50) {
+      Module._wasm_down();
+      lastDownTime['down'] = now;
+    }
+  }
+}
+
+function gameLoop(timestamp) {
+  const now = performance.now();
+  accumulator += now - lastFrame;
+  lastFrame = now;
+  
+  // 以固定速率tick
+  while (accumulator >= TICK_MS) {
+    if (gameReady) {
+      Module._wasm_tick();
+    }
+    accumulator -= TICK_MS;
+  }
+  
+  handleInput(now);
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+document.addEventListener('keydown', e => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) {
+    e.preventDefault();
+  }
+  if (!keyDown[e.code]) {
+    keyDown[e.code] = true;
+    if (e.code === 'Space') {
+      if (gameReady) Module._wasm_hard_drop();
+    }
+    if (e.code === 'KeyP') {
+      // TODO: pause
+    }
+  }
+});
+
+document.addEventListener('keyup', e => {
+  keyDown[e.code] = false;
+  if (['rotate','ArrowLeft','ArrowRight','down'].includes(e.key)) {
+    lastDownTime[e.code === 'ArrowUp' ? 'rotate' : e.code] = 0;
+  }
+});
+
+restartBtn.addEventListener('click', () => {
+  if (gameReady) Module._wasm_restart();
+});
+
+loadWASM().then(() => {
+  Module._wasm_init();
+  lastFrame = performance.now();
+  requestAnimationFrame(gameLoop);
+}).catch(err => {
+  console.error('WASM load failed:', err);
+  // 显示错误
+  ctx.fillStyle = '#300';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#f88';
+  ctx.font = '12px Courier';
+  ctx.fillText('WASM failed to load', 10, 30);
+  ctx.fillText('Run: emcc -o tetris.js tetris.c', 10, 50);
+  ctx.fillText('Then refresh.', 10, 70);
+});
+</script>
+</body>
+</html>

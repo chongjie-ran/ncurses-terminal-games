@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wordle - WASM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #121213; color: #ffffff; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+header { width: 100%; text-align: center; padding: 16px; border-bottom: 1px solid #3a3a3c; }
+h1 { font-size: 28px; letter-spacing: 3px; font-weight: 700; }
+#message { height: 32px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #fff; margin: 8px 0; }
+#board { display: flex; flex-direction: column; gap: 5px; margin: 16px 0; }
+.row { display: flex; gap: 5px; }
+.tile { width: 58px; height: 58px; border: 2px solid #3a3a3c; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; text-transform: uppercase; }
+.tile.active { border-color: #565758; }
+.tile.correct { background: #538d4e; border-color: #538d4e; }
+.tile.present { background: #b59f3b; border-color: #b59f3b; }
+.tile.wrong { background: #3a3a3c; border-color: #3a3a3c; }
+.tile.flip { animation: flip 0.3s ease-in-out; }
+@keyframes flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+#keyboard { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; user-select: none; }
+.keyboard-row { display: flex; gap: 5px; justify-content: center; }
+.key { padding: 0 10px; height: 52px; border-radius: 4px; background: #818384; color: #fff; font-size: 13px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; text-transform: uppercase; min-width: 32px; }
+.key:hover { background: #9a9c9e; }
+.key:active { background: #6a6c6e; }
+.key.wrong { background: #3a3a3c; }
+.key.present { background: #b59f3b; }
+.key.correct { background: #538d4e; }
+.key-wide { min-width: 56px; font-size: 11px; }
+</style>
+</head>
+<body>
+<header><h1>WORDLE</h1></header>
+<div id="message">Type a 5-letter word and press Enter</div>
+<div id="board"></div>
+<div id="keyboard"></div>
+
+<script src="wordle.js"></script>
+<script>
+const WORD_LEN = 5;
+const MAX_GUESSES = 6;
+const WORD_LIST = [
+  "APPLE","BEACH","CRANE","DREAM","EAGLE","FLAME","GRAPE","HOUSE","JUICE","KNIFE",
+  "LEMON","MANGO","NIGHT","OCEAN","PIANO","QUEEN","ROBOT","SNOWY","TIGER","UNCLE",
+  "VIVID","WHALE","YOUTH","ZEBRA","ADIEU","AUDIO","ALOHA","AROSE","SLATE","CRATE",
+  "TRACE","RAISE","STARE","SHINE","GLASS","BREAD","GRAND","BRAND","PLANT","TRAIN",
+  "BRAIN","CHAIR","CHAOS","DRAMA","HASTE","KARMA","LIVER","MANOR","PARTY","PASTA",
+  "PEACE","PEARL","PETAL","PIVOT","PRISM","PULSE","RELAY","RENEW","RIDER","ROAST",
+  "SINGE","SLUMP","SMART","SOLAR","SPARE","SPARK","SQUAD","STAIN","STALK","STARE",
+  "STAVE","STEAM","STEEL","STERN","STOCK","STONE","STORM","STORY","STOVE","STRAP",
+  "STRAW","STRIP","STUDY","STUMP","SURGE","SWAMP","SWARM","SWEAT","SWEEP","SWIFT",
+  "SWING","SWIRL","TASTE","TEASE","THANK","THICK","THIEF","THING","THINK","THORN",
+  "THROW","THUMB","TIGHT","TIRED","TITLE","TODAY","TONIC","TOOTH","TOWER","TOXIC",
+  "TRACE","TRACK","TRADE","TRAIL","TRAIN","TRASH","TREAT","TREND","TRIAL","TRIBE",
+  "TRICK","TRIED","TROOP","TRUCK","TRULY","TRUMP","TRUNK","TRUST","TRUTH","TUTOR",
+  "TWEAK","TWEET","TWICE","TWIRL","UNCLE","UNDER","UNION","UNITY","UNTIL","UPPER",
+  "UPSET","URBAN","USAGE","USUAL","UTTER","VAGUE","VALID","VALUE","VALVE","VAPOR",
+  "VAULT","VEGAN","VENUE","VERGE","VERSE","VIDEO","VIGOR","VINYL","VIOLA","VIRAL",
+  "VIRUS","VISIT","VISTA","VITAL","VIVID","VOCAL","VODKA","VOGUE","VOICE","WAGON",
+  "WAIST","WASTE","WATCH","WATER","WEARY","WEAVE","WEDGE","WEIGH","WEIRD","WHEAT",
+  "WHEEL","WHERE","WHICH","WHILE","WHINE","WHIRL","WHITE","WHOLE","WHOSE","WIDEN",
+  "WIDOW","WIDTH","WINCE","WINCH","WINDY","WIRED","WITCH","WITTY","WOMAN","WOODS",
+  "WORLD","WORRY","WORSE","WORST","WORTH","WOUND","WOVEN","WRATH","WRECK","WREST",
+  "WRING","WRIST","WRITE","WRONG","WROTE","YACHT","YEARN","YIELD","YOUNG","ZESTY"
+];
+
+var Game = null; // Will be WordleModule
+
+function getRandomWord() {
+  return WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+}
+
+function initBoard() {
+  var boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+  for (var r = 0; r < MAX_GUESSES; r++) {
+    var row = document.createElement('div');
+    row.className = 'row';
+    for (var c = 0; c < WORD_LEN; c++) {
+      var tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.id = 'tile_' + r + '_' + c;
+      row.appendChild(tile);
+    }
+    boardEl.appendChild(row);
+  }
+}
+
+function initKeyboard() {
+  var kbEl = document.getElementById('keyboard');
+  kbEl.innerHTML = '';
+  var rows = [
+    ['Q','W','E','R','T','Y','U','I','O','P'],
+    ['A','S','D','F','G','H','J','K','L'],
+    ['ENTER','Z','X','C','V','B','N','M','BKSP']
+  ];
+  rows.forEach(function(row) {
+    var rowEl = document.createElement('div');
+    rowEl.className = 'keyboard-row';
+    row.forEach(function(key) {
+      var btn = document.createElement('button');
+      btn.className = 'key' + (key.length > 1 ? ' key-wide' : '');
+      btn.textContent = key;
+      btn.dataset.key = key;
+      btn.addEventListener('click', function() { onKey(key); });
+      rowEl.appendChild(btn);
+    });
+    kbEl.appendChild(rowEl);
+  });
+}
+
+function showMsg(text) {
+  document.getElementById('message').textContent = text;
+}
+
+function updateKeyboard() {
+  var kbEl = document.getElementById('keyboard');
+  for (var ki = 0; ki < 26; ki++) {
+    var ch = String.fromCharCode(65 + ki);
+    var state = Game._wasm_get_keyboard(ki);
+    kbEl.querySelectorAll('.key[data-key="' + ch + '"]').forEach(function(btn) {
+      btn.classList.remove('correct','present','wrong');
+      if (state === 3) btn.classList.add('correct');
+      else if (state === 2) btn.classList.add('present');
+      else if (state === 1) btn.classList.add('wrong');
+    });
+  }
+}
+
+function updateBoard() {
+  var state = Game._wasm_get_state();
+  var guess = Game._wasm_get_current_guess();
+  var cursor = Game._wasm_get_cursor_col();
+
+  // Draw submitted guesses
+  for (var r = 0; r < guess; r++) {
+    for (var c = 0; c < WORD_LEN; c++) {
+      var tile = document.getElementById('tile_' + r + '_' + c);
+      var ch = Game._wasm_get_guess_char(r, c);
+      var ev = Game._wasm_get_eval(r, c);
+      tile.textContent = ch ? String.fromCharCode(ch) : '';
+      tile.className = 'tile';
+      if (ev === 3) tile.classList.add('correct');
+      else if (ev === 2) tile.classList.add('present');
+      else if (ev === 1) tile.classList.add('wrong');
+    }
+  }
+
+  // Draw current guess row
+  if (state === 0) { // playing
+    for (var c = 0; c < WORD_LEN; c++) {
+      var tile = document.getElementById('tile_' + guess + '_' + c);
+      var ch = Game._wasm_get_guess_char(guess, c);
+      tile.textContent = ch ? String.fromCharCode(ch) : '';
+      tile.className = 'tile' + (c === cursor ? ' active' : '');
+    }
+    // Clear rows after current
+    for (var r = guess + 1; r < MAX_GUESSES; r++) {
+      for (var c = 0; c < WORD_LEN; c++) {
+        document.getElementById('tile_' + r + '_' + c).textContent = '';
+        document.getElementById('tile_' + r + '_' + c).className = 'tile';
+      }
+    }
+  }
+
+  updateKeyboard();
+
+  if (state === 1) { // win
+    var msgs = ['Genius!', 'Magnificent!', 'Impressive!', 'Splendid!', 'Great!', 'Phew!'];
+    showMsg(msgs[Math.min(guess - 1, 5)]);
+  } else if (state === 2) { // lose
+    var target = '';
+    for (var c = 0; c < WORD_LEN; c++) target += String.fromCharCode(Game._wasm_get_target_char(c));
+    showMsg('The word was: ' + target);
+  }
+}
+
+function onKey(key) {
+  if (!Game) return;
+  if (key === 'BKSP' || key === 'BACKSPACE') {
+    Game._wasm_backspace();
+    updateBoard();
+  } else if (key === 'ENTER') {
+    var guessLen = Game._wasm_get_current_guess_len();
+    if (guessLen < WORD_LEN) {
+      showMsg('Not enough letters');
+      setTimeout(function() { showMsg('Type a 5-letter word and press Enter'); }, 1200);
+      return;
+    }
+    var prevGuess = Game._wasm_get_current_guess();
+    Game._wasm_enter();
+    var newGuess = Game._wasm_get_current_guess();
+    if (newGuess === prevGuess) {
+      // No advancement = invalid word
+      showMsg('Not in word list');
+      setTimeout(function() { showMsg('Type a 5-letter word and press Enter'); }, 1200);
+      return;
+    }
+    updateBoard();
+  } else {
+    var code = key.charCodeAt(0);
+    if (code >= 65 && code <= 90) {
+      Game._wasm_type_letter(code);
+      updateBoard();
+    }
+  }
+}
+
+document.addEventListener('keydown', function(e) {
+  if (!Game) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Enter') { onKey('ENTER'); return; }
+  if (e.key === 'Backspace') { onKey('BKSP'); return; }
+  if (e.key.length === 1 && e.key.match(/[a-zA-Z]/)) {
+    onKey(e.key.toUpperCase());
+  }
+});
+
+// Initialize WordleModule
+WordleModule().then(function(mod) {
+  Game = mod;
+  var word = getRandomWord();
+  Game._wasm_init_wordle(word);
+  initBoard();
+  initKeyboard();
+  updateBoard();
+  showMsg('Type a 5-letter word and press Enter');
+}).catch(function(err) {
+  console.error('Failed to load Wordle:', err);
+  showMsg('Failed to load game');
+});
+</script>
+</body>
+</html>

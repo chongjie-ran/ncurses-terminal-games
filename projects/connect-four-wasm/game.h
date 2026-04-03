@@ -21,6 +21,15 @@
 #define WIN_DIAG1 2
 #define WIN_DIAG2 3
 
+// AI mode
+#define MODE_2P 0
+#define MODE_VS_AI 1
+
+// AI difficulty (search depth)
+#define AI_EASY   1
+#define AI_MEDIUM 3
+#define AI_HARD   5
+
 typedef struct {
     int board[ROWS][COLS];
     int current_player;
@@ -32,6 +41,9 @@ typedef struct {
     bool animating;
     int anim_col;
     int anim_row;
+    int ai_mode;       // 0=2P, 1=vs AI
+    int ai_difficulty; // 1-5 (search depth)
+    bool ai_thinking;  // true while AI is computing
 } ConnectGame;
 
 #endif
