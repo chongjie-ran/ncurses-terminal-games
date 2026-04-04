@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dominoes</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a2e; color: #eee; }
+h1 { text-align: center; color: #e94560; }
+.game-info { text-align: center; margin: 10px; font-size: 1.2em; }
+.board { background: #16213e; border-radius: 10px; padding: 20px; margin: 20px auto; max-width: 800px; min-height: 120px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: center; }
+.chain-tile { background: #fff; color: #000; border-radius: 5px; padding: 8px 12px; font-weight: bold; display: flex; flex-direction: column; align-items: center; min-width: 50px; }
+.chain-tile .pip { font-size: 1.5em; }
+.chain-tile .divider { border-top: 2px solid #333; width: 80%; margin: 2px 0; }
+.human-hand { background: #0f3460; border-radius: 10px; padding: 20px; margin: 20px auto; max-width: 900px; }
+.hand-title { text-align: center; color: #e94560; margin-bottom: 10px; }
+.tiles { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.tile { background: #fff; color: #000; border-radius: 8px; padding: 10px 15px; cursor: pointer; display: flex; flex-direction: column; align-items: center; min-width: 60px; transition: transform 0.2s, box-shadow 0.2s; }
+.tile:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(233,69,96,0.5); }
+.tile .pips { font-size: 1.8em; font-weight: bold; display: flex; flex-direction: column; align-items: center; }
+.tile .divider { border-top: 2px solid #333; width: 100%; margin: 2px 0; }
+.tile .pip-row { display: flex; gap: 10px; }
+.tile.can-left { border: 3px solid #4ecca3; }
+.tile.can-right { border: 3px solid #ff6b6b; }
+.tile.can-both { border: 3px solid #ffd93d; }
+.status { text-align: center; padding: 10px; font-size: 1.1em; }
+.actions { text-align: center; margin: 10px; }
+button { background: #e94560; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 1em; margin: 5px; }
+button:hover { background: #ff6b6b; }
+button:disabled { background: #555; cursor: not-allowed; }
+.ai-hand { background: #0f3460; border-radius: 10px; padding: 10px; margin: 10px auto; max-width: 300px; text-align: center; opacity: 0.7; }
+</style>
+</head>
+<body>
+<h1>Dominoes</h1>
+<div class="game-info" id="gameInfo">Loading...</div>
+<div class="ai-hand" id="aiHand">AI Tiles: ?</div>
+<div class="board" id="board"><em>No tiles yet</em></div>
+<div class="status" id="status"></div>
+<div class="actions" id="actions"></div>
+<div class="human-hand">
+<div class="hand-title">Your Hand</div>
+<div class="tiles" id="humanHand"></div>
+</div>
+
+<script src="dominoes.js"></script>
+<script>
+var Module = {
+    onRuntimeInitialized: function() {
+        startGame();
+    }
+};
+
+function startGame() {
+    Module._newGame();
+    updateGame();
+}
+
+function updateGame() {
+    var data = Module._getGameState(11);
+    // Actually use stackalloc or cwrap
+}
+
+function getGameState() {
+    var gameState = {
+        currentPlayer: 0,
+        gameOver: 0,
+        winner: -1,
+        chainLength: 0,
+        chainLeft: 0,
+        chainRight: 0,
+        boneyardCount: 0,
+        humanCount: 0,
+        aiCount: 0,
+        humanPassed: 0,
+        aiPassed: 0
+    };
+    
+    var buf = Module._malloc(11 * 4);
+    Module.ccall('getGameState', 'number', ['pointer'], [buf]);
+    gameState.currentPlayer = Module.getValue(buf, 'i32');
+    gameState.gameOver = Module.getValue(buf + 4, 'i32');
+    gameState.winner = Module.getValue(buf + 8, 'i32');
+    gameState.chainLength = Module.getValue(buf + 12, 'i32');
+    gameState.chainLeft = Module.getValue(buf + 16, 'i32');
+    gameState.chainRight = Module.getValue(buf + 20, 'i32');
+    gameState.boneyardCount = Module.getValue(buf + 24, 'i32');
+    gameState.humanCount = Module.getValue(buf + 28, 'i32');
+    gameState.aiCount = Module.getValue(buf + 32, 'i32');
+    gameState.humanPassed = Module.getValue(buf + 36, 'i32');
+    gameState.aiPassed = Module.getValue(buf + 40, 'i32');
+    Module._free(buf);
+    
+    return gameState;
+}
+
+function renderGame() {
+    var gs = getGameState();
+    
+    // Game info
+    var turnText = gs.gameOver ? 
+        (gs.winner === 0 ? 'You Win!' : gs.winner === 1 ? 'AI Wins!' : 'Draw!') :
+        (gs.currentPlayer === 0 ? 'Your Turn' : 'AI Thinking...');
+    document.getElementById('gameInfo').textContent = turnText;
+    
+    // AI hand
+    document.getElementById('aiHand').textContent = 'AI Tiles: ' + gs.aiCount + ' | Boneyard: ' + gs.boneyardCount;
+    
+    // Chain/board
+    var board = document.getElementById('board');
+    if (gs.chainLength === 0) {
+        board.innerHTML = '<em>First tile to be played</em>';
+    } else {
+        board.innerHTML = '';
+        for (var i = 0; i < gs.chainLength; i++) {
+            var a = Module._malloc(4), b = Module._malloc(4);
+            Module._getChainDomino(i, a, b);
+            var va = Module.getValue(a, 'i32'), vb = Module.getValue(b, 'i32');
+            Module._free(a); Module._free(b);
+            
+            var tile = document.createElement('div');
+            tile.className = 'chain-tile';
+            tile.innerHTML = '<span class="pip">' + va + '</span><div class="divider"></div><span class="pip">' + vb + '</span>';
+            board.appendChild(tile);
+        }
+    }
+    
+    // Human hand
+    var hand = document.getElementById('humanHand');
+    hand.innerHTML = '';
+    for (var i = 0; i < gs.humanCount; i++) {
+        var a = Module._malloc(4), b = Module._malloc(4);
+        Module._getHumanDomino(i, a, b);
+        var va = Module.getValue(a, 'i32'), vb = Module.getValue(b, 'i32');
+        Module._free(a); Module._free(b);
+        
+        var canPlay = Module._canHumanPlay(i);
+        var tile = document.createElement('div');
+        tile.className = 'tile';
+        if (canPlay === 1) tile.classList.add('can-left');
+        else if (canPlay === 2) tile.classList.add('can-right');
+        else if (canPlay === 3) tile.classList.add('can-both');
+        tile.innerHTML = '<div class="pip-row"><span>' + va + '</span><span>' + vb + '</span></div>';
+        
+        if (!gs.gameOver && gs.currentPlayer === 0) {
+            tile.onclick = (function(idx, cp) {
+                return function() {
+                    playTile(idx, cp);
+                };
+            })(i, canPlay);
+        }
+        
+        hand.appendChild(tile);
+    }
+    
+    // Status and actions
+    var status = document.getElementById('status');
+    var actions = document.getElementById('actions');
+    
+    if (gs.gameOver) {
+        status.textContent = gs.winner === 0 ? 'Congratulations! You won!' : gs.winner === 1 ? 'AI wins this time.' : 'It\'s a draw!';
+        actions.innerHTML = '<button onclick="startGame()">New Game</button>';
+    } else if (gs.currentPlayer === 0) {
+        status.textContent = '';
+        actions.innerHTML = gs.boneyardCount > 0 ? '<button onclick="drawTile()">Draw from Boneyard</button>' : '';
+    } else {
+        status.textContent = 'AI is thinking...';
+        actions.innerHTML = '';
+        setTimeout(aiTurn, 500);
+    }
+}
+
+function playTile(pos, canPlay) {
+    // Prefer right if can play on both
+    var preferRight = (canPlay === 3) ? 1 : (canPlay === 2) ? 1 : 0;
+    Module._playHuman(pos, preferRight);
+    renderGame();
+}
+
+function drawTile() {
+    Module._drawTile();
+    renderGame();
+}
+
+function aiTurn() {
+    Module._aiTurn();
+    renderGame();
+}
+
+// Wait for Module to load
+if (typeof Module !== 'undefined') {
+    Module.onRuntimeInitialized = startGame;
+}
+</script>
+</body>
+</html>

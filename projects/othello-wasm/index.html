@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Othello WASM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #eee; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+h1 { font-size: 2rem; margin-bottom: 10px; color: #4ade80; }
+#status { font-size: 1.1rem; margin: 8px 0; color: #ccc; min-height: 1.5em; }
+#canvas { border: 3px solid #4ade80; border-radius: 8px; cursor: pointer; background: #2d5a27; }
+#scoreboard { display: flex; gap: 40px; margin: 12px 0; font-size: 1.2rem; }
+.score { padding: 8px 20px; border-radius: 8px; }
+.black { background: #222; border: 2px solid #888; }
+.white { background: #f0f0f0; color: #111; border: 2px solid #ccc; }
+#btn { padding: 10px 30px; font-size: 1rem; border: none; border-radius: 6px; background: #4ade80; color: #1a1a2e; cursor: pointer; margin-top: 8px; }
+#btn:hover { background: #22c55e; }
+</style>
+</head>
+<body>
+<h1> Othello / Reversi </h1>
+<div id="scoreboard">
+  <div class="score black">Black: <span id="bc">2</span></div>
+  <div class="score white">White: <span id="wc">2</span></div>
+</div>
+<canvas id="canvas" width="480" height="480"></canvas>
+<div id="status">Loading...</div>
+<button id="btn" onclick="resetGame()">New Game</button>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const CELL = 480 / 8;
+
+const JS_FALLBACK = true; // Use JS fallback for simplicity
+
+// ─── JS fallback engine ────────────────────────────────────────────
+const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const game = {
+    board: [], current_player: 1, black_count: 2, white_count: 2,
+    game_over: 0, winner: 0, valid_moves: [], valid_count: 0,
+
+    init() {
+        this.board = Array(8).fill().map(() => Array(8).fill(0));
+        this.board[3][3] = 2; this.board[3][4] = 1;
+        this.board[4][3] = 1; this.board[4][4] = 2;
+        this.current_player = 1; this.black_count = 2; this.white_count = 2;
+        this.game_over = 0; this.winner = 0;
+        this.calc_valid();
+    },
+
+    in_bounds(r, c) { return r >= 0 && r < 8 && c >= 0 && c < 8; },
+
+    get_flippable(r, c, dr, dc, player) {
+        const opp = player === 1 ? 2 : 1;
+        let nr = r+dr, nc = c+dc, cnt = 0;
+        while (this.in_bounds(nr,nc) && this.board[nr][nc] === opp) { nr+=dr; nc+=dc; cnt++; }
+        if (!this.in_bounds(nr,nc) || this.board[nr][nc] !== player) return 0;
+        return cnt;
+    },
+
+    is_valid(r, c) {
+        if (!this.in_bounds(r,c) || this.board[r][c] !== 0) return false;
+        for (const [dr,dc] of DIRS)
+            if (this.get_flippable(r, c, dr, dc, this.current_player) > 0) return true;
+        return false;
+    },
+
+    calc_valid() {
+        this.valid_moves = [];
+        for (let r=0; r<8; r++) for (let c=0; c<8; c++)
+            if (this.is_valid(r,c)) this.valid_moves.push(r*8+c);
+        this.valid_count = this.valid_moves.length;
+    },
+
+    make_move(r, c) {
+        if (this.game_over || !this.is_valid(r,c)) return false;
+        let total = 0;
+        for (const [dr,dc] of DIRS) {
+            const n = this.get_flippable(r, c, dr, dc, this.current_player);
+            if (n > 0) {
+                total += n;
+                let nr=r+dr, nc=c+dc;
+                for (let i=0; i<n; i++) { this.board[nr][nc]=this.current_player; nr+=dr; nc+=dc; }
+            }
+        }
+        this.board[r][c] = this.current_player;
+        const p = this.current_player, o = p===1?2:1;
+        if (p===1) { this.black_count += total+1; this.white_count -= total; }
+        else { this.white_count += total+1; this.black_count -= total; }
+        this.current_player = o;
+        this.calc_valid();
+        if (this.black_count+this.white_count===64||this.black_count===0||this.white_count===0)
+            { this.game_over=1; this.winner=this.black_count>this.white_count?1:this.white_count>this.black_count?2:0; }
+        else if (this.valid_count===0) {
+            this.current_player = p;
+            this.calc_valid();
+            if (this.valid_count===0)
+                { this.game_over=1; this.winner=this.black_count>this.white_count?1:this.white_count>this.black_count?2:0; }
+        }
+        return true;
+    }
+};
+
+// ─── Rendering ────────────────────────────────────────────────────
+function drawBoard() {
+    ctx.fillStyle = '#2d5a27';
+    ctx.fillRect(0, 0, 480, 480);
+    ctx.strokeStyle = '#1a4018'; ctx.lineWidth = 1;
+    for (let i=0; i<=8; i++) {
+        ctx.beginPath(); ctx.moveTo(i*CELL,0); ctx.lineTo(i*CELL,480); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,i*CELL); ctx.lineTo(480,i*CELL); ctx.stroke();
+    }
+    [2,4].forEach(r => [2,4].forEach(c => {
+        ctx.fillStyle = '#1a4018';
+        ctx.beginPath(); ctx.arc((r+0.5)*CELL,(c+0.5)*CELL,4,0,Math.PI*2); ctx.fill();
+    }));
+}
+
+function drawDisc(r, c, color) {
+    const cx=(c+0.5)*CELL, cy=(r+0.5)*CELL, rad=CELL*0.42;
+    ctx.shadowColor = color===1?'#888':'#444'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI*2);
+    ctx.fillStyle = color===1?'#111':'#f8f8f8'; ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(cx-rad*0.2, cy-rad*0.2, rad*0.3, 0, Math.PI*2);
+    ctx.fillStyle = color===1?'rgba(80,80,80,0.4)':'rgba(255,255,255,0.5)'; ctx.fill();
+}
+
+function drawValidMoves() {
+    for (const mv of game.valid_moves)
+        drawDot(Math.floor(mv/8), mv%8);
+}
+
+function drawDot(r, c) {
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath(); ctx.arc((c+0.5)*CELL, (r+0.5)*CELL, CELL*0.12, 0, Math.PI*2); ctx.fill();
+}
+
+function render() {
+    drawBoard();
+    for (let r=0; r<8; r++) for (let c=0; c<8; c++)
+        if (game.board[r][c]) drawDisc(r, c, game.board[r][c]);
+    drawValidMoves();
+    document.getElementById('bc').textContent = game.black_count;
+    document.getElementById('wc').textContent = game.white_count;
+    const st = document.getElementById('status');
+    if (game.game_over) {
+        st.textContent = game.winner===1?'Black wins!':game.winner===2?'White wins!':'Draw!';
+        st.style.color = '#facc15';
+    } else {
+        st.textContent = (game.current_player===1?'Black':'White')+"'s turn"+(game.valid_count===0?' (pass)':'');
+        st.style.color = game.current_player===1?'#fff':'#aaa';
+    }
+}
+
+canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const c = Math.floor((e.clientX - rect.left) / CELL);
+    const r = Math.floor((e.clientY - rect.top) / CELL);
+    if (game.make_move(r, c)) render();
+});
+
+function resetGame() { game.init(); render(); }
+
+// ─── WASM loading (optional enhancement) ───────────────────────────
+async function tryWASM() {
+    try {
+        const mod = await import('./othello.js');
+        const m = await mod.default();
+        const init = m.cwrap('othello_js_init', null, []);
+        const gc = m.cwrap('othello_js_get_cell', 'number', ['number','number']);
+        const gp = m.cwrap('othello_js_get_current_player', 'number', []);
+        const gbc = m.cwrap('othello_js_get_black_count', 'number', []);
+        const gwc = m.cwrap('othello_js_get_white_count', 'number', []);
+        const ggo = m.cwrap('othello_js_get_game_over', 'number', []);
+        const gw = m.cwrap('othello_js_get_winner', 'number', []);
+        const gvc = m.cwrap('othello_js_get_valid_count', 'number', []);
+        const gvm = m.cwrap('othello_js_get_valid_move', 'number', ['number']);
+        const mm = m.cwrap('othello_js_make_move', 'number', ['number','number']);
+        init();
+        // Overlay WASM reads onto JS game for display
+        const wasmGame = {
+            board: Array(8).fill().map((_,r)=>Array(8).fill().map((_,c)=>gc(r,c))),
+            current_player: gp(), black_count: gbc(), white_count: gwc(),
+            game_over: ggo(), winner: gw(), valid_moves: [],
+            valid_count: gvc(),
+            init() { init(); },
+            make_move(r,c) { const ok=mm(r,c); this.board=Array(8).fill().map((_,r2)=>Array(8).fill().map((_,c2)=>gc(r2,c2))); this.current_player=gp(); this.black_count=gbc(); this.white_count=gwc(); this.game_over=ggo(); this.winner=gw(); this.valid_count=gvc(); this.valid_moves=[]; for(let i=0;i<this.valid_count;i++)this.valid_moves.push(gvm(i)); return ok; }
+        };
+        Object.assign(game, wasmGame);
+        console.log('WASM loaded successfully');
+    } catch(e) {
+        console.log('WASM not available, using JS fallback:', e.message);
+    }
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────
+game.init();
+render();
+tryWASM(); // async enhancement
+</script>
+</body>
+</html>
