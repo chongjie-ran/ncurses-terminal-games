@@ -858,3 +858,121 @@ gcc game.c -o game -lraylib -lm -lpthread
 ---
 
 *最后更新: 2026-04-04*
+
+---
+
+## 2026-04-04 早间 💻 (补充)
+
+### 1. 代码练习 (LeetCode) - LRU Cache + Trie
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC146 LRU Cache | Medium | 双向链表 + HashMap | 最近使用放链表头,最久未使用在链表尾 |
+| LC208 Implement Trie | Medium | 前缀树 | insert/search/startsWith O(m), m=word length |
+| LC211 Word Dictionary | Medium | Trie (通配符) | DFS遍历.的所有子节点,支持任意字符匹配 |
+
+**LRU Cache 核心模式**:
+```c
+// 双向链表 + HashMap 实现 O(1) LRU Cache
+// HashMap<key, Node*> 快速定位
+// 双向链表维护顺序: head(最近) <-> ... <-> tail(最久)
+// get(key): 找到节点,移到head,返回value
+// put(key,val): 找到则更新并移到head; 未找到则新建插入head,若超容量则删除tail前一个
+```
+
+**Trie 核心模式**:
+```c
+// 每个节点 unordered_map<char, TrieNode*> children
+// insert: 沿路径走,无则创建,最后标记isEnd=true
+// search: 沿路径走,不存在返回false,是end返回true
+// startsWith: 同search但不检查isEnd
+```
+
+**LC211 通配符搜索 核心模式**:
+```c
+// '.' 匹配任意字符,需要DFS遍历所有可能的路径
+bool searchNode(word, idx, node):
+    if idx == len: return node.isEnd
+    if word[idx] == '.':
+        for child in node.children:
+            if searchNode(word, idx+1, child): return true
+        return false
+    else:
+        if not node.children[char]: return false
+        return searchNode(word, idx+1, node.children[char])
+```
+
+---
+
+### 2. 游戏验证: Space Invaders Raylib ✅
+
+#### 项目状态
+- 路径: `projects/space-invaders-raylib/`
+- 编译产物: `space_invaders` (Mach-O 64-bit arm64)
+- 源码: game.c/game.h/draw.c/draw.h/main.c
+
+#### 功能验证
+- 8列×4行外星人,重力下落
+- 玩家射击 + 敌人射击
+- 爆炸动画效果 (explosion timer)
+- Wave系统 (速度递增)
+- 完整游戏循环: Menu → Playing → GameOver/Victory
+
+#### 编译命令
+```bash
+g++ src/main.c src/game.c src/draw.c -o space_invaders \
+  -Wall -Wextra -O2 \
+  -I/opt/homebrew/include -L/opt/homebrew/lib \
+  -lraylib -lm
+```
+
+---
+
+### 3. 技术沉淀
+
+#### LRU Cache 双向链表实现技巧
+- 哑头(dummy head) + 哑尾(dummy tail) 简化边界处理
+- remove(n): `n->prev->next = n->next; n->next->prev = n->prev`
+- insertHead(n): 在head后插入,成为最近使用
+- 驱逐时删除tail前一个(lru)
+
+#### Trie vs HashMap
+- Trie: 前缀搜索O(m), 支持前缀匹配, 空间换时间
+- HashMap: 单键查找O(1), 不支持前缀匹配
+- 适用场景: 自动补全, IP路由, 字符串检索
+
+#### Raylib游戏项目结构
+```
+game.h          (常量定义, 类型声明, 函数原型)
+game.c          (游戏逻辑: init, update, collision)
+draw.c          (Raylib渲染: DrawRectangle, DrawCircle等)
+main.c          (主循环: InitWindow, BeginDrawing, EndDrawing)
+```
+
+---
+
+### 4. GitHub提交
+
+```bash
+cd ~/.openclaw/workspace-developer/projects/lc-practice/2026-04-04
+git add lc146_lru_cache.cpp lc208_trie.cpp lc211_word_dictionary.cpp
+git commit -m "feat: LRU Cache + Trie implementations in C++"
+```
+
+---
+
+### 5. 今日总结
+
+| 类型 | 完成内容 |
+|------|----------|
+| 代码练习 | LC146 LRU Cache, LC208 Trie, LC211 Word Dictionary |
+| 游戏验证 | Space Invaders Raylib (原生Mac编译) |
+| 学习主题 | 双向链表数据结构, Trie前缀树, 通配符DFS |
+
+#### 累计进度
+- WASM游戏: 21个
+- Raylib游戏: Space Invaders, Flappy Bird, Breakout (原生编译)
+
+---
+
+*版本: 1.21 | 更新: 2026-04-04 05:40*
