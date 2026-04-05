@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pinball WASM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: monospace; }
+#container { position: relative; }
+canvas { display: block; background: #0a1628; border: 2px solid #334; }
+#overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+#controls { color: #8cf; font-size: 12px; margin-top: 8px; text-align: center; }
+#controls span { margin: 0 12px; }
+.key { background: #223; padding: 2px 8px; border-radius: 3px; border: 1px solid #446; color: #aef; }
+</style>
+</head>
+<body>
+<div id="container">
+  <canvas id="c" width="400" height="700"></canvas>
+</div>
+<div id="controls">
+  <span><span class="key">Z</span> or <span class="key">←</span> Left Flipper</span>
+  <span><span class="key">X</span> or <span class="key">→</span> Right Flipper</span>
+  <span><span class="key">Space</span> Launch</span>
+  <span><span class="key">R</span> Restart</span>
+</div>
+<script>
+var Module = {
+ locatesFile: (f) => f,
+  onRuntimeInitialized: function() {
+    Module._wasm_init();
+    initInput();
+    requestAnimationFrame(gameLoop);
+  }
+};
+
+var lastTime = 0;
+var startTime = Date.now();
+var gameActive = true;
+
+function gameLoop(now) {
+  var dt = (now - lastTime) / 1000;
+  if (dt > 0.1) dt = 0.016;
+  lastTime = now;
+  
+  Module._wasm_update(dt);
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+var COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db'];
+var bumperColors = ['#ff4444','#ff8844','#ffcc44','#44ff88','#4488ff'];
+
+function render() {
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d');
+  var W = 400, H = 700;
+  
+  // Background
+  ctx.fillStyle = '#0a1628';
+  ctx.fillRect(0, 0, W, H);
+  
+  // Draw walls
+  ctx.strokeStyle = '#4a6fa5';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(20, 20); ctx.lineTo(20, H-20);
+  ctx.moveTo(W-20, 20); ctx.lineTo(W-20, H-20);
+  ctx.moveTo(20, 20); ctx.lineTo(W-20, 20);
+  ctx.stroke();
+  
+  // Angled rails at top corners
+  ctx.strokeStyle = '#3a5f95';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(20, 100); ctx.lineTo(60, 60); ctx.lineTo(120, 50);
+  ctx.moveTo(W-20, 100); ctx.lineTo(W-60, 60); ctx.lineTo(W-120, 50);
+  ctx.stroke();
+  
+  // Draw bumpers
+  for (var i = 0; i < 5; i++) {
+    var bx = Module._wasm_get_bumper_x(i);
+    var by = Module._wasm_get_bumper_y(i);
+    var br = Module._wasm_get_bumper_r();
+    var hit = Module._wasm_get_bumper_hit(i);
+    
+    ctx.beginPath();
+    ctx.arc(bx, by, br + (hit ? 4 : 0), 0, Math.PI*2);
+    ctx.fillStyle = hit ? '#fff' : bumperColors[i];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Bumper label
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText((i+1), bx, by);
+  }
+  
+  // Draw drain zone
+  ctx.fillStyle = 'rgba(255,0,0,0.1)';
+  ctx.fillRect(60, H-50, W-120, 30);
+  
+  // Draw flippers
+  var fy = Module._wasm_get_flipper_y();
+  var flen = Module._wasm_get_flipper_len();
+  
+  // Left flipper
+  var langle = Module._wasm_get_flipper_angle(0);
+  var lx = Module._wasm_get_flipper_x(0);
+  var lex = lx + Math.cos(langle) * flen;
+  var ley = fy + Math.sin(langle) * flen;
+  ctx.strokeStyle = '#e74c3c';
+  ctx.lineWidth = 14;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(lx, fy); ctx.lineTo(lex, ley);
+  ctx.stroke();
+  
+  // Right flipper
+  var rangle = Module._wasm_get_flipper_angle(1);
+  var rx = Module._wasm_get_flipper_x(1);
+  var rex = rx + Math.cos(rangle) * flen;
+  var rey = fy + Math.sin(rangle) * flen;
+  ctx.strokeStyle = '#3498db';
+  ctx.lineWidth = 14;
+  ctx.beginPath();
+  ctx.moveTo(rx, fy); ctx.lineTo(rex, rey);
+  ctx.stroke();
+  
+  // Flipper pivots
+  ctx.fillStyle = '#888';
+  ctx.beginPath(); ctx.arc(lx, fy, 6, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx, fy, 6, 0, Math.PI*2); ctx.fill();
+  
+  // Draw ball
+  if (Module._wasm_ball_active()) {
+    var bx = Module._wasm_get_ball_x();
+    var by = Module._wasm_get_ball_y();
+    ctx.beginPath();
+    ctx.arc(bx, by, 8, 0, Math.PI*2);
+    ctx.fillStyle = '#ecf0f1';
+    ctx.fill();
+    ctx.strokeStyle = '#bdc3c7';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  
+  // Draw plunger/launcher area
+  ctx.fillStyle = '#1a2a3a';
+  ctx.fillRect(W-50, H-150, 30, 130);
+  ctx.strokeStyle = '#4a6fa5';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(W-50, H-150, 30, 130);
+  
+  // Launch ball preview
+  var state = Module._wasm_get_state();
+  if (state === 0) { // STATE_READY
+    ctx.fillStyle = '#ecf0f1';
+    ctx.beginPath();
+    ctx.arc(W-40, H-60, 8, 0, Math.PI*2);
+    ctx.fill();
+  }
+  
+  // UI
+  var score = Module._wasm_get_score();
+  var balls = Module._wasm_get_balls_remaining();
+  
+  ctx.fillStyle = '#2c3e50';
+  ctx.fillRect(0, 0, W, 35);
+  
+  ctx.fillStyle = '#f1c40f';
+  ctx.font = 'bold 18px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('SCORE: ' + score, 25, 25);
+  
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#e74c3c';
+  ctx.fillText('BALLS: ' + balls, W-25, 25);
+  
+  // State overlays
+  if (state === 0) { // READY
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, H/2-60, W, 120);
+    ctx.fillStyle = '#f1c40f';
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('PINBALL', W/2, H/2-20);
+    ctx.fillStyle = '#8cf';
+    ctx.font = '16px monospace';
+    ctx.fillText('Press SPACE to launch', W/2, H/2+15);
+  } else if (state === 3) { // GAMEOVER
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, H/2-80, W, 160);
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 32px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', W/2, H/2-25);
+    ctx.fillStyle = '#f1c40f';
+    ctx.font = '20px monospace';
+    ctx.fillText('Score: ' + score, W/2, H/2+15);
+    ctx.fillStyle = '#8cf';
+    ctx.font = '14px monospace';
+    ctx.fillText('Press R to restart', W/2, H/2+50);
+  } else if (state === 2) { // DRAIN
+    ctx.fillStyle = 'rgba(231,76,60,0.3)';
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function initInput() {
+  var leftDown = false, rightDown = false;
+  
+  document.addEventListener('keydown', function(e) {
+    if (e.code === 'KeyZ' || e.code === 'ArrowLeft') {
+      if (!leftDown) { Module._wasm_flipper_up(0); leftDown = true; }
+    }
+    if (e.code === 'KeyX' || e.code === 'ArrowRight') {
+      if (!rightDown) { Module._wasm_flipper_up(1); rightDown = true; }
+    }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      Module._wasm_launch();
+    }
+    if (e.code === 'KeyR') {
+      Module._wasm_restart();
+    }
+  });
+  
+  document.addEventListener('keyup', function(e) {
+    if (e.code === 'KeyZ' || e.code === 'ArrowLeft') {
+      Module._wasm_flipper_down(0); leftDown = false;
+    }
+    if (e.code === 'KeyX' || e.code === 'ArrowRight') {
+      Module._wasm_flipper_down(1); rightDown = false;
+    }
+  });
+}
+</script>
+<script src="a.out.js"></script>
+</body>
+</html>
