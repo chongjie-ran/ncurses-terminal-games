@@ -1,6 +1,6 @@
 # Game Development Queue
 
-## WASM Games (Emscripten + Pure C)
+## WASM Games (Emscripten + Pure C + Canvas 2D)
 
 ### Completed ✅
 | Game | Status | Notes |
@@ -16,7 +16,8 @@
 | **Breakout WASM** | ✅ Built & Tested (2026-04-01) | Pure C + Emscripten, 5×10 bricks, ball/paddle physics, angle bounce, Playwright PASS |
 | **Pac-Man WASM** | ✅ Verified (2026-04-01) | 28×31 maze, 4 ghost types, frightened mode, power pellets, Playwright PASS |
 | **Flappy Bird WASM** | ✅ Built & Tested (2026-04-01) | Pure C + Emscripten, gravity physics, pipe gap, score/best tracking, Playwright PASS |
-| **Pong WASM** | ✅ Built & Tested (2026-04-01) | Pure C + Emscripten, AI opponent, angle bounce, Canvas 2D, Playwright PASS |
+| **Pong WASM** | ✅ Built & Tested (2026-04-04) | Pure C + Emscripten, AI opponent, angle bounce, Canvas 2D, Playwright PASS |
+| **Othello WASM** | ✅ Built & Tested (2026-04-04) | Pure C + Emscripten, 8x8 board, 8-dir flip, Canvas 2D, Playwright PASS |
 | **Wordle WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, DOM渲染, 猜词评估, 键盘颜色, Playwright PASS |
 | **Mahjong Solitaire WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 3层立体麻将, 自由牌判定, Playwright PASS |
 | **Hextris WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, odd-q offset hex grid, 3-piece types, Playwright PASS |
@@ -25,7 +26,9 @@
 | **Sudoku WASM** | ✅ Built & Tested (2026-04-02) | Pure C + Emscripten, 9x9 grid, backtracking solver, candidates, hints, 4 difficulty levels, Playwright PASS |
 | **Battleship WASM** | ✅ Built & Tested (2026-04-03) | Pure C + Emscripten, 10x10 grid, ship placement, hit/miss tracking, Playwright PASS |
 | **Connect Four AI WASM** | ✅ Built & Tested (2026-04-03) | Pure C + Emscripten, 3级AI(Minimax+Alpha-Beta), 防御优先, Playwright PASS |
-| **WASM Game Builder Script** | ✅ Built & Tested (2026-04-02) | 批量编译+测试所有WASM游戏, 支持--games过滤, HTTP server测试, Playwright集成 |
+| **Simon Says WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 4-color memory game, sequence playback, Canvas 2D, Node.js验证PASS |
+| **Dominoes WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 多米诺骨牌, Canvas 2D, Node.js验证PASS |
+| **Nonogram/Picross WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 像素逻辑谜题, Canvas 2D, 5种尺寸 |
 
 ### In Progress
 | Game | Priority | Notes |
@@ -34,30 +37,76 @@
 ### Queue (Next Up)
 | Game | Priority | Notes |
 |------|----------|-------|
-| **Raylib Games** | P1 | Space Invaders, Breakout using raylib instead of Canvas |
+| **New Games Ideas** | P1 | 待开发新游戏或移植 |
+| **Pinball WASM** | P2 | 弹球游戏 |
 
-### Architecture Note
-- Pure C game logic (game.c/game.h) - no raylib dependency
-- wasm_main.c - Emscripten wrapper exports C functions
-- index.html - Canvas 2D or DOM rendering + WASM loader
-- Key fix: ALLOW_MEMORY_GROWTH=1 required for dynamic memory
-- Key fix: GameModule loaded AFTER game.js (script order critical!)
-- Key fix: MODULARIZE=1 exports functions as Module._wasm_xxx()
-- DAS input: DELAY=150ms, ARR=50ms for smooth keyboard repeat
-- Wall Kick: SRS-style 4-position kick table for rotation
-- Frogger: water zone needs player to ride with log (player.x += direction * speed)
-- Sokoban: duplicate symbol issue - only game.c defines exported functions with EMSCRIPTEN_KEEPALIVE
-- Breakout: paddle angle bounce, rect-circle collision for ball-paddle and ball-brick
-- Space Invaders: bottom-alien shooting, alien movement step-down on wall hit, wave progression
-- Flappy Bird: gravity applied per-frame, pipe spawns at PIPE_INTERVAL spacing, localStorage best score
-- Pong: AI moves toward ball.y, paddle collision changes ball angle based on hit position
-- Snake: grid-based movement, food spawn, wall/self-collision, speed increases with score
-- Wordle: DOM rendering (no Canvas), keyboard color upgrade, 2-pass evaluation (correct→present→wrong)
-- WASM Builder: grep+sed提取EMSCRIPTEN_KEEPALIVE函数, JSON格式EXPORTED_FUNCTIONS, HTTP server解决CORS
-- Hextris: odd-q offset hex coordinates, 6-direction movement, flat-topped hex rendering
-- Gomoku: 15×15 board, 4-direction win check (horizontal/vertical/diag), 5-in-a-row win detection
-- Connect Four: 7x6 grid, gravity drop, 4-direction win detection, win line rendering
-- Sudoku: 9×9 grid, backtracking solver, candidate bitmask, puzzle generation with solvability check, 4 difficulty levels
-- Connect Four AI: Minimax + Alpha-Beta pruning, window scoring heuristic, immediate win/block detection, 3 difficulty depths
+---
 
-*Last updated: 2026-04-03 (Connect Four AI WASM added)*
+## Raylib Games (Native C + Raylib)
+
+### Completed ✅
+| Game | Status | WASM Status |
+|------|--------|-------------|
+| **Space Invaders** | ✅ Complete | ✅ Has wasm/ |
+| **Breakout** | ✅ Complete | ✅ Has wasm/ |
+| **Flappy Bird** | ✅ Complete | ❌ Not yet |
+| **Frogger** | ✅ Complete | ❌ Not yet |
+| **2048** | ✅ Complete | ❌ Not yet |
+| **Memory Match** | ✅ Complete | ❌ Not yet |
+| **Minesweeper** | ✅ Complete | ❌ Not yet |
+| **Pac-Man** | ✅ Complete | ❌ Not yet |
+| **Snake** | ✅ Complete | ❌ Not yet |
+| **Sokoban** | ✅ Complete | ❌ Not yet |
+| **Tetris** | ✅ Complete | ❌ Not yet |
+
+### Note on Raylib → WASM
+- Raylib games use native C compilation for desktop
+- WASM versions use Pure C + Emscripten + Canvas 2D (different approach)
+- Raylib → WASM requires emscripten ports of raylib (complex)
+- Emscripten available at: ~/emsdk/upstream/emscripten/emcc
+
+---
+
+## Architecture Summary
+
+### Pure C + Emscripten + Canvas 2D (WASM)
+- 24 games completed
+
+### Pure C + Raylib (Native)
+- 11 games completed
+
+### Key Build Commands
+
+#### WASM (Emscripten)
+- Emscripten: ~/emsdk/upstream/emscripten/emcc
+
+#### Raylib (Native)
+
+
+---
+
+## Game Patterns Reference
+
+### DAS Input (Delayed Auto Shift)
+- DELAY=150ms, ARR=50ms
+- For smooth keyboard repeat in action games
+
+### Wall Kick (SRS-style)
+- 4-position kick table for rotation
+- Used in Tetris
+
+### Odd-Q Offset Hex Coordinates
+- Used in Hextris
+- 6-direction movement
+
+### Minimax + Alpha-Beta Pruning
+- Used in Connect Four AI
+- Depth: 3-5 levels
+
+### Flood Fill (BFS/DFS)
+- Used in Minesweeper (reveal), Wordle (evaluation)
+- Grid traversal with boundary marking
+
+---
+
+*Last updated: 2026-04-05 (Nonogram/Picross WASM added, 24 games total)*
