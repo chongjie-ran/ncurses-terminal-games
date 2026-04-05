@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brick Breaker WASM</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            border: 2px solid #4A9FFF;
+            border-radius: 4px;
+            background: #0f0f1a;
+        }
+        #info {
+            color: #888;
+            text-align: center;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <canvas id="gameCanvas" width="480" height="640"></canvas>
+        <div id="info">← → Arrow Keys or Mouse to move paddle | Click to restart</div>
+    </div>
+    
+    <script src="brick_breaker.js"></script>
+    <script>
+        var canvas = document.getElementById('gameCanvas');
+        var ctx = canvas.getContext('2d');
+        
+        // Colors for brick rows
+        var colors = [
+            'rgb(255,60,60)',   // Red
+            'rgb(255,140,60)',  // Orange
+            'rgb(255,220,60)',  // Yellow
+            'rgb(60,200,100)',  // Green
+            'rgb(60,140,255)',  // Blue
+            'rgb(180,60,255)'   // Purple
+        ];
+        
+        // C function wrappers
+        var restart = Module.cwrap('restart', null, []);
+        var setKey = Module.cwrap('set_key', null, ['number', 'number']);
+        var setPaddleX = Module.cwrap('set_paddle_x', null, ['number']);
+        var updateGame = Module.cwrap('update_game', null, []);
+        var getBallX = Module.cwrap('get_ball_x', 'number', []);
+        var getBallY = Module.cwrap('get_ball_y', 'number', []);
+        var getPaddleX = Module.cwrap('get_paddle_x', 'number', []);
+        var getPaddleW = Module.cwrap('get_paddle_w', 'number', []);
+        var getPaddleH = Module.cwrap('get_paddle_h', 'number', []);
+        var getBallR = Module.cwrap('get_ball_r', 'number', []);
+        var getBrickW = Module.cwrap('get_brick_w', 'number', []);
+        var getBrickH = Module.cwrap('get_brick_h', 'number', []);
+        var getBrickGap = Module.cwrap('get_brick_gap', 'number', []);
+        var getBrickTop = Module.cwrap('get_brick_top', 'number', []);
+        var isBrickAlive = Module.cwrap('is_brick_alive', 'number', ['number', 'number']);
+        var getBrickColor = Module.cwrap('get_brick_color', 'number', ['number', 'number']);
+        var getScore = Module.cwrap('get_score', 'number', []);
+        var getLives = Module.cwrap('get_lives', 'number', []);
+        var isGameOver = Module.cwrap('is_game_over', 'number', []);
+        var isGameWon = Module.cwrap('is_game_won', 'number', []);
+        
+        // Initialize
+        restart();
+        
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') setKey(1, 1);
+            if (e.key === 'ArrowRight') setKey(2, 1);
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') setKey(1, 0);
+            if (e.key === 'ArrowRight') setKey(2, 0);
+        });
+        
+        // Mouse control
+        canvas.addEventListener('mousemove', (e) => {
+            var rect = canvas.getBoundingClientRect();
+            var x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            setPaddleX(x);
+        });
+        
+        // Touch control
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            var rect = canvas.getBoundingClientRect();
+            var x = (e.touches[0].clientX - rect.left) * (canvas.width / rect.width);
+            setPaddleX(x);
+        }, { passive: false });
+        
+        // Click to restart
+        canvas.addEventListener('click', () => {
+            if (isGameOver() || isGameWon()) restart();
+        });
+        
+        function drawBrick(x, y, w, h, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillRect(x, y, w, 3);
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(x, y + h - 2, w, 2);
+        }
+        
+        function gameLoop() {
+            // Update game state in C
+            updateGame();
+            
+            // Clear canvas
+            ctx.fillStyle = '#0f0f1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw bricks
+            var brickW = getBrickW();
+            var brickH = getBrickH();
+            var brickGap = getBrickGap();
+            var brickTop = getBrickTop();
+            
+            for (var r = 0; r < 6; r++) {
+                for (var c = 0; c < 8; c++) {
+                    if (isBrickAlive(r, c)) {
+                        var bx = c * (brickW + brickGap) + brickGap;
+                        var by = brickTop + r * (brickH + brickGap);
+                        var colorIdx = getBrickColor(r, c);
+                        drawBrick(bx, by, brickW, brickH, colors[colorIdx]);
+                    }
+                }
+            }
+            
+            // Draw paddle
+            var px = getPaddleX();
+            var pw = getPaddleW();
+            var ph = getPaddleH();
+            ctx.fillStyle = '#4A9FFF';
+            ctx.fillRect(px - pw / 2, 640 - 40 - ph / 2, pw, ph);
+            
+            // Draw ball
+            var bx = getBallX();
+            var by = getBallY();
+            var br = getBallR();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(bx, by, br, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw score and lives
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '18px Arial';
+            ctx.fillText('Score: ' + getScore(), 10, 20);
+            ctx.fillText('Lives: ' + getLives(), 380, 20);
+            
+            // Draw game over / win message
+            if (isGameOver()) {
+                ctx.fillStyle = '#FF4444';
+                ctx.font = '32px Arial';
+                ctx.fillText('GAME OVER', 140, 300);
+                ctx.font = '18px Arial';
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillText('Click to restart', 160, 340);
+            }
+            
+            if (isGameWon()) {
+                ctx.fillStyle = '#44FF44';
+                ctx.font = '32px Arial';
+                ctx.fillText('YOU WIN!', 160, 300);
+                ctx.font = '18px Arial';
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillText('Click to restart', 160, 340);
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        gameLoop();
+    </script>
+</body>
+</html>
