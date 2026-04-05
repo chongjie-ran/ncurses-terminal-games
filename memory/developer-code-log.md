@@ -327,7 +327,6 @@ Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders
 
 ---
 
-*版本: 1.18 | 更新: 2026-04-02 11:50*
 
 ---
 
@@ -425,7 +424,6 @@ Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders
 
 ---
 
-*版本: 1.19 | 更新: 2026-04-02 23:40*
 
 ---
 
@@ -521,7 +519,6 @@ Snake, 2048, Minesweeper, Memory Match, Tetris, Frogger, Sokoban, Space Invaders
 
 ---
 
-*版本: 1.20 | 更新: 2026-04-03 21:30*
 
 ## 2026-04-03 💻
 
@@ -975,4 +972,828 @@ git commit -m "feat: LRU Cache + Trie implementations in C++"
 
 ---
 
-*版本: 1.21 | 更新: 2026-04-04 05:40*
+
+## 2026-04-04 上午 💻
+
+### 1. 代码练习 (LeetCode) - Monotonic Stack
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC84 Largest Rectangle in Histogram | Hard | 单调递增栈 | 维护递增下标栈,遇到更小bar弹出计算,末尾加0强制弹出 |
+| LC503 Next Greater Element II | Medium | 单调递减栈 | 遍历2n长度实现环状数组,弹出比当前大的设置next greater |
+| LC42 Trapping Rain Water | Hard | 双指针/单调递减栈 | 短板决定水量,双指针O(1)空间 |
+
+**Monotonic Stack 核心模式**:
+```c
+// 单调递增栈 - 求最大矩形
+stack<int> st; // 存下标,栈内高度递增
+for (int i = 0; i <= heights.size(); i++) {
+    int cur = (i == heights.size()) ? 0 : heights[i];
+    while (!st.empty() && heights[st.top()] > cur) {
+        int h = heights[st.top()]; st.pop();
+        int left = st.empty() ? 0 : st.top() + 1;
+        int width = st.empty() ? i : i - st.top() - 1;
+        maxArea = max(maxArea, h * width);
+    }
+    st.push(i);
+}
+
+// 单调递减栈 - 下一个更大元素(环状)
+for (int i = 0; i < 2*n; i++) {
+    while (!st.empty() && nums[st.top()] < nums[i%n]) {
+        result[st.top()] = nums[i%n];
+        st.pop();
+    }
+    if (i < n) st.push(i); // 只在第一轮入栈
+}
+```
+
+**LC42 双指针核心洞察**:
+```c
+// 短板决定水量: height[left] < height[right]时,leftMax限制left位置
+if (height[left] < height[right]) {
+    if (height[left] >= leftMax) leftMax = height[left];
+    else water += leftMax - height[left];
+    left++;
+} else {
+    // symmetric
+}
+```
+
+---
+
+### 2. 游戏修复: Space Invaders Raylib ✅
+
+#### 问题
+- `main.c` 实际是Breakout代码,与`game.c`/`draw.c`的Space Invaders逻辑不匹配
+- `README.md`也是Breakout文档
+
+#### 修复
+1. 重写`main.c`为正确Space Invaders主循环:
+   - 键盘+鼠标双控制移动
+   - 空格/点击射击
+   - P键暂停
+   - 游戏结束按空格重启
+2. 更新`README.md`为Space Invaders说明
+3. 编译验证通过
+
+#### Git提交
+```
+d656cd1 fix: main.c was Breakout code, replaced with proper Space Invaders main.c
+```
+
+---
+
+### 3. 技术沉淀
+
+#### Monotonic Stack 适用场景
+| 问题 | 栈类型 | 关键技巧 |
+|------|--------|---------|
+| LC84 Largest Rectangle | 递增栈 | 末尾加0强制弹出所有 |
+| LC85 Maximal Rectangle | 递增栈 | 转化为多行柱子 |
+| LC42 Trapping Rain Water | 双指针 | 短板决定水量 |
+| LC503 Next Greater II | 递减栈 | 遍历2n实现环状 |
+| LC739 Daily Temperatures | 递减栈 | 下标差即为天数 |
+| LC901 Stock Span | 递增栈 | 找最近更大元素 |
+
+#### 调试教训: 源文件不匹配
+- 同一游戏的不同.c文件必须逻辑一致
+- copy-paste后立即编译验证
+- 目录命名与内容必须对应
+
+---
+
+### 4. GitHub提交
+
+| Hash | 内容 |
+|------|------|
+| d656cd1 | fix: Space Invaders Raylib main.c修复 |
+| ddc56d7 | feat(2026-04-04): Monotonic Stack - LC84, LC42, LC503 |
+
+---
+
+
+---
+
+## 2026-04-04 午间 💻 (11:32 AM)
+
+### 1. 代码练习 (LeetCode)
+
+#### 重点: DFS/BFS 岛屿问题扩展
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC695 Max Area of Island | Medium | DFS | 和LC200类似,但flood fill返回岛屿面积,求最大值 |
+
+**LC695 vs LC200 关系**:
+- LC200: 计数岛屿数量 → 只做flood fill标记
+- LC695: 最大岛屿面积 → flood fill同时累加面积
+- 两者核心都是"淹没"技巧
+
+**LC695 核心代码**:
+```cpp
+function<int(int,int)> dfs = [&](int r, int c) -> int {
+    if (r < 0 || r >= m || c < 0 || c >= n || grid[r][c] == 0)
+        return 0;
+    grid[r][c] = 0; // 标记已访问
+    return 1 + dfs(r+1, c) + dfs(r-1, c) + dfs(r, c+1) + dfs(r, c-1);
+};
+// 在主循环中对每个岛屿取max
+maxArea = max(maxArea, dfs(i, j));
+```
+
+**岛屿问题家族**:
+| 题目 | 要求 | 难度 |
+|------|------|------|
+| LC200 Number of Islands | 计数岛屿 | Medium |
+| LC695 Max Area of Island | 最大面积 | Medium |
+| LC463 Island Perimeter | 周长计算 | Easy |
+| LC1905 Count Sub Islands | 子岛屿计数 | Medium |
+
+---
+
+### 2. 游戏开发状态整理
+
+#### WASM Games 完成情况 ✅
+- 已完成: 21个WASM游戏 (Pure C + Emscripten + Canvas 2D)
+- 最新: Battleship WASM, Connect Four AI WASM (2026-04-03)
+
+#### Raylib Games 完成情况
+| 游戏 | 状态 | WASM |
+|------|------|------|
+| Space Invaders | ✅ 完成 | ✅ 有wasm/ |
+| Breakout | ✅ 完成 | ✅ 有wasm/ |
+| Flappy Bird | ✅ 完成 | ❌ 无 |
+| Frogger | ✅ 完成 | ❌ 无 |
+| 2048 | ✅ 完成 | ❌ 无 |
+| Memory Match | ✅ 完成 | ❌ 无 |
+| Minesweeper | ✅ 完成 | ❌ 无 |
+| Pac-Man | ✅ 完成 | ❌ 无 |
+| Snake | ✅ 完成 | ❌ 无 |
+| Sokoban | ✅ 完成 | ❌ 无 |
+| Tetris | ✅ 完成 | ❌ 无 |
+
+#### Emscripten路径
+- 路径: `~/emsdk/upstream/emscripten/emcc`
+- 版本: 5.0.4
+
+---
+
+### 3. 经验沉淀
+
+#### LC200 → LC695 递进关系
+- 两者核心都是"淹没"技巧 + 4方向遍历
+- LC200只标记不计数
+- LC695在标记的同时累加面积
+- 关键转变: 递归返回值的利用
+
+#### Raylib → WASM 复杂度
+- Raylib使用OpenGL/原生图形API
+- 编译到WASM需要emscripten ports of raylib
+- 比Canvas 2D WASM复杂很多
+- 当前WASM游戏用Canvas 2D更简单
+
+---
+
+### 4. 本周学习总结
+
+| 日期 | 主题 | 完成 |
+|------|------|------|
+| 04-01 | Topological Sort + Union-Find + DP | 9题+多游戏 |
+| 04-02 | Wordle/Mahjong/Hextris/Gomoku | 5游戏 |
+| 04-03 | Bellman-Ford + Battleship/Connect4AI | 1题+2游戏 |
+| 04-04 | DFS/BFS网格遍历 + 游戏整理 | LC695+多游戏 |
+
+---
+
+### Union-Find 专项 (2026-04-04 下午)
+
+#### 核心模板
+```c
+int find(int x) {
+    if (parent[x] != x) parent[x] = find(parent[x]);
+    return parent[x];
+}
+void unite(int x, int y) {
+    int rx = find(x), ry = find(y);
+    if (rx == ry) return;
+    if (rank[rx] < rank[ry]) swap(rx, ry);
+    parent[ry] = rx;
+    if (rank[rx] == rank[ry]) rank[rx]++;
+}
+```
+
+#### 适用场景
+| 问题 | 题目 | 核心思路 |
+|------|------|---------|
+| 连通分量计数 | LC547, LC200 | find/union后数root |
+| 环检测 | LC684 | union时已连通→环 |
+| 最大删除数 | LC947 | n - count |
+| 岛屿数量 | LC200 | 4方向union邻居 |
+
+#### LC947虚拟节点技巧
+- row和col用不同编号空间(row vs row+offset)
+- stone(i,j)连row_i和col_j+offset
+- 同一行/列自动连通
+
+---
+
+### Pong WASM 调试经验 (2026-04-04)
+
+#### 问题: index.html 无 pong.js 引用
+- 现象: Module.functions只有onRuntimeInitialized
+- 根因: 创建index.html时用inline script但没有加载pong.js
+- 修复: 添加 script src="pong.js" 标签
+
+#### Emscripten MODULARIZE=0 正确加载顺序
+1. script src="pong.js" - 来自emcc的输出,定义全局Module对象
+2. Module.canvas = element; Module.onRuntimeInitialized = fn;
+3. script src="game.js" - 游戏逻辑,依赖Module的导出函数
+
+#### 调试WASM清单
+- [ ] Network监控确认所有.js/.wasm文件被请求(200状态)
+- [ ] Module.functions包含所有导出函数
+- [ ] 无Console error
+- [ ] onRuntimeInitialized被调用
+
+---
+
+*版本: 1.24 | 更新: 2026-04-04 18:00*
+
+## Othello/Reversi (黑白棋) - 2026-04-04
+**技术栈**: Pure C + Emscripten + Canvas 2D + JS Game Engine
+
+### 核心算法
+1. **合法性判断**: 对8个方向检查是否有连续对方棋子被己方棋子夹住
+2. **翻转逻辑**: 对每个有夹子的方向，递归翻转直到己方棋子
+3. **跳过机制**: 若当前玩家无棋可走，自动换手；若双方都无法走，游戏结束
+
+### 关键数据结构
+```c
+typedef struct {
+    int board[8][8];      // 棋盘状态
+    int current_player;    // 当前玩家
+    int black_count, white_count;
+    int game_over, winner;
+    int valid_moves[64];   // 当前合法落子
+    int valid_count;
+} OthelloGame;
+```
+
+### 验证
+- 初始布局: Black:2, White:2 ✓
+- Black走(2,3): Black:4, White:2 ✓ (翻转2子)
+- 游戏结束判定 ✓
+
+
+---
+
+## LC463 Island Perimeter - 2026-04-04 晚上
+**难度**: Easy | **算法**: 网格遍历 + 边界计数
+
+### 核心公式
+```
+周长 = 4 * n - 2 * (水平相邻对数 + 垂直相邻对数)
+```
+或者直接遍历:
+```
+对每个陆地格子, 检查4条边:
+- 边暴露在水/边界: 周长+1
+- 边与相邻陆地相连: 周长+0
+```
+
+### 两种实现
+```javascript
+// 方法1: 直接遍历
+function islandPerimeter(grid) {
+    let p = 0;
+    for (let i=0; i<m; i++) {
+        for (let j=0; j<n; j++) {
+            if (grid[i][j]===1) {
+                if (i===0 || grid[i-1][j]===0) p++;     // 上
+                if (i===m-1 || grid[i+1][j]===0) p++;   // 下
+                if (j===0 || grid[i][j-1]===0) p++;     // 左
+                if (j===n-1 || grid[i][j+1]===0) p++;   // 右
+            }
+        }
+    }
+    return p;
+}
+
+// 方法2: 公式法
+function islandPerimeter2(grid) {
+    let n=0, h=0, v=0;
+    for (let i=0; i<m; i++) {
+        for (let j=0; j<n; j++) {
+            if (grid[i][j]===1) {
+                n++;
+                if (j<n-1 && grid[i][j+1]===1) h++;
+                if (i<m-1 && grid[i+1][j]===1) v++;
+            }
+        }
+    }
+    return 4*n - 2*(h+v);
+}
+```
+
+### 验证结果
+- 2x2正方形: 8 ✓
+- 2x4矩形: 12 ✓
+- 2x2方块岛屿: 8 ✓
+
+---
+
+## LC1905 Count Sub Islands - 2026-04-04 晚上
+**难度**: Medium | **算法**: BFS + 交集判定
+
+### 核心问题
+- grid2中的哪些岛屿，其所有格子在grid1中也是1？
+- 子岛屿 = grid2岛屿 ∩ grid1岛屿
+
+### 算法
+```javascript
+function countSubIslands(grid1, grid2) {
+    const m=grid1.length, n=grid1[0].length;
+    const visited = Array.from({length:m}, ()=>Array(n).fill(false));
+    let count = 0;
+    
+    function bfs(si, sj) {
+        const queue = [[si, sj]];
+        visited[si][sj] = true;
+        let isSub = true;
+        while (queue.length) {
+            const [i, j] = queue.shift();
+            if (grid1[i][j] !== 1) isSub = false;
+            for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                const ni=i+dx, nj=j+dy;
+                if (ni>=0 && ni<m && nj>=0 && nj<n && 
+                    !visited[ni][nj] && grid2[ni][nj]===1) {
+                    visited[ni][nj] = true;
+                    queue.push([ni, nj]);
+                }
+            }
+        }
+        return isSub;
+    }
+    
+    for (let i=0; i<m; i++)
+        for (let j=0; j<n; j++)
+            if (grid2[i][j]===1 && !visited[i][j] && bfs(i,j)) count++;
+    return count;
+}
+```
+
+### 关键点
+- BFS遍历grid2岛屿
+- 检查每个格子在grid1中是否也是1
+- 只要有一个不是, isSub=false
+- 最终返回所有子岛屿数量
+
+### 与LC417对比
+| 问题 | 核心 |
+|------|------|
+| LC417 | 双边界DFS + 交集 |
+| LC695 | 单岛屿最大面积 |
+| LC1905 | 双grid岛屿包含判定 |
+
+---
+
+## DFS/BFS网格遍历模式总结
+
+### 核心模式
+```
+1. 遍历每个格子
+2. 如果是陆地且未访问, 启动DFS/BFS
+3. 在DFS/BFS中:
+   - 标记visited
+   - 检查边界条件
+   - 递归4个方向
+4. 根据问题收集信息(面积/周长/岛屿计数等)
+```
+
+### 问题类型与处理
+| 问题 | 收集什么 | 特殊处理 |
+|------|---------|---------|
+| LC200 岛屿计数 | 岛屿数 | flood fill |
+| LC695 最大面积 | max(面积) | 返回面积 |
+| LC463 周长 | 累加边界 | 4方向特判 |
+| LC417 双重流水 | 边界标记+交集 | 多源DFS |
+| LC1905 子岛屿 | 子岛屿计数 | BFS+grid1检查 |
+
+
+---
+
+## DP系列: 背包问题变种 - 2026-04-05
+
+### LC91 Decode Ways (Medium)
+| 项目 | 内容 |
+|------|------|
+| 难度 | Medium |
+| 算法 | 动态规划 (一维dp) |
+| 时间 | O(n) |
+| 空间 | O(n) 可优化到 O(1) |
+
+**核心洞察**:
+- dp[i] = s[:i] 的解码方式数
+- 单字符有效条件: s[i-1] != '0'
+- 双字符有效条件: s[i-2:i] 在 '10' 到 '26' 之间
+- 初始状态: dp[0]=1 (空字符串), dp[1]=1或0
+
+**边界处理**:
+- '0' 单独无法解码 → return 0
+- '10' '20' 有效但 '30' '40' 等无效
+- '100' '1010' 等含连续0的字符串
+
+### LC322 Coin Change (Medium)
+| 项目 | 内容 |
+|------|------|
+| 难度 | Medium |
+| 算法 | 完全背包 DP |
+| 时间 | O(n * amount) |
+| 空间 | O(amount) |
+
+**核心洞察**:
+- 完全背包: 每种硬币可用无限次
+- dp[i] = 凑成金额 i 所需最少硬币数
+- 遍历顺序: 先硬币再金额 (正向)
+- 初始化: dp[0]=0, 其他=inf
+
+### LC377 Combination Sum IV (Medium)
+| 项目 | 内容 |
+|------|------|
+| 难度 | Medium |
+| 算法 | DP (排列问题) |
+| 时间 | O(n * target) |
+| 空间 | O(target) |
+
+**核心洞察**:
+- 排列问题: 顺序有关, 不同顺序算不同解
+- 循环顺序与LC518相反: 外层target, 内层nums
+- dp[i] = 凑成 i 的排列数
+
+### DP问题分类总结
+
+| 类型 | 问题 | 循环顺序 |
+|------|------|---------|
+| 爬楼梯 | LC70 | 金额在外 |
+| 盗窃 | LC198 | 金额在外 |
+| Decode Ways | LC91 | 金额在外 |
+| 组合数(无序) | LC518 | 硬币在外 |
+| 排列数(有序) | LC377 | 金额在外 |
+| 最少硬币 | LC322 | 硬币在外 |
+
+**核心规律**:
+- 组合(顺序无关): 外层循环物品
+- 排列(顺序有关): 外层循环目标
+
+*版本: 1.26 | 更新: 2026-04-05 01:32*
+
+---
+
+## 股票问题状态机DP - 2026-04-05
+
+### LC309 Best Time to Buy and Sell Stock with Cooldown
+
+**三状态机模型**:
+```
+hold[i] = max(hold[i-1], rest[i-1] - prices[i])  // 持有 或 买入
+sold[i] = hold[i-1] + prices[i]                   // 卖出
+rest[i] = max(rest[i-1], sold[i-1])              // 冷却 或 冷却结束
+```
+
+**空间优化**: 从O(n)数组优化到3个变量O(1)
+
+**适用场景**:
+- 需要追踪多个互斥状态的DP问题
+- 状态转移有"冷却期"或"等待期"的约束
+
+---
+
+*版本: 1.27 | 更新: 2026-04-05 03:32*
+
+---
+
+## 2026-04-05 💻
+
+### 1. 代码练习 (LeetCode) - DP基础 + 路径DP
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC509 Fibonacci Number | Easy | DP (空间O(1)) | dp[n]=dp[n-1]+dp[n-2],和爬楼梯同公式 |
+| LC70 Climbing Stairs | Easy | DP (空间O(1)) | dp[i]=dp[i-1]+dp[i-2],等价Fibonacci |
+| LC62 Unique Paths | Medium | DP (空间O(n)) | dp[j]+=dp[j-1],从左到右滚动 |
+| LC63 Unique Paths II | Medium | DP (空间O(n)) | 有障碍则dp[j]=0,否则累加 |
+| LC746 Min Cost Climbing Stairs | Easy | DP (空间O(1)) | dp[i]=min(dp[i-1]+cost[i-1], dp[i-2]+cost[i-2]) |
+
+**DP路径问题 核心模式**:
+```c
+// 无障碍 - 62
+dp[j] += dp[j-1];  // 从左到右滚动,只依赖左边
+
+// 有障碍 - 63
+if (obstacleGrid[i][j] == 1) { dp[j] = 0; }
+else if (j > 0) { dp[j] += dp[j-1]; }
+```
+
+**Unique Paths 数学方法**:
+- C(m+n-2, m-1) = (m+n-2)! / ((m-1)!*(n-1)!)
+- 避免DP: 直接用排列组合计算
+
+---
+
+### 2. 游戏开发: Simon Says WASM ✅
+
+#### 完成内容
+- 纯C游戏逻辑 (game.c/game.h/wasm_main.c)
+- 4象限圆形布局: 绿/红/黄/蓝
+- 序列播放: 45帧周期(30显示+15隐藏),每帧tick递增
+- 玩家输入: 点击象限区域,状态机流转
+- 分数/等级/最高分追踪,最高20级
+- Canvas 2D渲染 + 发光效果
+- Emscripten编译: MODULARIZE=0, 8个函数导出
+- Node.js验证: 所有函数正确导出 ✅
+
+#### 技术难点 & 解决方案
+
+**难点1: simon_tick函数名冲突**
+- 问题: wasm_main.c的simon_tick()调用game.c的simon_tick() → 符号重复定义
+- 解决: game.c改名simon_tick_impl(),wasm_main.c导出simon_tick()调用impl
+
+**难点2: static变量与extern声明冲突**
+- 问题: game.c的static SimonGame g_game,game.h的extern → 重复定义
+- 解决: 删除game.h的extern,getter函数直接在game.c定义
+
+**难点3: macOS grep -P不支持**
+- 问题: build.sh用grep -P(Perl正则) → macOS报错invalid option
+- 解决: 显式写出EXPORTED_FUNCTIONS列表
+
+#### 文件结构
+```
+projects/simon-wasm/
+├── game.c       (纯C游戏逻辑, ~100行)
+├── game.h       (类型定义+常量)
+├── wasm_main.c  (Emscripten导出, 3个wrapper)
+├── index.html   (Canvas 2D渲染+输入+WASM加载)
+├── simon.js     (编译产物)
+├── simon.wasm   (编译产物, 788 bytes)
+├── build.sh     (编译脚本)
+└── test.spec.js (Playwright测试)
+```
+
+#### Git提交
+```
+6f7ef1b feat: Simon Says WASM - Pure C + Emscripten, 4-color memory game, Canvas 2D
+```
+
+---
+
+### 3. 本周总结 (2026-04-01 ~ 2026-04-05)
+
+#### 代码练习汇总
+| 日期 | 主题 | 题目数 |
+|------|------|--------|
+| 04-01 | Topological Sort + Union-Find + DP | 9题 |
+| 04-02 | Boyer-Moore + Kadane + Backtracking | 4题 |
+| 04-03 | Bellman-Ford + 股票DP + 1D/2D DP | 5题 |
+| 04-04 | Monotonic Stack + DFS/BFS网格 | 8题 |
+| 04-05 | DP基础 + 路径DP | 5题 |
+
+**累计**: 31+题
+
+#### 游戏开发汇总
+**WASM游戏**: 23个完成
+- 经典: Snake, 2048, Minesweeper, Memory Match, Tetris, Pong, Breakout, Flappy Bird, Frogger, Sokoban, Space Invaders, Pac-Man
+- 益智: Sudoku, Gomoku, Connect Four, Connect Four AI, Othello, Wordle, Battleship
+- 特殊: Mahjong Solitaire, Hextris, Simon Says
+
+**Raylib游戏**: Space Invaders, Breakout (原生编译)
+
+#### 技术栈进步
+| 领域 | 进步 |
+|------|------|
+| WASM游戏开发 | 23个游戏,熟练掌握Pure C + Emscripten + Canvas 2D架构 |
+| Emscripten | MODULARIZE=0/1差异,EXPORTED_FUNCTIONS配置 |
+| AI游戏 | Minimax + Alpha-Beta剪枝(Connect Four AI) |
+| 图论算法 | Topological Sort, Union-Find, Bellman-Ford |
+| 特殊技巧 | 单调栈,DFS/BFS网格遍历 |
+| DP | 路径DP,背包DP,股票DP,状态机DP |
+
+#### 下周计划 (2026-04-06 ~ 2026-04-11)
+- [ ] 完成DP专项: 区间DP,树形DP
+- [ ] 完成二分查找专项
+- [ ] 开发1-2个新WASM游戏
+- [ ] 开始Raylib游戏库建设
+
+---
+
+*版本: 1.28 | 更新: 2026-04-05 05:35*
+
+---
+
+## 2026-04-05 📈
+
+### 股票问题全系列 (Stock Problems)
+
+| 题目 | 难度 | 算法 | 核心洞察 |
+|------|------|------|----------|
+| LC121 Best Time to Buy and Sell Stock | Easy | 一次遍历 | 追踪minPrice, max(maxProfit, price - minPrice) |
+| LC122 Best Time to Buy and Sell Stock II | Medium | 贪心 | 累加所有上升坡度 (prices[i] > prices[i-1]) |
+| LC123 Best Time to Buy and Sell Stock III | Hard | DP五状态 | buy1/sell1/buy2/sell2 四变量递推 |
+| LC188 Best Time to Buy and Sell Stock IV | Hard | DP三维 | hold[j]/cash[j] 双数组, j从0到k-1 |
+| LC309 Best Time to Buy and Sell Stock + Cooldown | Medium | 状态机DP | hold/sold/rest三状态转换 |
+
+### 通用股票DP框架 (支持任意k次交易)
+
+```c
+int maxProfit(int k, int* prices, int pricesSize) {
+    if (k >= pricesSize / 2) {
+        // 退化为无限次交易 - 贪心
+        int profit = 0;
+        for (int i = 1; i < pricesSize; i++) {
+            if (prices[i] > prices[i-1]) {
+                profit += prices[i] - prices[i-1];
+            }
+        }
+        return profit;
+    }
+    
+    int* hold = calloc(k, sizeof(int));
+    int* cash = calloc(k, sizeof(int));
+    for (int i = 0; i < k; i++) hold[i] = -prices[0];
+    
+    for (int i = 1; i < pricesSize; i++) {
+        hold[0] = max(hold[0], -prices[i]);
+        cash[0] = max(cash[0], hold[0] + prices[i]);
+        for (int j = 1; j < k; j++) {
+            hold[j] = max(hold[j], cash[j-1] - prices[i]);
+            cash[j] = max(cash[j], hold[j] + prices[i]);
+        }
+    }
+    
+    return cash[k-1];
+}
+```
+
+### 状态机DP模板 (LC309 冷却期)
+
+```
+三种状态:
+- hold: 持有股票
+- sold: 刚卖出(冷冻期)  
+- rest: 冷却中/未持有
+
+转移方程:
+hold = max(hold, rest - price[i])
+sold = hold_prev + price[i]
+rest = max(rest, sold)  // 冷却结束后保持或继续冷却
+```
+
+### 关键优化技巧
+
+| 技巧 | 适用场景 | 效果 |
+|------|---------|------|
+| k >= n/2 退化 | LC188 | O(n*k) → O(n) 贪心 |
+| 五状态→四变量 | LC123 | O(n)空间 → O(1)空间 |
+| 状态机三变量 | LC309 | 无需数组,仅用3变量 |
+
+### DP循环顺序规律 (补充)
+
+| 类型 | 问题 | 外层循环 | 内层循环 |
+|------|------|---------|---------|
+| 组合(无序) | LC322/LC518 | 硬币/物品 | 目标金额 |
+| 排列(有序) | LC377 | 目标金额 | 硬币/物品 |
+| 股票(交易) | LC188 | 价格遍历 | 交易次数j |
+
+
+---
+
+## 2026-04-05 💻
+
+### 1. 代码练习
+
+#### 上午: 股票问题全系列 (DP)
+
+| 题目 | 难度 | 算法 | 核心规律 |
+|------|------|------|---------|
+| LC121 | Easy | 一次遍历+最小值 | maxProfit = max(maxProfit, price - minPrice) |
+| LC122 | Medium | 贪心累加坡度 | 只要上涨就累加差值 |
+| LC123 | Hard | DP五状态 | buy1/sell1/buy2/sell2四状态 |
+| LC188 | Hard | DP三维 | hold[j]/cash[j]数组，k>=n/2退化贪心 |
+| LC309 | Medium | 状态机DP | hold/sold/rest三状态 |
+
+**关键洞察**: 
+- k>=n/2时退化为无限次交易 → 贪心
+- 五状态空间优化: O(n)空间 → O(1)变量
+
+---
+
+#### 下午: 区间DP + 树形DP
+
+| 题目 | 难度 | 算法 | 核心规律 |
+|------|------|------|---------|
+| LC516 | Medium | 区间DP | dp[i][j] = dp[i+1][j-1]+2 或 max(dp[i+1][j],dp[i][j-1]) |
+| LC337 | Medium | 树形DP | f(抢)=val+g(左)+g(右)，g(不抢)=max(f,g)+max(f,g) |
+
+**树形DP模板**:
+```c
+typedef struct {int f; int g;} Pair;
+Pair helper(TreeNode* node) {
+    if (!node) return (Pair){0, 0};
+    Pair l = helper(node->left), r = helper(node->right);
+    int f = node->val + l.g + r.g;
+    int g = max(max(l.f,l.g), max(r.f,r.g));
+    return (Pair){f, g};
+}
+```
+
+---
+
+#### 傍晚: Catalan数 DP
+
+| 题目 | 难度 | 算法 | 核心规律 |
+|------|------|------|---------|
+| LC96 | Medium | Catalan数 | G(n)=Σ G(i-1)*G(n-i)，验证G(3)=5,G(4)=14,G(5)=42 |
+
+**Catalan模板**:
+```c
+dp[0]=1; dp[1]=1;
+for (int i=2; i<=n; i++)
+    for (int j=1; j<=i; j++)
+        dp[i] += dp[j-1] * dp[i-j];
+```
+
+---
+
+### 2. 游戏开发
+
+#### Pinball WASM ✅
+| 项目 | 内容 |
+|------|------|
+| 技术 | Pure C + Emscripten + Canvas 2D |
+| 尺寸 | 400×700 |
+| 状态 | ✅ Built & Verified |
+
+**特性**: 翻转球拍(Z/X键) + 5个弹球柱 + 重力物理引擎
+
+**物理实现**:
+- 线段-圆碰撞: 二次方程判别式
+- 反射: v - 2*(v·n)*n
+- 上击加速: dy -= 5, dx += direction*3
+- 重力: dy += 0.15/帧，速度上限15
+
+#### Nonogram WASM ✅
+| 项目 | 内容 |
+|------|------|
+| 技术 | Pure C + Emscripten + Canvas 2D |
+| 尺寸 | 5种: 5x5, 7x7, 10x10, 10x15, 15x15 |
+| 特性 | 行列提示生成、填充/标记、完成检测 |
+
+#### Simon Says WASM ✅
+| 项目 | 内容 |
+|------|------|
+| 技术 | Pure C + Emscripten + Canvas 2D |
+| 特性 | 4色记忆序列游戏 |
+
+#### Dominoes WASM ✅
+| 项目 | 内容 |
+|------|------|
+| 技术 | Pure C + Emscripten + Canvas 2D |
+| 特性 | 多米诺骨牌 |
+
+**WASM游戏总数: 25个**
+
+---
+
+### 3. GitHub 提交
+
+```
+commit b6b22bd
+Add Pinball, Nonogram, Simon Says WASM games + LC96 Unique BST
+34 files changed, 1791 insertions(+)
+```
+
+---
+
+### 4. 技术沉淀
+
+#### DP分类总结
+
+| 类型 | 代表题 | 外层循环 |
+|------|--------|---------|
+| 组合(无序) | LC322/LC518 | 物品 |
+| 排列(有序) | LC377 | 目标 |
+| 股票(交易) | LC188 | 价格 |
+| 区间DP | LC516 | i从大到小 |
+| 树形DP | LC337 | 后序遍历 |
+| Catalan | LC96 | 内层枚举根 |
+
+#### 翻转球物理完整实现
+```
+线段-圆碰撞:
+  1. 求圆心到线段的最近点
+  2. 判断距离 < 半径
+  3. 反射方向 = v - 2*(v·n)*n
+  4. 上击: dy -= 5, dx += boost
+重力: dy += 0.15/帧
+速度上限: clamp(sqrt(dx*dx+dy*dy), 0, 15)
+```
