@@ -29,6 +29,8 @@
 | **Simon Says WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 4-color memory game, sequence playback, Canvas 2D, Node.js验证PASS |
 | **Dominoes WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 多米诺骨牌, Canvas 2D, Node.js验证PASS |
 | **Nonogram/Picross WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 像素逻辑谜题, Canvas 2D, 5种尺寸 |
+| **Pinball WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 翻转球+弹球柱, 重力物理, Canvas 2D, Node.js验证PASS |
+| **Brick Breaker WASM** | ✅ Built (2026-04-06) | Pure C + Emscripten, 6×8砖块, 角度反弹, 分数系统 |
 
 ### In Progress
 | Game | Priority | Notes |
@@ -38,7 +40,7 @@
 | Game | Priority | Notes |
 |------|----------|-------|
 | **New Games Ideas** | P1 | 待开发新游戏或移植 |
-| **Pinball WASM** | P2 | 弹球游戏 |
+| **Balloon Pop WASM** | P2 | 气球射击/消除游戏 |
 
 ---
 
@@ -70,7 +72,7 @@
 ## Architecture Summary
 
 ### Pure C + Emscripten + Canvas 2D (WASM)
-- 24 games completed
+- 26 games completed
 
 ### Pure C + Raylib (Native)
 - 11 games completed
@@ -107,6 +109,18 @@
 - Used in Minesweeper (reveal), Wordle (evaluation)
 - Grid traversal with boundary marking
 
+### Pinball Flipper Physics
+- Line segment to circle collision (quadratic formula)
+- Reflection: v - 2*(v·n)*n
+- Up-flip boost: dy -= 5, dx += direction*3
+- Gravity: dy += 0.15 per frame
+- Speed cap: clamp to BALL_SPEED_MAX=15
+
+### Brick Breaker Physics
+- Paddle angle bounce: hit_pos determines reflection angle
+- Speed increase: speed *= 1.005 per paddle hit
+- Max speed cap: 8 units
+
 ---
 
-*Last updated: 2026-04-05 (Nonogram/Picross WASM added, 24 games total)*
+*Last updated: 2026-04-06 (Brick Breaker WASM added, 26 games total)*
