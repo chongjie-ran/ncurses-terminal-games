@@ -296,7 +296,8 @@ def with_retry(config: RetryConfig = None, circuit_config: CircuitBreakerConfig 
             return await executor.execute_with_retry_async(_call)
         
         import asyncio
-        if asyncio.iscoroutinefunction(func):
+        import inspect
+        if inspect.iscoroutinefunction(func):
             return async_wrapper
         return wrapper
     
