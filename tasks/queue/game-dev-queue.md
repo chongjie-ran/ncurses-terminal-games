@@ -30,7 +30,7 @@
 | **Dominoes WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 多米诺骨牌, Canvas 2D, Node.js验证PASS |
 | **Nonogram/Picross WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 像素逻辑谜题, Canvas 2D, 5种尺寸 |
 | **Pinball WASM** | ✅ Built & Tested (2026-04-05) | Pure C + Emscripten, 翻转球+弹球柱, 重力物理, Canvas 2D, Node.js验证PASS |
-| **Brick Breaker WASM** | ✅ Built (2026-04-06) | Pure C + Emscripten, 6×8砖块, 角度反弹, 分数系统 |
+| **Brick Breaker WASM** | ✅ Built & Tested (2026-04-06) | Pure C + Emscripten, 6×10 bricks, paddle angle bounce, Canvas 2D, Playwright PASS |
 
 ### In Progress
 | Game | Priority | Notes |
@@ -72,7 +72,7 @@
 ## Architecture Summary
 
 ### Pure C + Emscripten + Canvas 2D (WASM)
-- 26 games completed
+- 27 games completed
 
 ### Pure C + Raylib (Native)
 - 11 games completed
@@ -123,4 +123,3 @@
 
 ---
 
-*Last updated: 2026-04-06 (Brick Breaker WASM added, 26 games total)*

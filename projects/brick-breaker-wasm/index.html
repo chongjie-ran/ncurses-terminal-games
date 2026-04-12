@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brick Breaker WASM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Segoe UI', sans-serif; }
+canvas { background: #0f0f1a; border: 2px solid #333; border-radius: 4px; display: block; }
+#hud { color: #eee; font-size: 18px; margin: 10px 0; display: flex; gap: 30px; }
+#hud span { font-weight: bold; }
+.lbl { color: #888; font-size: 14px; }
+#controls { color: #666; font-size: 13px; margin-top: 8px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div><span class="lbl">SCORE</span> <span id="score">0</span></div>
+  <div><span class="lbl">LIVES</span> <span id="lives">3</span></div>
+</div>
+<canvas id="c" width="480" height="640"></canvas>
+<div id="controls">← → or A/D to move &nbsp;|&nbsp; SPACE to start/restart</div>
+<script>
+const BRICK_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6'];
+
+var Module = {
+  locateFile: function(path) { return path; },
+  onRuntimeInitialized: function() {
+    canvas = document.getElementById('c');
+    ctx = canvas.getContext('2d');
+    _init_game();
+    bindKeys();
+    requestAnimationFrame(loop);
+  }
+};
+
+var canvas, ctx;
+var lastDir = 0;
+
+function bindKeys() {
+  var keys = {};
+  document.addEventListener('keydown', function(e) {
+    if (e.code === 'Space') { e.preventDefault(); _init_game(); }
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys['left'] = 1;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys['right'] = 1;
+    updateDir(keys);
+  });
+  document.addEventListener('keyup', function(e) {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys['left'] = 0;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys['right'] = 0;
+    updateDir(keys);
+  });
+  function updateDir(k) {
+    var dir = 0;
+    if (k['left']) dir -= 1;
+    if (k['right']) dir += 1;
+    if (dir !== lastDir) {
+      _game_set_paddle_dir(dir);
+      lastDir = dir;
+    }
+  }
+  window.keys = keys;
+}
+
+function loop() {
+  _tick_game();
+  draw();
+  document.getElementById('score').textContent = _get_score();
+  document.getElementById('lives').textContent = _get_lives();
+  requestAnimationFrame(loop);
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  var state = _get_game_state();
+
+  // Draw bricks
+  for (var i = 0; i < 60; i++) {
+    var color = _get_brick_color(i);
+    if (!color) continue;
+    var row = Math.floor(i / 10);
+    var col = i % 10;
+    var bx = col * 48 + 8;
+    var by = 60 + row * 20;
+    ctx.fillStyle = BRICK_COLORS[color - 1];
+    ctx.fillRect(bx, by, 44, 16);
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(bx, by, 44, 3);
+  }
+
+  // Draw paddle
+  var px = _get_paddle_x(), py = _get_paddle_y();
+  var pw = _get_paddle_w(), ph = _get_paddle_h();
+  ctx.fillStyle = '#ecf0f1';
+  ctx.beginPath();
+  ctx.roundRect(px, py, pw, ph, 4);
+  ctx.fill();
+
+  // Draw ball
+  var bx = _get_ball_x(), by = _get_ball_y();
+  var br = _get_ball_r();
+  var fc = _get_frame_count();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(bx, by, br, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(bx, by, br + 2 + Math.sin(fc * 0.2), 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Overlays
+  ctx.textAlign = 'center';
+  if (state === 0) {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText('BRICK BREAKER', canvas.width/2, canvas.height/2 - 40);
+    ctx.font = '18px sans-serif';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('Press SPACE to Start', canvas.width/2, canvas.height/2 + 10);
+    ctx.font = '14px sans-serif';
+    ctx.fillText('Arrow keys or A/D to move paddle', canvas.width/2, canvas.height/2 + 40);
+  } else if (state === 2) {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 40px sans-serif';
+    ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 20);
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px sans-serif';
+    ctx.fillText('Score: ' + _get_score(), canvas.width/2, canvas.height/2 + 20);
+    ctx.font = '16px sans-serif';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('Press SPACE to restart', canvas.width/2, canvas.height/2 + 55);
+  } else if (state === 3) {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#2ecc71';
+    ctx.font = 'bold 40px sans-serif';
+    ctx.fillText('YOU WIN!', canvas.width/2, canvas.height/2 - 20);
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px sans-serif';
+    ctx.fillText('Score: ' + _get_score(), canvas.width/2, canvas.height/2 + 20);
+    ctx.font = '16px sans-serif';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('Press SPACE to play again', canvas.width/2, canvas.height/2 + 55);
+  }
+}
+</script>
+<script src="brick_breaker.js"></script>
+</body>
+</html>

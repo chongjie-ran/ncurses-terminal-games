@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>算力经纪人 | Power Broker</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a12; color: #e0e0e0; font-family: 'Courier New', monospace; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+#app { width: 100%; max-width: 480px; padding: 16px; }
+.panel { background: #12121e; border: 1px solid #333; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+.title { text-align: center; font-size: 20px; color: #00d4ff; margin-bottom: 4px; font-weight: bold; letter-spacing: 2px; }
+.subtitle { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat { background: #1a1a2a; border-radius: 6px; padding: 10px; text-align: center; }
+.stat-val { font-size: 18px; font-weight: bold; color: #00d4ff; }
+.stat-lbl { font-size: 10px; color: #666; margin-top: 2px; }
+.stat-val.green { color: #00ff88; }
+.stat-val.red { color: #ff4444; }
+.stat-val.gold { color: #ffd700; }
+.event-box { background: #1e1e2e; border-left: 3px solid #ff6b35; padding: 10px 12px; border-radius: 4px; margin: 8px 0; }
+.event-name { font-size: 14px; color: #ff6b35; font-weight: bold; }
+.event-desc { font-size: 11px; color: #aaa; margin-top: 4px; }
+.event-impact { font-size: 12px; margin-top: 4px; font-weight: bold; }
+.event-impact.pos { color: #00ff88; }
+.event-impact.neg { color: #ff4444; }
+.btn-row { display: flex; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+button { flex: 1; min-width: 80px; padding: 10px 8px; border: 1px solid #333; border-radius: 6px; background: #1a1a2a; color: #e0e0e0; font-family: inherit; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+button:hover { background: #252540; border-color: #00d4ff; color: #00d4ff; }
+button:active { transform: scale(0.97); }
+button.primary { background: #003a50; border-color: #00d4ff; color: #00d4ff; }
+button.danger { border-color: #ff4444; color: #ff4444; }
+button.danger:hover { background: #2a0a0a; }
+.ach-list { max-height: 200px; overflow-y: auto; }
+.ach-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #222; font-size: 12px; }
+.ach-item.locked { color: #444; }
+.ach-marker { font-size: 14px; }
+.ach-name { font-weight: bold; color: #ffd700; }
+.ach-desc { font-size: 10px; color: #666; }
+.boss-warn { background: linear-gradient(135deg, #2a0a0a, #1a0505); border: 1px solid #ff4444; color: #ff4444; text-align: center; padding: 8px; border-radius: 6px; font-size: 12px; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+.difficulty { display: flex; flex-direction: column; gap: 8px; }
+.gameover { text-align: center; }
+.gameover h2 { color: #ffd700; font-size: 24px; margin-bottom: 16px; }
+.stars { font-size: 24px; color: #ffd700; margin: 8px 0; }
+.diff-btn { text-align: left; padding: 12px; }
+.diff-btn .diff-name { font-size: 14px; font-weight: bold; color: #00d4ff; }
+.diff-btn .diff-desc { font-size: 11px; color: #666; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="power_broker.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let wasm = null;
+
+async function loadWasm() {
+  const resp = await fetch('power_broker.wasm');
+  const buf = await resp.arrayBuffer();
+  const { instance } = await WebAssembly.instantiate(buf, {});
+  wasm = instance.exports;
+  wasm.init();
+  render();
+}
+
+function G(fn) { return fn(wasm); }
+const V = fn => { if (!wasm) return 0; fn(wasm); return 0; };
+
+const STATE = { MENU: 0, DIFFSEL: 1, TRADING: 2, ACHS: 3, GAMEOVER: 4 };
+
+function btn(label, onClick, cls = '') {
+  return `<button class="${cls}" onclick="(${onClick})()">${label}</button>`;
+}
+
+function statGrid() {
+  const cash = G(w => w.get_cash());
+  const power = G(w => w.get_power());
+  const price = G(w => w.get_price());
+  const assets = G(w => w.get_total_assets());
+  const profit = G(w => w.get_profit());
+  const day = G(w => w.get_day());
+  const streak = G(w => w.get_win_streak());
+  const achN = G(w => { let n=0; for(let i=0;i<12;i++) if(w.ach_unlocked(i)) n++; return n; });
+  const profitClass = profit >= 0 ? 'green' : 'red';
+  return `
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-val">$${cash.toLocaleString()}</div><div class="stat-lbl">资金</div></div>
+    <div class="stat"><div class="stat-val">${power}</div><div class="stat-lbl">算力(单位)</div></div>
+    <div class="stat"><div class="stat-val gold">$${price}</div><div class="stat-lbl">市价/单位</div></div>
+    <div class="stat"><div class="stat-val ${profitClass}">$${profit >= 0 ? '+' : ''}${profit.toLocaleString()}</div><div class="stat-lbl">累计盈利</div></div>
+    <div class="stat"><div class="stat-val">$${assets.toLocaleString()}</div><div class="stat-lbl">总资产</div></div>
+    <div class="stat"><div class="stat-val">${day}/30</div><div class="stat-lbl">天数</div></div>
+  </div>`;
+}
+
+function eventBox() {
+  const name = G(w => {
+    const buf = w.memory.buffer;
+    const ptr = w.get_event_name();
+    const mem = new Uint8Array(buf, ptr, 32);
+    let end = mem.indexOf(0);
+    if (end < 0) end = 32;
+    return new TextDecoder().decode(mem.slice(0, end));
+  });
+  const desc = G(w => {
+    const buf = w.memory.buffer;
+    const ptr = w.get_event_desc();
+    const mem = new Uint8Array(buf, ptr, 64);
+    let end = mem.indexOf(0);
+    if (end < 0) end = 64;
+    return new TextDecoder().decode(mem.slice(0, end));
+  });
+  const impact = G(w => w.get_event_impact());
+  const isBoss = G(w => w.get_boss());
+  const cls = impact >= 0 ? 'pos' : 'neg';
+  return `
+  <div class="event-box">
+    ${isBoss ? '<div class="boss-warn">⚠️ BOSS级事件预警 ⚠️</div>' : ''}
+    <div class="event-name">${name}</div>
+    <div class="event-desc">${desc}</div>
+    <div class="event-impact ${cls}">${impact >= 0 ? '+' : ''}${impact}%</div>
+  </div>`;
+}
+
+function render() {
+  if (!wasm) return;
+  const state = G(w => w.get_state());
+  const app = $('#app');
+  
+  if (state === STATE.MENU) {
+    app.innerHTML = `
+    <div class="panel">
+      <div class="title">⚡ 算力经纪人</div>
+      <div class="subtitle">Power Broker v1.4 WASM</div>
+      <p style="text-align:center;font-size:12px;color:#666;margin-bottom:16px">成为AI算力市场的幕后操盘手<br>通过买卖算力赚取利润</p>
+      <div class="btn-row" style="flex-direction:column">
+        ${btn('🎮 新游戏', () => { G(w => w.new_game(1)); render(); })}
+        ${btn('📊 成就列表', () => { G(w => w.back_to_menu()); render(); }, 'danger')}
+      </div>
+    </div>`;
+  } else if (state === STATE.DIFFSEL) {
+    const diffs = [
+      {d:0, name:'🌱 简单', desc:'初始$150,000 + 150算力'},
+      {d:1, name:'⚖️ 普通', desc:'初始$100,000 + 100算力'},
+      {d:2, name:'🔥 困难', desc:'初始$60,000 + 80算力'},
+    ];
+    app.innerHTML = `
+    <div class="panel">
+      <div class="title">选择难度</div>
+      <div class="difficulty" style="margin-top:12px">
+        ${diffs.map(d => `
+        <button class="diff-btn" onclick="G(w => w.new_game(${d.d})); render();">
+          <div class="diff-name">${d.name}</div>
+          <div class="diff-desc">${d.desc}</div>
+        </button>`).join('')}
+      </div>
+      <div style="margin-top:12px">${btn('返回', () => { G(w => w.back_to_menu()); render(); })}</div>
+    </div>`;
+  } else if (state === STATE.TRADING) {
+    app.innerHTML = `
+    <div class="panel">
+      <div class="title">⚡ 算力经纪人</div>
+      <div style="text-align:center;font-size:11px;color:#444;margin-bottom:12px">Day ${G(w => w.get_day())} / 30</div>
+      ${statGrid()}
+      ${eventBox()}
+      <div class="btn-row">
+        ${btn('📈 买入10', () => { G(w => w.player_action(1,10)); render(); })}
+        ${btn('📈 买入50', () => { G(w => w.player_action(1,50)); render(); })}
+      </div>
+      <div class="btn-row">
+        ${btn('📉 卖出10', () => { G(w => w.player_action(2,10)); render(); })}
+        ${btn('📉 卖出50', () => { G(w => w.player_action(2,50)); render(); })}
+      </div>
+      <div class="btn-row">
+        ${btn('⏭️ 跳过回合', () => { G(w => w.end_day()); render(); }, 'primary')}
+      </div>
+      <div class="btn-row" style="margin-top:4px">
+        ${btn('🏆 成就', () => renderAchievements())}
+        ${btn('🏠 主页', () => { G(w => w.back_to_menu()); render(); }, 'danger')}
+      </div>
+    </div>`;
+  } else if (state === STATE.GAMEOVER) {
+    const assets = G(w => w.get_total_assets());
+    const profit = G(w => w.get_profit());
+    const stars = profit >= 100000 ? 5 : profit >= 50000 ? 4 : profit >= 10000 ? 3 : profit >= 0 ? 2 : 1;
+    app.innerHTML = `
+    <div class="panel gameover">
+      <h2>🎉 游戏结束</h2>
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-val">$${assets.toLocaleString()}</div><div class="stat-lbl">最终资产</div></div>
+        <div class="stat"><div class="stat-val ${profit>=0?'green':'red'}">$${profit>=0?'+':''}${profit.toLocaleString()}</div><div class="stat-lbl">净利润</div></div>
+      </div>
+      <div class="stars">${'⭐'.repeat(stars)}${'☆'.repeat(5-stars)}</div>
+      <div class="btn-row" style="flex-direction:column">
+        ${btn('🔄 再来一局', () => { G(w => w.new_game(1)); render(); }, 'primary')}
+        ${btn('🏠 返回主页', () => { G(w => w.back_to_menu()); render(); })}
+      </div>
+    </div>`;
+  }
+}
+
+function renderAchievements() {
+  const achCount = G(w => w.get_ach_count());
+  let items = '';
+  for (let i = 0; i < achCount; i++) {
+    const unlocked = G(w => w.ach_unlocked(i));
+    const name = G(w => {
+      const buf = w.memory.buffer;
+      const ptr = w.ach_unlocked ? 0 : 0;
+      return '';
+    });
+    const n = G(w => { const buf = w.memory.buffer; const p = w.get_ach_name(i); const m = new Uint8Array(buf, p, 32); let e = m.indexOf(0); return new TextDecoder().decode(m.slice(0, e < 0 ? 32 : e)); });
+    const d = G(w => { const buf = w.memory.buffer; const p = w.get_ach_desc(i); const m = new Uint8Array(buf, p, 64); let e = m.indexOf(0); return new TextDecoder().decode(m.slice(0, e < 0 ? 64 : e)); });
+    const cls = unlocked ? '' : 'locked';
+    const marker = unlocked ? '🏆' : '🔒';
+    items += `<div class="ach-item ${cls}"><span class="ach-marker">${marker}</span><div><div class="ach-name">${n || `成就${i+1}`}</div><div class="ach-desc">${d || ''}</div></div></div>`;
+  }
+  const achN = G(w => { let n=0; for(let i=0;i<12;i++) if(w.ach_unlocked(i)) n++; return n; });
+  $('#app').innerHTML = `
+  <div class="panel">
+    <div class="title">🏆 成就列表</div>
+    <div style="text-align:center;font-size:12px;color:#ffd700;margin-bottom:12px">${achN} / 12 已解锁</div>
+    <div class="ach-list">${items}</div>
+    <div style="margin-top:12px">${btn('返回', () => render())}</div>
+  </div>`;
+}
+
+loadWasm().catch(console.error);
+</script>
+</body>
+</html>

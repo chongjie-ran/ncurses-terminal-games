@@ -1,15 +1,16 @@
 {
   "name": "brick-breaker-wasm",
   "version": "1.0.0",
-  "description": "",
+  "description": "Brick Breaker WASM game",
   "main": "brick_breaker.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "npx http-server -p 8765 -o",
+    "test": "npx playwright test",
+    "test:dev": "npx playwright test --ui"
   },
-  "keywords": [],
+  "keywords": ["wasm", "game"],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "license": "MIT",
   "devDependencies": {
     "@playwright/test": "^1.59.1"
   }

@@ -1,0 +1,49 @@
+> """
+> javis-claude-core - Claude Code架构的Python实现
+  
+> 借鉴自Claude Code Rust源码，保留核心设计模式。
+> 模块映射：
+> - session.rs → session.py (会话管理)
+> - bash.rs → bash_executor.py (Bash执行)
+> - file_ops.rs → file_ops.py (文件操作)
+> - conversation.rs → runtime.py (对话运行时)
+> - compact.rs → compact.py (会话压缩)
+  
+> 设计原则：
+> 1. Trait-based Executor (ToolExecutor trait)
+> 2. Session持久化 (JSON格式)
+> 3. 工具注册表 (ToolRegistry)
+> 4. 权限模式 (PermissionMode)
+> """
+  
+> from .session import MessageRole, ContentBlock, ConversationMessage, Session
+> from .bash_executor import BashExecutor, BashCommandInput, BashCommandOutput
+> from .file_ops import FileOps, ReadResult, WriteResult, GrepResult, GlobResult
+> from .runtime import ConversationRuntime, ToolExecutor, ToolError, RuntimeError
+> from .compact import SessionCompactor, CompactionResult
+  
+> __all__ = [
+      # Session
+>     "MessageRole",
+>     "ContentBlock",
+>     "ConversationMessage",
+>     "Session",
+      # Bash
+>     "BashExecutor",
+>     "BashCommandInput",
+>     "BashCommandOutput",
+      # FileOps
+>     "FileOps",
+>     "ReadResult",
+>     "WriteResult",
+>     "GrepResult",
+>     "GlobResult",
+      # Runtime
+>     "ConversationRuntime",
+>     "ToolExecutor",
+>     "ToolError",
+>     "RuntimeError",
+      # Compact
+>     "SessionCompactor",
+>     "CompactionResult",
+> ]

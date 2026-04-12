@@ -1,0 +1,449 @@
+#include "../include/game.h"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <ctime>
+#include <algorithm>
+#include <cstdlib>
+
+using namespace std;
+
+ModelLeagueGame::ModelLeagueGame() {
+    rng.seed(time(nullptr));
+    mainWin = nullptr;
+    screenWidth = 80;
+    screenHeight = 24;
+}
+
+ModelLeagueGame::~ModelLeagueGame() {
+    if (mainWin) endwin();
+}
+
+void ModelLeagueGame::init() {
+    initscr();
+    cbreak();
+    noecho();
+    keypad(stdscr, TRUE);
+    curs_set(0);
+    
+    if (has_colors()) {
+        start_color();
+        init_pair(1, COLOR_GREEN, COLOR_BLACK);
+        init_pair(2, COLOR_YELLOW, COLOR_BLACK);
+        init_pair(3, COLOR_MAGENTA, COLOR_BLACK);
+        init_pair(4, COLOR_RED, COLOR_BLACK);
+        init_pair(5, COLOR_CYAN, COLOR_BLACK);
+        init_pair(6, COLOR_WHITE, COLOR_BLUE);
+    }
+    
+    getmaxyx(stdscr, screenHeight, screenWidth);
+    mainWin = newwin(screenHeight - 1, screenWidth, 0, 0);
+    initCards();
+    initAlliances();
+    loadGame();
+}
+
+void ModelLeagueGame::initCards() {
+    ModelCard card;
+    card.id = "gpt4";
+    card.name = "GPT-4";
+    card.description = "OpenAI 最强模型，全能型选手";
+    card.alliance = ALLIANCE_OPENAI;
+    card.rarity = RARITY_LEGENDARY;
+    card.attack = 95;
+    card.defense = 85;
+    card.speed = 80;
+    card.hp = 100;
+    card.maxHp = 100;
+    allCards.push_back(card);
+    
+    card.id = "claude";
+    card.name = "Claude";
+    card.description = "Anthropic 安全对齐专家";
+    card.alliance = ALLIANCE_ANTHROPIC;
+    card.rarity = RARITY_LEGENDARY;
+    card.attack = 90;
+    card.defense = 95;
+    card.speed = 75;
+    card.hp = 110;
+    card.maxHp = 110;
+    allCards.push_back(card);
+    
+    card.id = "gemini";
+    card.name = "Gemini Pro";
+    card.description = "Google 多模态强者";
+    card.alliance = ALLIANCE_GOOGLE;
+    card.rarity = RARITY_EPIC;
+    card.attack = 88;
+    card.defense = 80;
+    card.speed = 85;
+    card.hp = 95;
+    card.maxHp = 95;
+    allCards.push_back(card);
+    
+    card.id = "llama";
+    card.name = "Llama 3";
+    card.description = "Meta 开源之光";
+    card.alliance = ALLIANCE_INDEPENDENT;
+    card.rarity = RARITY_RARE;
+    card.attack = 75;
+    card.defense = 70;
+    card.speed = 70;
+    card.hp = 85;
+    card.maxHp = 85;
+    allCards.push_back(card);
+    
+    card.id = "qwen";
+    card.name = "Qwen 2.5";
+    card.description = "阿里 通义千问";
+    card.alliance = ALLIANCE_INDEPENDENT;
+    card.rarity = RARITY_RARE;
+    card.attack = 78;
+    card.defense = 72;
+    card.speed = 73;
+    card.hp = 88;
+    card.maxHp = 88;
+    allCards.push_back(card);
+    
+    playerCards.push_back(allCards[3]);
+    playerCards.push_back(allCards[4]);
+}
+
+void ModelLeagueGame::initAlliances() {
+    Alliance alliance;
+    alliance.name = "OpenAI 联盟";
+    alliance.leader = "Sam Altman";
+    alliance.description = "追求 AGI 的先锋联盟";
+    alliance.level = 5;
+    alliances.push_back(alliance);
+    
+    alliance.name = "Anthropic 联盟";
+    alliance.leader = "Dario Amodei";
+    alliance.description = "安全对齐的守护者";
+    alliance.level = 4;
+    alliances.push_back(alliance);
+    
+    alliance.name = "Google DeepMind";
+    alliance.leader = "Demis Hassabis";
+    alliance.description = "科学突破的引领者";
+    alliance.level = 5;
+    alliances.push_back(alliance);
+}
+
+void ModelLeagueGame::run() {
+    bool running = true;
+    while (running) {
+        showMainMenu();
+        int choice = wgetch(mainWin);
+        
+        switch (choice) {
+            case '1': showCardCollection(); break;
+            case '2': startBattle(); break;
+            case '3': showAllianceList(); break;
+            case '4': addGold(100); addExp(50); break;
+            case 'q': running = false; break;
+        }
+    }
+    saveGame();
+}
+
+void ModelLeagueGame::showMainMenu() {
+    clearScreen();
+    drawBox(mainWin, 0, 0, screenHeight, screenWidth);
+    
+    mvwprintw(mainWin, 2, screenWidth/2 - 15, "================================");
+    mvwprintw(mainWin, 3, screenWidth/2 - 15, "   模型联盟大作战 v1.0");
+    mvwprintw(mainWin, 4, screenWidth/2 - 15, "================================");
+    
+    showResourcePanel();
+    
+    mvwprintw(mainWin, 10, screenWidth/2 - 12, "[1] 卡牌收藏");
+    mvwprintw(mainWin, 12, screenWidth/2 - 12, "[2] 开始战斗");
+    mvwprintw(mainWin, 14, screenWidth/2 - 12, "[3] 联盟信息");
+    mvwprintw(mainWin, 16, screenWidth/2 - 12, "[4] 获取资源 (测试)");
+    mvwprintw(mainWin, 18, screenWidth/2 - 12, "[Q] 退出游戏");
+    
+    mvwprintw(mainWin, 21, 2, "请选择操作：");
+    wrefresh(mainWin);
+}
+
+void ModelLeagueGame::showCardCollection() {
+    clearScreen();
+    drawBox(mainWin, 0, 0, screenHeight, screenWidth);
+    
+    mvwprintw(mainWin, 1, 2, "=== 卡牌收藏 (按 B 返回) ===");
+    mvwprintw(mainWin, 2, 2, "持有卡牌：%d / %d", (int)playerCards.size(), MAX_CARDS);
+    
+    int y = 4;
+    for (size_t i = 0; i < playerCards.size(); i++) {
+        ModelCard& card = playerCards[i];
+        const char* rarityStr = "";
+        
+        switch (card.rarity) {
+            case RARITY_COMMON: rarityStr = "[普通]"; break;
+            case RARITY_RARE: rarityStr = "[稀有]"; break;
+            case RARITY_EPIC: rarityStr = "[史诗]"; break;
+            case RARITY_LEGENDARY: rarityStr = "[传说]"; break;
+        }
+        
+        mvwprintw(mainWin, y++, 2, "%d. %s %s (Lv.%d)", 
+                  (int)(i+1), card.name.c_str(), rarityStr, card.level);
+        mvwprintw(mainWin, y++, 4, "ATK:%d DEF:%d SPD:%d HP:%d/%d",
+                  card.attack, card.defense, card.speed, card.hp, card.maxHp);
+        mvwprintw(mainWin, y++, 4, "EXP: %d", card.exp);
+        y++;
+    }
+    
+    mvwprintw(mainWin, screenHeight - 2, 2, "按 B 返回主菜单");
+    wrefresh(mainWin);
+    
+    int ch;
+    while ((ch = wgetch(mainWin)) != 'b' && ch != 'B') {
+        if (ch == 'q') break;
+    }
+}
+
+ModelCard ModelLeagueGame::drawRandomCard() {
+    if (allCards.empty()) return ModelCard();
+    
+    uniform_int_distribution<> dist(0, allCards.size() - 1);
+    ModelCard newCard = allCards[dist(rng)];
+    newCard.id = newCard.id + "_" + to_string(time(nullptr));
+    return newCard;
+}
+
+void ModelLeagueGame::addCard(const ModelCard& card) {
+    if (playerCards.size() < MAX_CARDS) {
+        playerCards.push_back(card);
+    }
+}
+
+void ModelLeagueGame::startBattle() {
+    if (playerCards.empty()) {
+        clearScreen();
+        mvwprintw(mainWin, 10, 2, "没有可用的卡牌！请先收集卡牌。");
+        wrefresh(mainWin);
+        wgetch(mainWin);
+        return;
+    }
+    
+    clearScreen();
+    mvwprintw(mainWin, 2, 2, "选择出战卡牌：");
+    for (size_t i = 0; i < playerCards.size(); i++) {
+        mvwprintw(mainWin, 4 + i, 4, "%d. %s (HP:%d/%d)", 
+                  (int)(i+1), playerCards[i].name.c_str(),
+                  playerCards[i].hp, playerCards[i].maxHp);
+    }
+    mvwprintw(mainWin, 10, 2, "选择 (1-%d): ", (int)playerCards.size());
+    wrefresh(mainWin);
+    
+    int choice = wgetch(mainWin) - '0';
+    if (choice < 1 || choice > (int)playerCards.size()) return;
+    
+    ModelCard enemy = drawRandomCard();
+    enemy.hp = enemy.maxHp;
+    
+    currentBattle.playerCard = playerCards[choice - 1];
+    currentBattle.enemyCard = enemy;
+    currentBattle.state = BATTLE_PLAYER_TURN;
+    currentBattle.turn = 1;
+    currentBattle.battleLog = "战斗开始！";
+    
+    bool battleEnd = false;
+    while (!battleEnd) {
+        showBattleScene();
+        
+        if (currentBattle.state == BATTLE_PLAYER_TURN) {
+            mvwprintw(mainWin, screenHeight - 3, 2, "按 [A] 攻击 [S] 防御 [Q] 逃跑：");
+            wrefresh(mainWin);
+            
+            int action = wgetch(mainWin);
+            if (action == 'q' || action == 'Q') {
+                currentBattle.state = BATTLE_DEFEAT;
+                battleEnd = true;
+            } else if (action == 'a' || action == 'A') {
+                int dmg = calculateDamage(currentBattle.playerCard, currentBattle.enemyCard);
+                currentBattle.enemyCard.hp -= dmg;
+                currentBattle.battleLog = "你攻击造成 " + to_string(dmg) + " 点伤害！";
+                
+                if (currentBattle.enemyCard.hp <= 0) {
+                    currentBattle.state = BATTLE_VICTORY;
+                    battleEnd = true;
+                } else {
+                    currentBattle.state = BATTLE_ENEMY_TURN;
+                }
+            } else if (action == 's' || action == 'S') {
+                currentBattle.playerCard.defense += 10;
+                currentBattle.battleLog = "你进入防御状态！";
+                currentBattle.state = BATTLE_ENEMY_TURN;
+            }
+        } else if (currentBattle.state == BATTLE_ENEMY_TURN) {
+            napms(500);
+            
+            int dmg = calculateDamage(currentBattle.enemyCard, currentBattle.playerCard);
+            currentBattle.playerCard.hp -= dmg;
+            currentBattle.battleLog = "敌人攻击造成 " + to_string(dmg) + " 点伤害！";
+            
+            if (currentBattle.playerCard.hp <= 0) {
+                currentBattle.state = BATTLE_DEFEAT;
+                battleEnd = true;
+            } else {
+                currentBattle.state = BATTLE_PLAYER_TURN;
+                currentBattle.turn++;
+            }
+        } else {
+            battleEnd = true;
+        }
+    }
+    
+    endBattle(currentBattle.state == BATTLE_VICTORY);
+}
+
+int ModelLeagueGame::calculateDamage(const ModelCard& attacker, const ModelCard& defender) {
+    int baseDmg = max(1, attacker.attack - defender.defense / 2);
+    uniform_int_distribution<> dist(-5, 10);
+    return baseDmg + dist(rng);
+}
+
+void ModelLeagueGame::showBattleScene() {
+    clearScreen();
+    drawBox(mainWin, 0, 0, screenHeight, screenWidth);
+    
+    mvwprintw(mainWin, 1, screenWidth/2 - 8, "=== 战斗场景 ===");
+    mvwprintw(mainWin, 2, 2, "回合：%d", currentBattle.turn);
+    
+    mvwprintw(mainWin, 5, 2, "【玩家】%s Lv.%d", 
+              currentBattle.playerCard.name.c_str(), currentBattle.playerCard.level);
+    mvwprintw(mainWin, 6, 2, "HP: %d/%d", 
+              currentBattle.playerCard.hp, currentBattle.playerCard.maxHp);
+    mvwprintw(mainWin, 7, 2, "ATK:%d DEF:%d SPD:%d",
+              currentBattle.playerCard.attack, currentBattle.playerCard.defense,
+              currentBattle.playerCard.speed);
+    
+    mvwprintw(mainWin, 6, screenWidth/2 - 1, "VS");
+    
+    mvwprintw(mainWin, 5, screenWidth - 30, "【敌人】%s Lv.%d",
+              currentBattle.enemyCard.name.c_str(), currentBattle.enemyCard.level);
+    mvwprintw(mainWin, 6, screenWidth - 30, "HP: %d/%d",
+              currentBattle.enemyCard.hp, currentBattle.enemyCard.maxHp);
+    mvwprintw(mainWin, 7, screenWidth - 30, "ATK:%d DEF:%d SPD:%d",
+              currentBattle.enemyCard.attack, currentBattle.enemyCard.defense,
+              currentBattle.enemyCard.speed);
+    
+    mvwprintw(mainWin, 12, 2, "战斗日志：%s", currentBattle.battleLog.c_str());
+    
+    switch (currentBattle.state) {
+        case BATTLE_PLAYER_TURN:
+            mvwprintw(mainWin, 14, 2, ">> 你的回合 <<");
+            break;
+        case BATTLE_ENEMY_TURN:
+            mvwprintw(mainWin, 14, 2, ">> 敌人回合 <<");
+            break;
+        case BATTLE_VICTORY:
+            mvwprintw(mainWin, 14, 2, ">> 胜利！ <<");
+            break;
+        case BATTLE_DEFEAT:
+            mvwprintw(mainWin, 14, 2, ">> 失败... <<");
+            break;
+        default:
+            break;
+    }
+    
+    wrefresh(mainWin);
+}
+
+void ModelLeagueGame::endBattle(bool playerWin) {
+    clearScreen();
+    
+    if (playerWin) {
+        mvwprintw(mainWin, 10, screenWidth/2 - 10, "恭喜！你获胜了！");
+        resources.winCount++;
+        addGold(50);
+        addExp(30);
+    } else {
+        mvwprintw(mainWin, 10, screenWidth/2 - 10, "很遗憾，你失败了...");
+        resources.loseCount++;
+        addExp(10);
+    }
+    
+    mvwprintw(mainWin, 12, 2, "按任意键返回...");
+    wrefresh(mainWin);
+    wgetch(mainWin);
+}
+
+void ModelLeagueGame::showAllianceList() {
+    clearScreen();
+    drawBox(mainWin, 0, 0, screenHeight, screenWidth);
+    
+    mvwprintw(mainWin, 1, 2, "=== 联盟列表 (按 B 返回) ===");
+    
+    for (size_t i = 0; i < alliances.size(); i++) {
+        Alliance& a = alliances[i];
+        mvwprintw(mainWin, 4 + i * 4, 2, "%d. %s", (int)(i+1), a.name.c_str());
+        mvwprintw(mainWin, 5 + i * 4, 4, "领袖：%s | 等级：%d", a.leader.c_str(), a.level);
+        mvwprintw(mainWin, 6 + i * 4, 4, "%s", a.description.c_str());
+    }
+    
+    mvwprintw(mainWin, screenHeight - 2, 2, "按 B 返回主菜单");
+    wrefresh(mainWin);
+    
+    int ch;
+    while ((ch = wgetch(mainWin)) != 'b' && ch != 'B') {
+        if (ch == 'q') break;
+    }
+}
+
+void ModelLeagueGame::addGold(int amount) {
+    resources.gold += amount;
+}
+
+void ModelLeagueGame::addExp(int amount) {
+    resources.exp += amount;
+    checkLevelUp();
+}
+
+void ModelLeagueGame::checkLevelUp() {
+    int expNeeded = resources.level * 100;
+    while (resources.exp >= expNeeded) {
+        resources.level++;
+        resources.exp -= expNeeded;
+        expNeeded = resources.level * 100;
+        resources.gold += 200;
+    }
+}
+
+void ModelLeagueGame::showResourcePanel() {
+    mvwprintw(mainWin, 6, 2, "金币：%d | 钻石：%d", resources.gold, resources.diamond);
+    mvwprintw(mainWin, 7, 2, "等级：%d | EXP: %d", resources.level, resources.exp);
+    mvwprintw(mainWin, 8, 2, "战绩：%d胜 %d负", resources.winCount, resources.loseCount);
+}
+
+void ModelLeagueGame::drawBox(WINDOW* win, int y, int x, int h, int w) {
+    for (int i = 0; i < w; i++) {
+        mvwprintw(win, y, x + i, "-");
+        mvwprintw(win, y + h - 1, x + i, "-");
+    }
+    for (int i = 0; i < h; i++) {
+        mvwprintw(win, y + i, x, "|");
+        mvwprintw(win, y + i, x + w - 1, "|");
+    }
+}
+
+void ModelLeagueGame::drawText(WINDOW* win, int y, int x, const string& text) {
+    mvwprintw(win, y, x, "%s", text.c_str());
+}
+
+void ModelLeagueGame::clearScreen() {
+    werase(mainWin);
+    wrefresh(mainWin);
+}
+
+void ModelLeagueGame::saveGame() {}
+void ModelLeagueGame::loadGame() {}
+
+int main() {
+    ModelLeagueGame game;
+    game.init();
+    game.run();
+    return 0;
+}

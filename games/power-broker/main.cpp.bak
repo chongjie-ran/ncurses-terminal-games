@@ -1,0 +1,128 @@
+/**
+ * Power Broker v1.2 - fix stdio+empty-input bug
+ */
+#include <iostream>
+#include <vector>
+#include <string>
+#include <cstdlib>
+#include <ctime>
+#include <algorithm>
+using namespace std;
+const int INITIAL_CASH=100000, INITIAL_POWER=100, INITIAL_PRICE=100, MAX_PRICE=500, MIN_PRICE=20, DAY_LIMIT=30;
+struct Event{string name,description;int priceImpact;};
+vector<Event> EVENTS={
+  {"AI芯片禁令","美国扩大芯片出口管制",+40},
+  {"数据中心故障","某大厂数据中心宕机",+25},
+  {"新能源突破","电价暴跌，算力成本降低",-20},
+  {"新矿难","内蒙古矿难，GPU供应紧张",+30},
+  {"大厂抛售","某巨头出售过剩算力",-35},
+  {"政策利好","国家出台AI算力扶持政策",+15},
+  {"黑客攻击","交易所遭攻击",-15},
+  {"5nm量产","新一代制程量产，成本下降",-25},
+  {"算力泡沫","市场过热，监管介入",-20},
+  {"战争风险","地缘冲突升级",+35},
+};
+struct GameState{
+  int day,cash,power,currentPrice,totalProfit;
+  GameState(){day=1;cash=INITIAL_CASH;power=INITIAL_POWER;currentPrice=INITIAL_PRICE;totalProfit=0;}
+};
+class MarketEngine{
+  int volatility;
+public:
+  MarketEngine(){volatility=10;srand(time(NULL));}
+  int dailyFluctuation(){return (rand()%(volatility*2+1))-volatility;}
+  Event getRandomEvent(){return EVENTS[rand()%EVENTS.size()];}
+  int updatePrice(int p,Event* e=NULL){
+    int chg=dailyFluctuation();
+    if(e) chg+=(p*e->priceImpact)/100;
+    return max(MIN_PRICE,min(MAX_PRICE,p+chg));
+  }
+};
+class TradeSystem{
+public:
+  static bool buy(GameState& s,int amt,int price){int cost=amt*price;if(cost>s.cash)return false;s.cash-=cost;s.power+=amt;return true;}
+  static bool sell(GameState& s,int amt,int price){if(amt>s.power)return false;s.cash+=amt*price;s.power-=amt;return true;}
+  static int totalAssets(const GameState& s,int price){return s.cash+s.power*price;}
+};
+class StdioUI{
+public:
+  static void clear(){cout<<"\033[2J\033[H";}
+  static void drawHeader(int day){
+    cout<<"=========================================="<<endl;
+    cout<<"    算力经纪人 | Power Broker    Day "<<day<<endl;
+    cout<<"=========================================="<<endl;
+  }
+  static void drawStatus(const GameState& s,int price){
+    cout<<"  资金: $"<<s.cash<<endl;
+    cout<<"  算力: "<<s.power<<" 单位"<<endl;
+    cout<<"  市价: $"<<price<<"/单位"<<endl;
+    cout<<"  总资产: $"<<TradeSystem::totalAssets(s,price)<<endl;
+  }
+  static void drawEvent(const Event& e){
+    cout<<"  [事件] "<<e.name<<endl;
+    cout<<"        "<<e.description<<endl;
+  }
+  static void drawMenu(){
+    cout<<endl<<"  操作:"<<endl;
+    cout<<"    [1]买入10 [2]买入50 [3]卖出10 [4]卖出50 [5]观望 [q]退出"<<endl;
+  }
+  static void drawEnd(const GameState& s){
+    cout<<"=========================================="<<endl;
+    cout<<"           游戏结束 - Game Over"<<endl;
+    cout<<"=========================================="<<endl;
+    cout<<"最终总资产: $"<<TradeSystem::totalAssets(s,s.currentPrice)<<endl;
+    cout<<"总利润: $"<<s.totalProfit<<endl;
+    cout<<"最终持有算力: "<<s.power<<" 单位 @ $"<<s.currentPrice<<endl;
+    cout<<"=========================================="<<endl;
+  }
+};
+class Game{
+  GameState state;
+  MarketEngine market;
+public:
+  void run(){
+    string cmd;
+    while(state.day<=DAY_LIMIT){
+      StdioUI::clear();
+      StdioUI::drawHeader(state.day);
+      StdioUI::drawStatus(state,state.currentPrice);
+      Event event=market.getRandomEvent();
+      state.currentPrice=market.updatePrice(state.currentPrice,&event);
+      StdioUI::drawEvent(event);
+      StdioUI::drawMenu();
+      cout<<"> ";
+      cout.flush();
+      if(!getline(cin,cmd)) break;
+      if(cmd.empty()) continue;
+      char ch=cmd[0];
+      bool ok=false;
+      switch(ch){
+        case 113:case 81: state.day=DAY_LIMIT+1;break;
+        case 49:ok=TradeSystem::buy(state,10,state.currentPrice);break;
+        case 50:ok=TradeSystem::buy(state,50,state.currentPrice);break;
+        case 51:ok=TradeSystem::sell(state,10,state.currentPrice);break;
+        case 52:ok=TradeSystem::sell(state,50,state.currentPrice);break;
+        case 53:break;
+        default:cout<<"  无效操作"<<endl;continue;
+      }
+      if(ok) cout<<"  操作成功"<<endl;
+      int assets=TradeSystem::totalAssets(state,state.currentPrice);
+      state.totalProfit=assets-INITIAL_CASH-(INITIAL_POWER*INITIAL_PRICE);
+      state.day++;
+    }
+    StdioUI::clear();
+    StdioUI::drawEnd(state);
+  }
+};
+int main(){
+  string line;
+  cout<<"========================================"<<endl;
+  cout<<"   算力经纪人 | Power Broker"<<endl;
+  cout<<"   成为AI算力市场的幕后操盘手"<<endl;
+  cout<<"========================================"<<endl;
+  cout<<"按回车开始游戏..."<<endl;
+  getline(cin,line);
+  Game game;
+  game.run();
+  return 0;
+}
