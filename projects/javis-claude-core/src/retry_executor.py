@@ -1,0 +1,311 @@
+"""
+retry_executor.py - 错误恢复机制
+
+V3.3 P0 实现 (P2 Review Fix Applied)
+对应Claude Code: src/retry.rs
+核心功能：
+- 指数退避重试策略
+- 错误分类与恢复决策
+- 熔断器模式(Circuit Breaker) — 线程安全
+- 最大重试次数限制
+"""
+
+from __future__ import annotations
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Callable, TypeVar, Optional, List, Any
+import time
+import asyncio
+import threading
+from functools import wraps
+
+T = TypeVar('T')
+
+
+class ErrorSeverity(Enum):
+    """错误严重程度"""
+    RECOVERABLE = "recoverable"      # 可恢复: 网络超时、临时故障
+    TRANSIENT = "transient"          # 短暂: 资源争用、限流
+    FATAL = "fatal"                  # 致命: 权限拒绝、参数错误
+
+
+@dataclass
+class RetryConfig:
+    """重试配置"""
+    max_attempts: int = 3
+    base_delay_ms: int = 100
+    max_delay_ms: int = 5000
+    exponential_base: float = 2.0
+    jitter: bool = True
+    
+    def get_delay(self, attempt: int) -> float:
+        """计算延迟(毫秒)"""
+        delay = self.base_delay_ms * (self.exponential_base ** (attempt - 1))
+        delay = min(delay, self.max_delay_ms)
+        if self.jitter:
+            import random
+            delay *= (0.5 + random.random() * 0.5)
+        return delay / 1000.0
+
+
+@dataclass
+class RetryResult:
+    """重试结果"""
+    success: bool
+    attempts: int
+    total_duration_ms: int
+    last_error: Optional[str] = None
+    recovered: bool = False
+
+
+class CircuitState(Enum):
+    CLOSED = "closed"      # 正常: 允许请求
+    OPEN = "open"           # 断开: 拒绝请求
+    HALF_OPEN = "half_open" # 半开: 试探恢复
+
+
+@dataclass
+class CircuitBreakerConfig:
+    """熔断器配置"""
+    failure_threshold: int = 5      # 失败次数阈值
+    recovery_timeout_sec: int = 60  # 恢复超时
+    half_open_attempts: int = 3     # 半开试探次数
+
+
+class CircuitBreaker:
+    """熔断器 (P2 Fix: 线程安全保护)"""
+    
+    def __init__(self, config: CircuitBreakerConfig = None):
+        self.config = config or CircuitBreakerConfig()
+        self._state = CircuitState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time: Optional[float] = None
+        self._half_open_successes = 0
+        # Fix: 添加线程锁，保护状态读写
+        self._lock = threading.Lock()
+    
+    @property
+    def state(self) -> CircuitState:
+        return self._state
+    
+    @state.setter
+    def state(self, value: CircuitState) -> None:
+        self._state = value
+    
+    @property
+    def failure_count(self) -> int:
+        """外部只读访问_failure_count"""
+        with self._lock:
+            return self._failure_count
+    
+    def record_failure(self) -> None:
+        """记录失败 (线程安全)"""
+        with self._lock:
+            self._failure_count += 1
+            self._last_failure_time = time.time()
+            if self._failure_count >= self.config.failure_threshold:
+                self._state = CircuitState.OPEN
+    
+    def record_success(self) -> None:
+        """记录成功 (线程安全)"""
+        with self._lock:
+            if self._state == CircuitState.HALF_OPEN:
+                self._half_open_successes += 1
+                if self._half_open_successes >= self.config.half_open_attempts:
+                    self._state = CircuitState.CLOSED
+                    self._failure_count = 0
+                    self._half_open_successes = 0
+            elif self._state == CircuitState.CLOSED:
+                self._failure_count = max(0, self._failure_count - 1)
+    
+    def can_execute(self) -> bool:
+        """是否可以执行 (线程安全)"""
+        with self._lock:
+            if self._state == CircuitState.CLOSED:
+                return True
+            if self._state == CircuitState.OPEN:
+                if self._last_failure_time:
+                    elapsed = time.time() - self._last_failure_time
+                    if elapsed >= self.config.recovery_timeout_sec:
+                        self._state = CircuitState.HALF_OPEN
+                        self._half_open_successes = 0
+                        return True
+                return False
+            return True  # HALF_OPEN
+
+
+class RetryExecutor:
+    """带重试和熔断的执行器"""
+    
+    def __init__(self, retry_config: RetryConfig = None, 
+                 circuit_config: CircuitBreakerConfig = None):
+        self.retry_config = retry_config or RetryConfig()
+        self.circuit_breaker = CircuitBreaker(circuit_config)
+    
+    def classify_error(self, error: Exception) -> ErrorSeverity:
+        """错误分类"""
+        error_msg = str(error).lower()
+        error_type = type(error).__name__.lower()
+        
+        # 致命错误: 不重试
+        fatal_patterns = ['permission', 'access denied', 'not found',
+                         'invalid argument', 'authentication', 'unauthorized']
+        if any(p in error_msg or p in error_type for p in fatal_patterns):
+            return ErrorSeverity.FATAL
+        
+        # 短暂错误: 短等待重试
+        transient_patterns = ['resource', 'busy', 'locked', 'temporary',
+                             'connection pool', 'too many open']
+        if any(p in error_msg for p in transient_patterns):
+            return ErrorSeverity.TRANSIENT
+        
+        # 默认: 可恢复
+        return ErrorSeverity.RECOVERABLE
+    
+    def execute_with_retry(
+        self,
+        func: Callable[[], T],
+        on_retry: Optional[Callable[[int, Exception], None]] = None
+    ) -> RetryResult:
+        """同步执行带重试"""
+        start_time = time.time()
+        last_error: Optional[Exception] = None
+        
+        for attempt in range(1, self.retry_config.max_attempts + 1):
+            try:
+                if not self.circuit_breaker.can_execute():
+                    return RetryResult(
+                        success=False,
+                        attempts=attempt,
+                        total_duration_ms=int((time.time() - start_time) * 1000),
+                        last_error="Circuit breaker open",
+                    )
+                
+                result = func()
+                self.circuit_breaker.record_success()
+                return RetryResult(
+                    success=True,
+                    attempts=attempt,
+                    total_duration_ms=int((time.time() - start_time) * 1000),
+                    recovered=(attempt > 1),
+                )
+                
+            except Exception as e:
+                last_error = e
+                severity = self.classify_error(e)
+                
+                if severity == ErrorSeverity.FATAL:
+                    return RetryResult(
+                        success=False,
+                        attempts=attempt,
+                        total_duration_ms=int((time.time() - start_time) * 1000),
+                        last_error=str(e),
+                    )
+                
+                self.circuit_breaker.record_failure()
+                
+                if on_retry and attempt < self.retry_config.max_attempts:
+                    on_retry(attempt, e)
+                
+                if attempt < self.retry_config.max_attempts:
+                    delay = self.retry_config.get_delay(attempt)
+                    time.sleep(delay)
+        
+        return RetryResult(
+            success=False,
+            attempts=self.retry_config.max_attempts,
+            total_duration_ms=int((time.time() - start_time) * 1000),
+            last_error=str(last_error) if last_error else "Unknown error",
+        )
+    
+    async def execute_with_retry_async(
+        self,
+        coro_func: Callable[[], T],
+        on_retry: Optional[Callable[[int, Exception], None]] = None
+    ) -> RetryResult:
+        """异步执行带重试"""
+        start_time = time.time()
+        last_error: Optional[Exception] = None
+        
+        for attempt in range(1, self.retry_config.max_attempts + 1):
+            try:
+                if not self.circuit_breaker.can_execute():
+                    return RetryResult(
+                        success=False,
+                        attempts=attempt,
+                        total_duration_ms=int((time.time() - start_time) * 1000),
+                        last_error="Circuit breaker open",
+                    )
+                
+                result = await coro_func()
+                self.circuit_breaker.record_success()
+                return RetryResult(
+                    success=True,
+                    attempts=attempt,
+                    total_duration_ms=int((time.time() - start_time) * 1000),
+                    recovered=(attempt > 1),
+                )
+                
+            except Exception as e:
+                last_error = e
+                severity = self.classify_error(e)
+                
+                if severity == ErrorSeverity.FATAL:
+                    return RetryResult(
+                        success=False,
+                        attempts=attempt,
+                        total_duration_ms=int((time.time() - start_time) * 1000),
+                        last_error=str(e),
+                    )
+                
+                self.circuit_breaker.record_failure()
+                
+                if on_retry and attempt < self.retry_config.max_attempts:
+                    on_retry(attempt, e)
+                
+                if attempt < self.retry_config.max_attempts:
+                    delay = self.retry_config.get_delay(attempt)
+                    await asyncio.sleep(delay)
+        
+        return RetryResult(
+            success=False,
+            attempts=self.retry_config.max_attempts,
+            total_duration_ms=int((time.time() - start_time) * 1000),
+            last_error=str(last_error) if last_error else "Unknown error",
+        )
+
+
+def with_retry(config: RetryConfig = None, circuit_config: CircuitBreakerConfig = None):
+    """装饰器: 带重试的函数执行"""
+    def decorator(func: Callable) -> Callable:
+        executor = RetryExecutor(
+            retry_config=config or RetryConfig(),
+            circuit_config=circuit_config,
+        )
+        
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            def _call():
+                return func(*args, **kwargs)
+            return executor.execute_with_retry(_call)
+        
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            async def _call():
+                return func(*args, **kwargs)
+            return await executor.execute_with_retry_async(_call)
+        
+        import asyncio
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        return wrapper
+    
+    return decorator
+
+
+# 导出
+__all__ = [
+    'RetryExecutor', 'RetryResult', 'RetryConfig',
+    'CircuitBreaker', 'CircuitBreakerConfig', 'CircuitState',
+    'ErrorSeverity', 'with_retry',
+]

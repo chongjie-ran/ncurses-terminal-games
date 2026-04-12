@@ -28,6 +28,23 @@ class TokenUsage:
     def total_tokens(self) -> int:
         return (self.input_tokens + self.output_tokens + 
                 self.cache_creation_input_tokens + self.cache_read_input_tokens)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "cache_creation_input_tokens": self.cache_creation_input_tokens,
+            "cache_read_input_tokens": self.cache_read_input_tokens,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TokenUsage":
+        return cls(
+            input_tokens=data.get("input_tokens", 0),
+            output_tokens=data.get("output_tokens", 0),
+            cache_creation_input_tokens=data.get("cache_creation_input_tokens", 0),
+            cache_read_input_tokens=data.get("cache_read_input_tokens", 0),
+        )
 
 
 @dataclass
@@ -65,7 +82,9 @@ class ContentBlock:
         if self.tool_use_id is not None: result["tool_use_id"] = self.tool_use_id
         if self.tool_name is not None: result["tool_name"] = self.tool_name
         if self.output is not None: result["output"] = self.output
-        if self.type == "tool_result": result["is_error"] = self.is_error
+        # Fix: 始终输出 is_error 字段，保持序列化一致性
+        if self.type == "tool_result" or self.is_error:
+            result["is_error"] = self.is_error
         return result
     
     @classmethod
@@ -112,10 +131,7 @@ class ConversationMessage:
             "blocks": [b.to_dict() for b in self.blocks]
         }
         if self.usage:
-            result["usage"] = {
-                "input_tokens": self.usage.input_tokens,
-                "output_tokens": self.usage.output_tokens,
-            }
+            result["usage"] = self.usage.to_dict()
         return result
     
     @classmethod
@@ -124,11 +140,7 @@ class ConversationMessage:
         blocks = [ContentBlock.from_dict(b) for b in data.get("blocks", [])]
         usage = None
         if "usage" in data:
-            u = data["usage"]
-            usage = TokenUsage(
-                input_tokens=u.get("input_tokens", 0),
-                output_tokens=u.get("output_tokens", 0),
-            )
+            usage = TokenUsage.from_dict(data["usage"])
         return cls(role=role, blocks=blocks, usage=usage)
 
 
@@ -176,26 +188,34 @@ class Session:
             return cls.from_json(f.read())
     
     def get_messages_for_api(self) -> List[Dict[str, Any]]:
+        """转换为 API 格式。TOOL 消息中的每个 tool_result 产生一条独立记录。"""
         result = []
         for msg in self.messages:
             msg_dict = {"role": msg.role.value}
             if msg.role == MessageRole.USER:
                 texts = [b.text for b in msg.blocks if b.text]
                 msg_dict["content"] = " ".join(texts) if texts else ""
+                result.append(msg_dict)
             elif msg.role == MessageRole.ASSISTANT:
                 contents = []
                 for b in msg.blocks:
                     if b.type == "text" and b.text:
                         contents.append({"type": "text", "text": b.text})
                     elif b.type == "tool_use":
+                        try:
+                            inp = json.loads(b.input) if b.input else {}
+                        except (json.JSONDecodeError, TypeError):
+                            inp = b.input if b.input else {}
                         contents.append({
                             "type": "tool_use",
                             "id": b.id,
                             "name": b.name,
-                            "input": json.loads(b.input) if b.input else {}
+                            "input": inp
                         })
                 msg_dict["content"] = contents
+                result.append(msg_dict)
             elif msg.role == MessageRole.TOOL:
+                # 每个 tool_result block 产生一条独立的 tool 消息
                 for b in msg.blocks:
                     if b.type == "tool_result":
                         result.append({
@@ -203,7 +223,8 @@ class Session:
                             "tool_use_id": b.tool_use_id,
                             "content": b.output or ""
                         })
-                        continue
-                continue
-            result.append(msg_dict)
+            elif msg.role == MessageRole.SYSTEM:
+                texts = [b.text for b in msg.blocks if b.text]
+                msg_dict["content"] = " ".join(texts) if texts else ""
+                result.append(msg_dict)
         return result

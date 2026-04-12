@@ -1,0 +1,319 @@
+"""
+resource_guard.py - 资源限制保护
+
+V3.3 P0 实现 (P2 Review Fix Applied)
+对应Claude Code: src/resource.rs
+核心功能：
+- 内存使用限制
+- CPU时间限制
+- 并发任务数限制
+- 磁盘空间检查
+- 打开文件数限制
+"""
+
+from __future__ import annotations
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional, Dict, List, Callable
+import time
+import threading
+import resource
+import sys
+import os
+import collections
+
+
+class ResourceType(Enum):
+    MEMORY = "memory"
+    CPU_TIME = "cpu_time"
+    DISK_SPACE = "disk_space"
+    CONCURRENT_TASKS = "concurrent_tasks"
+    FILES_OPEN = "files_open"
+
+
+@dataclass
+class ResourceLimit:
+    """资源限制配置"""
+    memory_mb: Optional[int] = None       # 最大内存(MB)
+    cpu_time_sec: Optional[int] = None   # 最大CPU时间(秒)
+    disk_space_gb: Optional[int] = None   # 最大磁盘空间(GB)
+    max_concurrent: Optional[int] = None  # 最大并发任务数
+    max_files: Optional[int] = None      # 最大打开文件数
+    
+    def is_empty(self) -> bool:
+        return all(v is None for v in [
+            self.memory_mb, self.cpu_time_sec, self.disk_space_gb,
+            self.max_concurrent, self.max_files
+        ])
+
+
+class ResourceExceeded(Exception):
+    """资源超限异常"""
+    def __init__(self, resource_type: ResourceType, current: float, limit: float):
+        self.resource_type = resource_type
+        self.current = current
+        self.limit = limit
+        super().__init__(f"{resource_type.value} exceeded: {current:.1f}/{limit:.1f}")
+
+
+@dataclass
+class ResourceSnapshot:
+    """资源使用快照"""
+    timestamp: float
+    memory_mb: float
+    cpu_time_sec: float
+    threads: int
+    open_files: int
+
+
+class ResourceMonitor:
+    """资源监控器 (P2 Fix: deque + 跨平台 _count_open_files)"""
+    
+    _instance: Optional['ResourceMonitor'] = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    # Fix: 使用 deque 替代 list，自动管理最大长度
+                    cls._instance._snapshots: collections.deque = collections.deque(maxlen=100)
+                    cls._instance._start_time = time.time()
+        return cls._instance
+    
+    def get_current_snapshot(self) -> ResourceSnapshot:
+        """获取当前资源快照"""
+        try:
+            mem_usage = resource.getrusage(resource.RUSAGE_SELF)
+            memory_mb = mem_usage.ru_maxrss / 1024  # macOS: KB -> MB
+            cpu_time = mem_usage.ru_utime + mem_usage.ru_stime
+            
+            # 线程数
+            threads = threading.active_count()
+            
+            # 打开文件数
+            open_files = self._count_open_files()
+            
+            return ResourceSnapshot(
+                timestamp=time.time(),
+                memory_mb=memory_mb,
+                cpu_time_sec=cpu_time,
+                threads=threads,
+                open_files=open_files,
+            )
+        except Exception:
+            return ResourceSnapshot(
+                timestamp=time.time(),
+                memory_mb=0,
+                cpu_time_sec=0,
+                threads=1,
+                open_files=0,
+            )
+    
+    def _count_open_files(self) -> int:
+        """计算打开的文件描述符数 (P2 Fix: 跨平台实现)
+        
+        Linux: 优先使用 /proc/{pid}/fd (高效, POSIX)
+        macOS: 使用 lsof 作为 fallback
+        其他: 返回0，不阻塞执行
+        """
+        pid = os.getpid()
+        
+        # Linux: 读取 /proc/{pid}/fd 目录
+        if os.path.exists("/proc") and os.path.isdir("/proc"):
+            try:
+                fd_dir = f"/proc/{pid}/fd"
+                return len(os.listdir(fd_dir))
+            except (PermissionError, FileNotFoundError, OSError):
+                pass
+        
+        # macOS / BSD: 使用 lsof
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["lsof", "-p", str(pid)],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            # lsof 输出包含标题行，需要减去
+            lines = result.stdout.strip().split("\n") if result.stdout.strip() else []
+            return max(0, len(lines) - 1)
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            pass
+        
+        return 0
+    
+    def record_snapshot(self) -> ResourceSnapshot:
+        """记录快照 (deque 自动淘汰旧记录)"""
+        snap = self.get_current_snapshot()
+        self._snapshots.append(snap)
+        # deque maxlen 自动管理，不需要手动截断
+        return snap
+    
+    def get_stats(self) -> Dict[str, float]:
+        """获取统计信息"""
+        if not self._snapshots:
+            return {}
+        mem_values = [s.memory_mb for s in self._snapshots]
+        cpu_values = [s.cpu_time_sec for s in self._snapshots]
+        return {
+            'memory_peak_mb': max(mem_values),
+            'memory_avg_mb': sum(mem_values) / len(mem_values),
+            'cpu_time_total_sec': cpu_values[-1] - cpu_values[0],
+            'threads_peak': max(s.threads for s in self._snapshots),
+            'open_files_peak': max(s.open_files for s in self._snapshots),
+        }
+
+
+class ResourceGuard:
+    """资源守卫 - 执行前检查+执行中监控"""
+    
+    def __init__(self, limits: ResourceLimit):
+        self.limits = limits
+        self.monitor = ResourceMonitor()
+        self._task_semaphore: Optional[threading.Semaphore] = None
+        self._active_tasks = 0
+        self._active_lock = threading.Lock()
+        
+        if limits.max_concurrent:
+            self._task_semaphore = threading.Semaphore(limits.max_concurrent)
+    
+    def check_limits(self, snapshot: ResourceSnapshot) -> None:
+        """检查资源限制"""
+        if self.limits.memory_mb and snapshot.memory_mb > self.limits.memory_mb:
+            raise ResourceExceeded(
+                ResourceType.MEMORY,
+                snapshot.memory_mb,
+                self.limits.memory_mb
+            )
+        
+        if self.limits.cpu_time_sec and snapshot.cpu_time_sec > self.limits.cpu_time_sec:
+            raise ResourceExceeded(
+                ResourceType.CPU_TIME,
+                snapshot.cpu_time_sec,
+                self.limits.cpu_time_sec
+            )
+        
+        if self.limits.max_files and snapshot.open_files > self.limits.max_files:
+            raise ResourceExceeded(
+                ResourceType.FILES_OPEN,
+                snapshot.open_files,
+                self.limits.max_files
+            )
+        
+        if self.limits.max_concurrent:
+            with self._active_lock:
+                if self._active_tasks >= self.limits.max_concurrent:
+                    raise ResourceExceeded(
+                        ResourceType.CONCURRENT_TASKS,
+                        self._active_tasks,
+                        self.limits.max_concurrent
+                    )
+    
+    def check_disk_space(self, path: str = ".") -> None:
+        """检查磁盘空间 (P2 Fix: shutil.disk_usage 跨平台兼容)"""
+        if not self.limits.disk_space_gb:
+            return
+        try:
+            # Fix: 使用 shutil.disk_usage 同时支持 Linux/macOS/Windows
+            import shutil
+            usage = shutil.disk_usage(path)
+            free_gb = usage.free / (1024**3)
+            if free_gb < self.limits.disk_space_gb:
+                raise ResourceExceeded(
+                    ResourceType.DISK_SPACE,
+                    free_gb,
+                    self.limits.disk_space_gb
+                )
+        except (OSError, PermissionError):
+            # 路径不可访问时跳过检查
+            pass
+    
+    def enter_task(self) -> None:
+        """进入任务(获取信号量)"""
+        if self._task_semaphore:
+            self._task_semaphore.acquire()
+        with self._active_lock:
+            self._active_tasks += 1
+    
+    def exit_task(self) -> None:
+        """退出任务(释放信号量)"""
+        with self._active_lock:
+            self._active_tasks -= 1
+            active = self._active_tasks
+        if self._task_semaphore:
+            self._task_semaphore.release()
+    
+    def run_with_protection(self, func: Callable, *args, **kwargs):
+        """带资源保护执行"""
+        self.check_disk_space()
+        snapshot = self.monitor.get_current_snapshot()
+        self.check_limits(snapshot)
+        
+        self.enter_task()
+        try:
+            self.monitor.record_snapshot()
+            return func(*args, **kwargs)
+        finally:
+            self.exit_task()
+            self.monitor.record_snapshot()
+    
+    def get_guard_status(self) -> Dict:
+        """获取守卫状态"""
+        snap = self.monitor.get_current_snapshot()
+        stats = self.monitor.get_stats()
+        
+        status = {
+            'limits_active': not self.limits.is_empty(),
+            'current': {
+                'memory_mb': snap.memory_mb,
+                'cpu_time_sec': snap.cpu_time_sec,
+                'threads': snap.threads,
+                'open_files': snap.open_files,
+            },
+            'stats': stats,
+        }
+        
+        if self.limits.memory_mb:
+            status.setdefault('limits', {})['memory_mb'] = self.limits.memory_mb
+        if self.limits.cpu_time_sec:
+            status.setdefault('limits', {})['cpu_time_sec'] = self.limits.cpu_time_sec
+        
+        return status
+
+
+# 全局默认守卫
+_default_guard: Optional[ResourceGuard] = None
+
+
+def get_default_guard() -> ResourceGuard:
+    """获取默认资源守卫"""
+    global _default_guard
+    if _default_guard is None:
+        _default_guard = ResourceGuard(ResourceLimit(
+            memory_mb=4096,    # 4GB
+            cpu_time_sec=300,  # 5分钟
+            max_concurrent=4,
+        ))
+    return _default_guard
+
+
+# 便捷装饰器
+def protected(limits: ResourceLimit = None):
+    """资源保护装饰器"""
+    guard = ResourceGuard(limits or ResourceLimit())
+    
+    def decorator(func: Callable) -> Callable:
+        def wrapper(*args, **kwargs):
+            return guard.run_with_protection(func, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+__all__ = [
+    'ResourceType', 'ResourceLimit', 'ResourceExceeded',
+    'ResourceSnapshot', 'ResourceMonitor', 'ResourceGuard',
+    'get_default_guard', 'protected',
+]
