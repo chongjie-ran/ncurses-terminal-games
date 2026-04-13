@@ -1,5 +1,5 @@
 """Pydantic Schemas"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -47,8 +47,7 @@ class ProjectResponse(ProjectBase):
     status: str = "idle"
     created_at: datetime
     updated_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PullLogResponse(BaseModel):
     id: int
@@ -59,8 +58,7 @@ class PullLogResponse(BaseModel):
     commit_after: Optional[str]
     diff_count: int
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PullResult(BaseModel):
     success: bool

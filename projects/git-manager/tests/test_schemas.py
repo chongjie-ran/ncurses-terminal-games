@@ -75,7 +75,7 @@ class TestProjectCreate:
         """auth_password不应出现在响应中（exclude=True）"""
         p = ProjectCreate(**sample_project_data)
         # 检查exclude配置
-        cls_fields = p.model_fields
+        cls_fields = type(p).model_fields
         assert cls_fields["auth_password"].exclude == True
 
 
