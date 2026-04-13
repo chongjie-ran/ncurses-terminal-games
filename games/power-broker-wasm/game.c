@@ -21,7 +21,6 @@ static struct {
     int init_assets;
     int total_assets;
     int win_streak;
-    int day_profit;
     int volume;
     int boss_today;
 } g;
@@ -57,9 +56,9 @@ static const char* ACH_NAME[] = {
     "孤注一掷","Boss克星","交易王","硬核玩家"
 };
 static const char* ACH_DESC[] = {
-    "完成首次交易","单次交易≥50单位","累计盈利≥$10000","累计盈利≥$100000",
-    "资产缩水50%后恢复","连续3天赚钱","连续5天赚钱","持有≥1000单位算力",
-    "全仓买入","成功应对Boss级事件","总交易量≥1000单位","通关Hard难度"
+    "完成首次交易","单次交易>=50单位","累计盈利>=$10000","累计盈利>=$100000",
+    "资产缩水50%后恢复","连续3天赚钱","连续5天赚钱","持有>=1000单位算力",
+    "全仓买入","成功应对Boss级事件","总交易量>=1000单位","通关Hard难度"
 };
 static int ach_unlocked[N_ACHS];
 
@@ -84,32 +83,21 @@ static int price_clamp(int p) {
     return p;
 }
 
-static int price_fluctuate(void) {
-    int vol = VOLATILITY[g.difficulty];
-    return (rng_next() % (vol * 2 + 1)) - vol;
-}
-
 static int assets(void) {
     return g.cash + g.power * g.price;
-}
-
-static int daily_profit(void) {
-    return assets() - g.init_assets;
 }
 
 static void update_event(void) {
     cur_event_idx = rng_next() % N_EVENTS;
     cur_event_impact = EVT_IMPACT[cur_event_idx];
-    
-    // Boss days: 10, 20
     g.boss_today = (g.day == 10 || g.day == 20) ? 1 : 0;
     
-    int delta = price_fluctuate();
+    int delta = (rng_next() % (VOLATILITY[g.difficulty] * 2 + 1)) - VOLATILITY[g.difficulty];
+    int pct = EVT_IMPACT[cur_event_idx];
+    delta += (g.price * pct) / 100;
+    
     if (g.boss_today) {
-        delta += (cur_event_impact > 0) ? 60 : 50;
-        delta = (cur_event_impact > 0) ? (delta > 0 ? 60 : -40) : (delta < 0 ? -40 : 10);
-    } else {
-        delta += (g.price * cur_event_impact) / 100;
+        delta = (pct > 0) ? 60 : -50;
     }
     
     g.price = price_clamp(g.price + delta);
@@ -117,55 +105,28 @@ static void update_event(void) {
 
 static void check_achieves(void) {
     int a = assets();
-    int p = daily_profit();
+    int p = a - g.init_assets;
     g.profit = p;
     
-    // First trade
-    if (!first_done && g.volume > 0) {
-        first_done = 1;
-        ach_unlocked[0] = 1;
-    }
-    // Profit milestones
+    if (!first_done && g.volume > 0) { first_done = 1; ach_unlocked[0] = 1; }
     if (p >= 10000) ach_unlocked[2] = 1;
     if (p >= 100000) ach_unlocked[3] = 1;
-    // Streak
     if (g.win_streak >= 3) ach_unlocked[5] = 1;
     if (g.win_streak >= 5) ach_unlocked[6] = 1;
-    // Power
     if (g.power >= 1000) ach_unlocked[7] = 1;
-    // Boss
     if (g.boss_today) ach_unlocked[9] = 1;
-    // Volume
     if (g.volume >= 1000) ach_unlocked[10] = 1;
-    // Hard
     if (g.difficulty == DIFF_HARD) ach_unlocked[11] = 1;
-    // Loss recovery
     if (!loss_flag && a <= g.init_assets / 2) loss_flag = 1;
-    if (loss_flag && a >= g.init_assets) {
-        loss_flag = 0;
-        ach_unlocked[4] = 1;
-    }
-}
-
-static int count_achs(void) {
-    int n = 0;
-    for (int i = 0; i < N_ACHS; i++) if (ach_unlocked[i]) n++;
-    return n;
+    if (loss_flag && a >= g.init_assets) { loss_flag = 0; ach_unlocked[4] = 1; }
 }
 
 // === WASM Exports ===
 void wasm_init(void) {
     g.state = STATE_MENU;
-    g.day = 1;
-    g.cash = 100000;
-    g.power = 100;
-    g.price = 100;
-    g.profit = 0;
-    g.init_assets = 110000;
-    g.total_assets = 110000;
-    g.win_streak = 0;
-    g.volume = 0;
-    g.boss_today = 0;
+    g.day = 1; g.cash = 100000; g.power = 100; g.price = 100;
+    g.profit = 0; g.init_assets = 110000; g.total_assets = 110000;
+    g.win_streak = 0; g.volume = 0; g.boss_today = 0;
     rng_seed = (unsigned int)time(NULL);
     for (int i = 0; i < N_ACHS; i++) ach_unlocked[i] = 0;
     first_done = allin_done = loss_flag = 0;
@@ -177,17 +138,13 @@ void wasm_new_game(int difficulty) {
     g.cash = INIT_CASH[difficulty];
     g.power = INIT_POWER[difficulty];
     g.price = 100;
-    g.day = 1;
-    g.profit = 0;
+    g.day = 1; g.profit = 0;
     g.init_assets = g.cash + g.power * g.price;
     g.total_assets = g.init_assets;
-    g.win_streak = 0;
-    g.volume = 0;
-    g.boss_today = 0;
+    g.win_streak = 0; g.volume = 0; g.boss_today = 0;
     for (int i = 0; i < N_ACHS; i++) ach_unlocked[i] = 0;
     first_done = allin_done = loss_flag = 0;
     rng_seed = (unsigned int)(time(NULL) + difficulty * 17);
-    
     update_event();
     g.state = STATE_TRADING;
 }
@@ -198,69 +155,38 @@ int wasm_get_cash(void) { return g.cash; }
 int wasm_get_power(void) { return g.power; }
 int wasm_get_price(void) { return g.price; }
 int wasm_get_profit(void) { return g.profit; }
-int wasm_get_init_assets(void) { return g.init_assets; }
-int wasm_get_total_assets(void) { return assets(); }
+int wasm_get_total_assets(void) { return g.cash + g.power * g.price; }
 int wasm_get_win_streak(void) { return g.win_streak; }
 int wasm_is_boss_day(void) { return g.boss_today; }
-
-const char* wasm_get_event_name(void) {
-    return EVT_NAME[cur_event_idx];
-}
-const char* wasm_get_event_desc(void) {
-    return EVT_DESC[cur_event_idx];
-}
-int wasm_get_event_impact(void) {
-    return cur_event_impact;
-}
-
 int wasm_get_ach_count(void) { return N_ACHS; }
-int wasm_get_ach_unlocked(int idx) {
-    if (idx < 0 || idx >= N_ACHS) return 0;
-    return ach_unlocked[idx];
-}
-const char* wasm_get_ach_name(int idx) {
-    if (idx < 0 || idx >= N_ACHS) return "";
-    return ACH_NAME[idx];
-}
-const char* wasm_get_ach_desc(int idx) {
-    if (idx < 0 || idx >= N_ACHS) return "";
-    return ACH_DESC[idx];
-}
+int wasm_get_ach_unlocked(int idx) { return (idx >= 0 && idx < N_ACHS) ? ach_unlocked[idx] : 0; }
+const char* wasm_get_event_name(void) { return EVT_NAME[cur_event_idx]; }
+const char* wasm_get_event_desc(void) { return EVT_DESC[cur_event_idx]; }
+int wasm_get_event_impact(void) { return cur_event_impact; }
 
 void wasm_player_action(int action_type, int amount) {
-    if (g.state != STATE_TRADING) return;
-    // action_type: 1=buy, 2=sell
+    if (g.state != STATE_TRADING || amount <= 0) return;
     int cost = amount * g.price;
-    
-    if (action_type == 1) { // Buy
-        if (cost <= g.cash && amount > 0) {
-            g.cash -= cost;
-            g.power += amount;
-            g.volume += amount;
+    if (action_type == 1) { // buy
+        if (cost <= g.cash) {
+            g.cash -= cost; g.power += amount; g.volume += amount;
             if (!allin_done && g.cash < g.price) { allin_done = 1; ach_unlocked[8] = 1; }
             if (amount >= 50) ach_unlocked[1] = 1;
         }
-    } else if (action_type == 2) { // Sell
-        if (amount <= g.power && amount > 0) {
-            g.cash += cost;
-            g.power -= amount;
-            g.volume += amount;
+    } else if (action_type == 2) { // sell
+        if (amount <= g.power) {
+            g.cash += cost; g.power -= amount; g.volume += amount;
         }
     }
 }
 
 void wasm_end_day(void) {
     if (g.state != STATE_TRADING) return;
-    
     int a = assets();
     g.profit = a - g.init_assets;
-    if (g.profit > 0) g.win_streak++; else g.win_streak = 0;
-    
+    g.win_streak = (g.profit > 0) ? g.win_streak + 1 : 0;
     check_achieves();
-    
     g.day++;
-    g.total_assets = assets();
-    
     if (g.day > DAY_LIMITS[g.difficulty]) {
         g.state = STATE_GAMEOVER;
     } else {
@@ -268,6 +194,4 @@ void wasm_end_day(void) {
     }
 }
 
-void wasm_return_to_menu(void) {
-    g.state = STATE_MENU;
-}
+void wasm_return_to_menu(void) { g.state = STATE_MENU; }

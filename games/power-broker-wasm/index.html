@@ -60,7 +60,7 @@ async function loadWasm() {
   const buf = await resp.arrayBuffer();
   const { instance } = await WebAssembly.instantiate(buf, {});
   wasm = instance.exports;
-  wasm.init();
+  wasm._wasm_init();
   render();
 }
 
@@ -74,14 +74,14 @@ function btn(label, onClick, cls = '') {
 }
 
 function statGrid() {
-  const cash = G(w => w.get_cash());
-  const power = G(w => w.get_power());
-  const price = G(w => w.get_price());
-  const assets = G(w => w.get_total_assets());
-  const profit = G(w => w.get_profit());
-  const day = G(w => w.get_day());
-  const streak = G(w => w.get_win_streak());
-  const achN = G(w => { let n=0; for(let i=0;i<12;i++) if(w.ach_unlocked(i)) n++; return n; });
+  const cash = G(w => w._wasm_get_cash());
+  const power = G(w => w._wasm_get_power());
+  const price = G(w => w._wasm_get_price());
+  const assets = G(w => w._wasm_get_total_assets());
+  const profit = G(w => w._wasm_get_profit());
+  const day = G(w => w._wasm_get_day());
+  const streak = G(w => w._wasm_get_win_streak());
+  const achN = G(w => { let n=0; for(let i=0;i<12;i++) if(w._wasm_get_ach_unlocked(i)) n++; return n; });
   const profitClass = profit >= 0 ? 'green' : 'red';
   return `
   <div class="stat-grid">
@@ -97,7 +97,7 @@ function statGrid() {
 function eventBox() {
   const name = G(w => {
     const buf = w.memory.buffer;
-    const ptr = w.get_event_name();
+    const ptr = w._wasm_get_event_name();
     const mem = new Uint8Array(buf, ptr, 32);
     let end = mem.indexOf(0);
     if (end < 0) end = 32;
@@ -105,14 +105,14 @@ function eventBox() {
   });
   const desc = G(w => {
     const buf = w.memory.buffer;
-    const ptr = w.get_event_desc();
+    const ptr = w._wasm_get_event_desc();
     const mem = new Uint8Array(buf, ptr, 64);
     let end = mem.indexOf(0);
     if (end < 0) end = 64;
     return new TextDecoder().decode(mem.slice(0, end));
   });
-  const impact = G(w => w.get_event_impact());
-  const isBoss = G(w => w.get_boss());
+  const impact = G(w => w._wasm_get_event_impact());
+  const isBoss = G(w => w._wasm_is_boss_day());
   const cls = impact >= 0 ? 'pos' : 'neg';
   return `
   <div class="event-box">
@@ -125,7 +125,7 @@ function eventBox() {
 
 function render() {
   if (!wasm) return;
-  const state = G(w => w.get_state());
+  const state = G(w => w._wasm_get_state());
   const app = $('#app');
   
   if (state === STATE.MENU) {
@@ -135,8 +135,8 @@ function render() {
       <div class="subtitle">Power Broker v1.4 WASM</div>
       <p style="text-align:center;font-size:12px;color:#666;margin-bottom:16px">成为AI算力市场的幕后操盘手<br>通过买卖算力赚取利润</p>
       <div class="btn-row" style="flex-direction:column">
-        ${btn('🎮 新游戏', () => { G(w => w.new_game(1)); render(); })}
-        ${btn('📊 成就列表', () => { G(w => w.back_to_menu()); render(); }, 'danger')}
+        ${btn('🎮 新游戏', () => { G(w => w.(_wasm_new_game(1)); render(); })}
+        ${btn('📊 成就列表', () => { G(w => w._wasm_return_to_menu()); render(); }, 'danger')}
       </div>
     </div>`;
   } else if (state === STATE.DIFFSEL) {
@@ -150,39 +150,39 @@ function render() {
       <div class="title">选择难度</div>
       <div class="difficulty" style="margin-top:12px">
         ${diffs.map(d => `
-        <button class="diff-btn" onclick="G(w => w.new_game(${d.d})); render();">
+        <button class="diff-btn" onclick="G(w => w.(_wasm_new_game(${d.d})); render();">
           <div class="diff-name">${d.name}</div>
           <div class="diff-desc">${d.desc}</div>
         </button>`).join('')}
       </div>
-      <div style="margin-top:12px">${btn('返回', () => { G(w => w.back_to_menu()); render(); })}</div>
+      <div style="margin-top:12px">${btn('返回', () => { G(w => w._wasm_return_to_menu()); render(); })}</div>
     </div>`;
   } else if (state === STATE.TRADING) {
     app.innerHTML = `
     <div class="panel">
       <div class="title">⚡ 算力经纪人</div>
-      <div style="text-align:center;font-size:11px;color:#444;margin-bottom:12px">Day ${G(w => w.get_day())} / 30</div>
+      <div style="text-align:center;font-size:11px;color:#444;margin-bottom:12px">Day ${G(w => w._wasm_get_day())} / 30</div>
       ${statGrid()}
       ${eventBox()}
       <div class="btn-row">
-        ${btn('📈 买入10', () => { G(w => w.player_action(1,10)); render(); })}
-        ${btn('📈 买入50', () => { G(w => w.player_action(1,50)); render(); })}
+        ${btn('📈 买入10', () => { G(w => w._wasm_player_action(1,10)); render(); })}
+        ${btn('📈 买入50', () => { G(w => w._wasm_player_action(1,50)); render(); })}
       </div>
       <div class="btn-row">
-        ${btn('📉 卖出10', () => { G(w => w.player_action(2,10)); render(); })}
-        ${btn('📉 卖出50', () => { G(w => w.player_action(2,50)); render(); })}
+        ${btn('📉 卖出10', () => { G(w => w._wasm_player_action(2,10)); render(); })}
+        ${btn('📉 卖出50', () => { G(w => w._wasm_player_action(2,50)); render(); })}
       </div>
       <div class="btn-row">
-        ${btn('⏭️ 跳过回合', () => { G(w => w.end_day()); render(); }, 'primary')}
+        ${btn('⏭️ 跳过回合', () => { G(w => w._wasm_end_day()); render(); }, 'primary')}
       </div>
       <div class="btn-row" style="margin-top:4px">
         ${btn('🏆 成就', () => renderAchievements())}
-        ${btn('🏠 主页', () => { G(w => w.back_to_menu()); render(); }, 'danger')}
+        ${btn('🏠 主页', () => { G(w => w._wasm_return_to_menu()); render(); }, 'danger')}
       </div>
     </div>`;
   } else if (state === STATE.GAMEOVER) {
-    const assets = G(w => w.get_total_assets());
-    const profit = G(w => w.get_profit());
+    const assets = G(w => w._wasm_get_total_assets());
+    const profit = G(w => w._wasm_get_profit());
     const stars = profit >= 100000 ? 5 : profit >= 50000 ? 4 : profit >= 10000 ? 3 : profit >= 0 ? 2 : 1;
     app.innerHTML = `
     <div class="panel gameover">
@@ -193,30 +193,30 @@ function render() {
       </div>
       <div class="stars">${'⭐'.repeat(stars)}${'☆'.repeat(5-stars)}</div>
       <div class="btn-row" style="flex-direction:column">
-        ${btn('🔄 再来一局', () => { G(w => w.new_game(1)); render(); }, 'primary')}
-        ${btn('🏠 返回主页', () => { G(w => w.back_to_menu()); render(); })}
+        ${btn('🔄 再来一局', () => { G(w => w.(_wasm_new_game(1)); render(); }, 'primary')}
+        ${btn('🏠 返回主页', () => { G(w => w._wasm_return_to_menu()); render(); })}
       </div>
     </div>`;
   }
 }
 
 function renderAchievements() {
-  const achCount = G(w => w.get_ach_count());
+  const achCount = G(w => w._wasm_get_ach_count());
   let items = '';
   for (let i = 0; i < achCount; i++) {
-    const unlocked = G(w => w.ach_unlocked(i));
+    const unlocked = G(w => w._wasm_get_ach_unlocked(i));
     const name = G(w => {
       const buf = w.memory.buffer;
       const ptr = w.ach_unlocked ? 0 : 0;
       return '';
     });
-    const n = G(w => { const buf = w.memory.buffer; const p = w.get_ach_name(i); const m = new Uint8Array(buf, p, 32); let e = m.indexOf(0); return new TextDecoder().decode(m.slice(0, e < 0 ? 32 : e)); });
-    const d = G(w => { const buf = w.memory.buffer; const p = w.get_ach_desc(i); const m = new Uint8Array(buf, p, 64); let e = m.indexOf(0); return new TextDecoder().decode(m.slice(0, e < 0 ? 64 : e)); });
+    const n = unlocked ? `成就${i+1}` : `???`;
+    const d = unlocked ? `已解锁` : `未解锁`;
     const cls = unlocked ? '' : 'locked';
     const marker = unlocked ? '🏆' : '🔒';
     items += `<div class="ach-item ${cls}"><span class="ach-marker">${marker}</span><div><div class="ach-name">${n || `成就${i+1}`}</div><div class="ach-desc">${d || ''}</div></div></div>`;
   }
-  const achN = G(w => { let n=0; for(let i=0;i<12;i++) if(w.ach_unlocked(i)) n++; return n; });
+  const achN = G(w => { let n=0; for(let i=0;i<12;i++) if(w._wasm_get_ach_unlocked(i)) n++; return n; });
   $('#app').innerHTML = `
   <div class="panel">
     <div class="title">🏆 成就列表</div>
@@ -230,3 +230,37 @@ loadWasm().catch(console.error);
 </script>
 </body>
 </html>
+<!-- Save/Load helper functions - added to end of index.html before </script> -->
+<script>
+// Save game to localStorage
+function saveGame() {
+  if (!wasm) return;
+  const w = wasm;
+  const saveData = {
+    day: w._wasm_get_day(),
+    difficulty: 1,
+    cash: w._wasm_get_cash(),
+    power: w._wasm_get_power(),
+    price: w._wasm_get_price(),
+    profit: w._wasm_get_profit(),
+    volume: 0,
+    winStreak: w._wasm_get_win_streak(),
+    bossToday: w._wasm_is_boss_day(),
+    achievements: []
+  };
+  for (let i = 0; i < 12; i++) {
+    saveData.achievements.push(w._wasm_get_ach_unlocked(i) ? 1 : 0);
+  }
+  localStorage.setItem('powerbroker_save', JSON.stringify(saveData));
+  alert('存档成功！');
+}
+
+// Load game from localStorage
+function loadGame() {
+  if (!wasm) return;
+  const saveStr = localStorage.getItem('powerbroker_save');
+  if (!saveStr) { alert('无存档'); return; }
+  // For now, show a message that load is available
+  alert('读档功能开发中，请使用新游戏继续');
+}
+</script>

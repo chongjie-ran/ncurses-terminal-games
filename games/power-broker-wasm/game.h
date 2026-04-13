@@ -46,3 +46,8 @@ void wasm_end_day(void);
 void wasm_return_to_menu(void);
 
 #endif
+
+// === Save/Load ===
+int wasm_save_size(void);
+void wasm_write_save(char* buf, int max_len);
+int wasm_read_save(const char* buf, int len);
