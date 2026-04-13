@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breakout - WASM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+  }
+  canvas {
+    border: 2px solid #4a9eff;
+    border-radius: 4px;
+    display: block;
+  }
+  #hud {
+    color: #4a9eff;
+    font-size: 18px;
+    margin-bottom: 12px;
+    letter-spacing: 2px;
+    text-align: center;
+  }
+  #hint {
+    color: #666;
+    font-size: 13px;
+    margin-top: 10px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="hud">SCORE: <span id="score">0</span>  LIVES: <span id="lives">3</span>  LEVEL: <span id="level">1</span></div>
+<canvas id="c" width="800" height="600"></canvas>
+<div id="hint">← → or A/D: Move Paddle  |  SPACE: Launch Ball  |  P: Pause  |  R: Restart</div>
+
+<script>
+var Module = {
+  onRuntimeInitialized: function() {
+    Module.ccall('init_game', null, [], []);
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+  }
+};
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// State names
+const STATE = { MENU:0, PLAYING:1, WIN:2, GAMEOVER:3, NEXT_LEVEL:4, PAUSED:5 };
+const STATE_NAMES = ['MENU','PLAYING','WIN','GAMEOVER','NEXT LEVEL','PAUSED'];
+
+// Brick colors by row (top to bottom)
+const BRICK_COLORS = ['#ff4466','#ff8844','#ffcc22','#44ff88','#44aaff'];
+
+let lastTime = 0;
+let paused = false;
+let keys = {};
+
+// Input handling
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+
+  if (e.key === ' ' || e.key === 'Enter') {
+    const lr = Module._get_launch_ready();
+    if (lr) Module.ccall('launch_ball', null, [], []);
+  }
+  if (e.key === 'p' || e.key === 'P') {
+    paused = !paused;
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    Module.ccall('reset_game', null, [], []);
+    paused = false;
+  }
+});
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// Stars background
+const stars = [];
+for (let i = 0; i < 80; i++) {
+  stars.push({ x: Math.random()*800, y: Math.random()*600, r: Math.random()*1.5+0.5, a: Math.random() });
+}
+
+function drawBackground() {
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, 800, 600);
+  stars.forEach(s => {
+    ctx.globalAlpha = s.a * 0.6;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  document.getElementById('score').textContent = Module._get_score();
+  document.getElementById('lives').textContent = Module._get_lives();
+  document.getElementById('level').textContent = Module._get_level();
+}
+
+function drawPaddle() {
+  const px = Module._get_paddle_x();
+  const py = Module._get_paddle_y();
+  const pw = Module._get_paddle_w();
+  const ph = Module._get_paddle_h();
+
+  ctx.fillStyle = '#4a9eff';
+  ctx.beginPath();
+  ctx.roundRect(px, py, pw, ph, 6);
+  ctx.fill();
+
+  // highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath();
+  ctx.roundRect(px+4, py+2, pw-8, ph/3, 3);
+  ctx.fill();
+}
+
+function drawBall() {
+  const bx = Module._get_ball_x();
+  const by = Module._get_ball_y();
+  const br = Module._get_ball_r();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = '#4a9eff';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(bx, by, br, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function drawBricks() {
+  const rows = Module._get_brick_rows();
+  const cols = Module._get_brick_cols();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!Module._get_brick_alive(r, c)) continue;
+      const bx = Module._get_brick_x(r, c);
+      const by = Module._get_brick_y(r, c);
+      const bw = Module._get_brick_w();
+      const bh = Module._get_brick_h();
+      const colorIdx = Module._get_brick_color_idx(r, c);
+
+      ctx.fillStyle = BRICK_COLORS[colorIdx] || '#fff';
+      ctx.shadowColor = BRICK_COLORS[colorIdx] || '#fff';
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 4);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // inner highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.beginPath();
+      ctx.roundRect(bx+3, by+3, bw-6, bh/3, 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawOverlay(title, sub) {
+  ctx.fillStyle = 'rgba(10,10,26,0.85)';
+  ctx.fillRect(0, 0, 800, 600);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 48px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, 400, 260);
+  ctx.font = '22px Courier New';
+  ctx.fillStyle = '#4a9eff';
+  ctx.fillText(sub, 400, 310);
+}
+
+function loop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  const state = Module._get_game_state();
+
+  // Input: paddle movement
+  if (state === STATE.PLAYING || state === STATE.NEXT_LEVEL) {
+    const speed = 400;
+    if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+      Module.ccall('move_paddle', null, ['number'], [-speed * dt]);
+    }
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+      Module.ccall('move_paddle', null, ['number'], [speed * dt]);
+    }
+  }
+
+  if (!paused) {
+    Module._update_game(dt);
+  }
+
+  // Draw
+  drawBackground();
+  drawBricks();
+  drawPaddle();
+  drawBall();
+  drawHUD();
+
+  // Overlay states
+  const gs = Module._get_game_state();
+  if (gs === STATE.GAMEOVER) drawOverlay('GAME OVER', 'Press R to restart');
+  if (gs === STATE.WIN) drawOverlay('YOU WIN!', 'Press R to play again');
+  if (paused && gs === STATE.PLAYING) drawOverlay('PAUSED', 'Press P to resume');
+</script>
+<script src="breakout.js"></script>
+</body>
+</html>
