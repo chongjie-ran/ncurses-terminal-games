@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型联盟大作战 | Model League</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0d1117; color: #e6e6e6; font-family: 'SF Mono', 'Courier New', monospace; min-height: 100vh; }
+#app { max-width: 520px; margin: 0 auto; padding: 12px; }
+.panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+.title { text-align: center; font-size: 18px; color: #58a6ff; font-weight: bold; margin-bottom: 4px; }
+.subtitle { text-align: center; font-size: 11px; color: #484f58; margin-bottom: 12px; }
+.stat-row { display: flex; justify-content: space-around; padding: 8px 0; border-bottom: 1px solid #21262d; font-size: 13px; }
+.stat-row:last-child { border-bottom: none; }
+.stat-label { color: #8b949e; }
+.stat-val { font-weight: bold; color: #58a6ff; }
+.stat-val.gold { color: #ffd700; }
+.stat-val.green { color: #3fb950; }
+.msg-box { background: #1c2128; border: 1px solid #388bfd; border-radius: 4px; padding: 8px 12px; margin: 8px 0; font-size: 13px; color: #58a6ff; text-align: center; }
+.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.card { background: #1c2128; border: 1px solid #30363d; border-radius: 6px; padding: 10px; cursor: pointer; transition: all 0.15s; }
+.card:hover { border-color: #58a6ff; background: #1f2937; }
+.card.owned { border-color: #3fb950; }
+.card.in-deck { border-color: #ffd700; background: #2a2500; }
+.card-name { font-size: 13px; font-weight: bold; color: #e6e6e6; }
+.card-stats { font-size: 11px; color: #8b949e; margin-top: 4px; }
+.card-stars { color: #ffd700; font-size: 11px; }
+.card-price { font-size: 11px; color: #ffd700; margin-top: 4px; }
+.card-owned { font-size: 11px; color: #3fb950; }
+.card-lv { font-size: 11px; color: #58a6ff; }
+.nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+button { padding: 12px; border: 1px solid #30363d; border-radius: 6px; background: #21262d; color: #e6e6e6; font-family: inherit; font-size: 13px; cursor: pointer; }
+button:hover { border-color: #58a6ff; color: #58a6ff; }
+button.primary { background: #1f4482; border-color: #58a6ff; color: #58a6ff; }
+button:active { transform: scale(0.97); }
+.back-btn { margin-top: 8px; }
+.faction-grid { display: flex; flex-direction: column; gap: 6px; }
+.faction-btn { text-align: left; padding: 12px; }
+.faction-name { font-weight: bold; color: #58a6ff; font-size: 14px; }
+.faction-desc { font-size: 11px; color: #8b949e; margin-top: 2px; }
+.faction-active { border-color: #3fb950 !important; background: #0d2419; }
+.section-title { font-size: 14px; color: #8b949e; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #21262d; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="model_league.js"></script>
+<script>
+// Card name lookup (mirrors game.c ALL_CARDS)
+const CARD_NAMES = ['?','Claude','GPT-5','Gemini','DeepSeek','Llama','Mistral','Qwen','Grok-2','Grok-3','Perplexity','Copilot','StableLM','CharacterAI','Inflection','MetaAI','AmazonQ','Groq','xAI-Omega'];
+const FACTION_NAMES = ['SHANXIAN(速度)','JUDNAO(智囊)','HUNDUN(混沌)'];
+const FAC_DESC = ['ATK+10%','DEF+10%','SPD+15%'];
+const FAC_BONUS = ['ATK+10%','DEF+10%','SPD+15%'];
+const RARITY_STARS = ['','*','**','***','****','*****'];
+const SKILL_NAMES = ['无','全力一击(ATK×2)','护盾(DEF×2)','加速(SPD×2)','治疗(恢复HP)','削弱(敌人ATK-30%)'];
+const TYPE_NAMES = ['THINK','EFF','BAL'];
+
+let wasm = null;
+
+async function loadWasm() {
+  const resp = await fetch('model_league.wasm');
+  const buf = await resp.arrayBuffer();
+  const { instance } = await WebAssembly.instantiate(buf, {});
+  wasm = instance.exports;
+  wasm._wasm_init();
+  render();
+}
+
+function G(fn) { return fn(wasm); }
+
+const STATE = {MENU:0,SHOP:1,COLLECTION:2,DECKBUILD:3,UPGRADE:4,BATTLE:5,FACTION:6,MINE:7,GAMEOVER:8};
+
+function stars(r) { return '★'.repeat(r) + '☆'.repeat(5-r); }
+
+function btn(label, onClick, cls='') { return `<button class="${cls}" onclick="(${onClick})()">${label}</button>`; }
+
+function render() {
+  if (!wasm) return;
+  const state = G(w => w._wasm_get_state());
+  const gold = G(w => w._wasm_get_gold());
+  const exp = G(w => w._wasm_get_exp());
+  const level = G(w => w._wasm_get_level());
+  const cycle = G(w => w._wasm_get_cycle());
+  const fac = G(w => w._wasm_get_faction());
+  const cardCount = G(w => w._wasm_get_card_count());
+  const deckSize = G(w => w._wasm_get_deck_size());
+  const app = document.getElementById('app');
+  
+  // Build deck card id set for highlighting
+  let deckIds = new Set();
+  for (let i = 0; i < 5; i++) {
+    let cid = G(w => w._wasm_deck_card(i));
+    if (cid > 0) deckIds.add(cid);
+  }
+
+  if (state === STATE.MENU) {
+    app.innerHTML = `
+    <div class="panel">
+      <div class="title">⚔️ 模型联盟大作战</div>
+      <div class="subtitle">v1.3 WASM Edition</div>
+      <div class="stat-row"><span class="stat-label">金币</span><span class="stat-val gold">💰${gold}</span></div>
+      <div class="stat-row"><span class="stat-label">经验</span><span class="stat-val green">${exp}/${level*100}</span></div>
+      <div class="stat-row"><span class="stat-label">等级</span><span class="stat-val">Lv.${level}</span></div>
+      <div class="stat-row"><span class="stat-label">周期</span><span class="stat-val">第${cycle}周期</span></div>
+      <div class="stat-row"><span class="stat-label">阵营</span><span class="stat-val">${FACTION_NAMES[fac]}</span></div>
+      <div class="stat-row"><span class="stat-label">卡牌</span><span class="stat-val">${cardCount}/18</span></div>
+      <div class="stat-row"><span class="stat-label">卡组</span><span class="stat-val">${deckSize}/5</span></div>
+    </div>
+    <div class="panel">
+      <div class="nav-grid">
+        ${btn('🛒 商店', () => { G(w => w._wasm_navigate(1)); render(); })}
+        ${btn('📚 收藏', () => { G(w => w._wasm_navigate(2)); render(); })}
+        ${btn('📋 卡组', () => { G(w => w._wasm_navigate(3)); render(); })}
+        ${btn('⬆️ 升级', () => { G(w => w._wasm_navigate(4)); render(); })}
+        ${btn('⚔️ 战斗', () => { G(w => w._wasm_navigate(5)); render(); })}
+        ${btn('🏛️ 阵营', () => { G(w => w._wasm_navigate(6)); render(); })}
+        ${btn('⛏️ 挖矿', () => { G(w => w._wasm_navigate(7)); render(); })}
+        ${btn('⏭️ 下一周期', () => { G(w => w._wasm_next_cycle()); render(); })}
+      </div>
+    </div>`;
+  } else if (state === STATE.SHOP) {
+    let cards = '';
+    for (let id = 1; id <= 18; id++) {
+      const owned = G(w => w._wasm_card_owned(id));
+      const cost = G(w => w._wasm_card_cost(id));
+      const rarity = G(w => w._wasm_card_rarity(id));
+      const atk = G(w => w._wasm_card_atk(id));
+      const def = G(w => w._wasm_card_def(id));
+      const spd = G(w => w._wasm_card_spd(id));
+      const cls = owned ? 'card owned' : 'card';
+      const priceOrOwned = owned ? '<div class="card-owned">已拥有</div>' : `<div class="card-price">💰${cost}</div>`;
+      cards += `<div class="${cls}" onclick="(${id > 9 ? '() => {}' : `() => shopBuy(${id})`})">${id <= 9 ? `<div class="card-name">${CARD_NAMES[id]}</div>` : `<div class="card-name">${CARD_NAMES[id]}</div>`}<div class="card-stars">${stars(rarity)}</div><div class="card-stats">ATK:${atk} DEF:${def} SPD:${spd}</div>${priceOrOwned}</div>`;
+    }
+    app.innerHTML = `
+    <div class="panel">
+      <div class="title">🛒 卡牌商店</div>
+      <div class="stat-row"><span class="stat-label">金币</span><span class="stat-val gold">💰${gold}</span></div>
+    </div>
+    <div class="panel">
+      <div class="card-grid">${cards}</div>
+      <button class="back-btn" onclick="G(w => w._wasm_back()); render();">返回主页</button>
+    </div>`;
+  } else if (state === STATE.COLLECTION) {
+    let cards = '';
+    for (let id = 1; id <= 18; id++) {
+      const owned = G(w => w._wasm_card_owned(id));
+      const rarity = G(w => w._wasm_card_rarity(id));
+      const atk = G(w => w._wasm_card_atk(id));
+      const def = G(w => w._wasm_card_def(id));
+      const spd = G(w => w._wasm_card_spd(id));
+      const lv = G(w => w._wasm_card_lv(id));
+      const cls = owned ? 'card owned' : 'card';
+      const lvTag = owned && lv > 0 ? `<div class="card-lv">+${lv}</div>` : '';
+      cards += `<div class="${cls}"><div class="card-name">${CARD_NAMES[id]}</div><div class="card-stars">${stars(rarity)}</div><div class="card-stats">ATK:${atk} DEF:${def} SPD:${spd}</div>${owned ? '<div class="card-owned">已拥有</div>'+lvTag : '<div class="card-owned" style="color:#484f58">未解锁</div>'}</div>`;
+    }
+    app.innerHTML = `<div class="panel"><div class="title">📚 我的收藏 (${cardCount}/18)</div></div><div class="panel"><div class="card-grid">${cards}</div><button class="back-btn" onclick="G(w => w._wasm_back()); render();">返回</button></div>`;
+  } else if (state === STATE.DECKBUILD) {
+    let cards = '';
+    for (let id = 1; id <= 18; id++) {
+      const owned = G(w => w._wasm_card_owned(id));
+      if (!owned) continue;
+      const rarity = G(w => w._wasm_card_rarity(id));
+      const atk = G(w => w._wasm_card_atk(id));
+      const def = G(w => w._wasm_card_def(id));
+      const spd = G(w => w._wasm_card_spd(id));
+      const lv = G(w => w._wasm_card_lv(id));
+      const inDeck = deckIds.has(id);
+      const cls = inDeck ? 'card in-deck' : 'card owned';
+      const deckTag = inDeck ? '<div class="card-owned">已入卡组</div>' : `<div class="card-price">点击加入</div>`;
+      cards += `<div class="${cls}" onclick="deckToggle(${id})"><div class="card-name">${CARD_NAMES[id]}</div><div class="card-stars">${stars(rarity)}</div><div class="card-stats">ATK:${atk} DEF:${def} SPD:${spd}</div>${lv > 0 ? `<div class="card-lv">+${lv}</div>` : ''}${deckTag}</div>`;
+    }
+    app.innerHTML = `<div class="panel"><div class="title">📋 构建卡组</div><div class="stat-row"><span class="stat-label">当前</span><span class="stat-val">${deckSize}/5</span></div></div><div class="panel"><div class="card-grid">${cards}</div><button class="back-btn" onclick="G(w => w._wasm_back()); render();">返回</button></div>`;
+  } else if (state === STATE.UPGRADE) {
+    let cards = '';
+    for (let id = 1; id <= 18; id++) {
+      const owned = G(w => w._wasm_card_owned(id));
+      if (!owned) continue;
+      const rarity = G(w => w._wasm_card_rarity(id));
+      const atk = G(w => w._wasm_card_atk(id));
+      const def = G(w => w._wasm_card_def(id));
+      const spd = G(w => w._wasm_card_spd(id));
+      const lv = G(w => w._wasm_card_lv(id));
+      const maxed = lv >= 3;
+      const cost = (rarity + 1) * 50;
+      const cls = maxed ? 'card owned' : 'card';
+      const costTag = maxed ? '<div class="card-owned">满级</div>' : `<div class="card-price">💰${cost}</div>`;
+      cards += `<div class="${cls}" onclick="${maxed ? '' : `upgradeCard(${id})`}"><div class="card-name">${CARD_NAMES[id]}</div><div class="card-stars">${stars(rarity)}</div><div class="card-stats">ATK:${atk} DEF:${def} SPD:${spd}</div><div class="card-lv">Lv.${lv}/3</div>${costTag}</div>`;
+    }
+    app.innerHTML = `<div class="panel"><div class="title">⬆️ 升级卡牌</div><div class="stat-row"><span class="stat-label">金币</span><span class="stat-val gold">💰${gold}</span></div></div><div class="panel"><div class="card-grid">${cards}</div><button class="back-btn" onclick="G(w => w._wasm_back()); render();">返回</button></div>`;
+  } else if (state === STATE.BATTLE) {
+    app.innerHTML = `
+    <div class="panel">
+      <div class="title">⚔️ 战斗</div>
+      <div class="stat-row"><span class="stat-label">卡组</span><span class="stat-val">${deckSize}/5</span></div>
+      <div class="stat-row"><span class="stat-label">周期</span><span class="stat-val">第${cycle}周期</span></div>
+      ${cycle > 0 && cycle % 5 === 0 ? '<div class="msg-box" style="color:#ff6b35">⚠️ BOSS关卡！</div>' : ''}
+    </div>
+    <div class="panel">
+      <div class="msg-box">${deckSize === 0 ? '请先构建卡组！' : '准备好战斗了吗？'}</div>
+      <button onclick="doBattle()">⚔️ 开始战斗</button>
+      <button class="back-btn" onclick="G(w => w._wasm_back()); render();">返回</button>
+    </div>`;
+  } else if (state === STATE.FACTION) {
+    let facBtns = '';
+    for (let f = 0; f < 3; f++) {
+      const active = f === fac ? ' faction-active' : '';
+      facBtns += `<button class="faction-btn${active}" onclick="setFaction(${f})"><div class="faction-name">${FACTION_NAMES[f]}</div><div class="faction-desc">${FAC_DESC[f]}</div></button>`;
+    }
+    app.innerHTML = `<div class="panel"><div class="title">🏛️ 阵营大厅</div><div class="stat-row"><span class="stat-label">当前</span><span class="stat-val">${FACTION_NAMES[fac]}</span></div></div><div class="panel"><div class="faction-grid">${facBtns}</div><button class="back-btn" onclick="G(w => w._wasm_back()); render();">返回</button></div>`;
+  } else if (state === STATE.MINE) {
+    app.innerHTML = `<div class="panel"><div class="title">⛏️ 金币矿场</div></div><div class="panel"><div class="msg-box">挖矿赚取金币</div><button onclick="doMine()">⛏️ 挖矿</button><button class="back-btn" onclick="G(w => w._wasm_back()); render();">返回</button></div>`;
+  }
+}
+
+function shopBuy(id) { G(w => w._wasm_shop_buy(id)); render(); }
+function deckToggle(id) { G(w => w._wasm_deck_toggle(id)); render(); }
+function upgradeCard(id) { G(w => w._wasm_upgrade_card(id)); render(); }
+function setFaction(f) { G(w => w._wasm_set_faction(f)); render(); }
+function doBattle() { G(w => w._wasm_battle_fight()); render(); }
+function doMine() { G(w => w._wasm_mine_gold()); render(); }
+
+loadWasm().catch(console.error);
+</script>
+</body>
+</html>
