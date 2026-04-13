@@ -203,21 +203,14 @@ class ResourceGuard:
                 self.limits.max_files
             )
         
-        # [DISABLED] max_concurrent race-fix: semaphore in enter_task handles it
-        #         if self.limits.max_concurrent:
-        # [DISABLED] max_concurrent race-fix: semaphore in enter_task handles it
-        #             with self._active_lock:
-        # [DISABLED] max_concurrent race-fix: semaphore in enter_task handles it
-        #                 if self._active_tasks >= self.limits.max_concurrent:
-        # [DISABLED] max_concurrent race-fix: semaphore in enter_task handles it
-        #                     raise ResourceExceeded(
-        # [DISABLED] max_concurrent race-fix: semaphore in enter_task handles it
-        #                         ResourceType.CONCURRENT_TASKS,
-        # [DISABLED] max_concurrent race-fix: semaphore in enter_task handles it
-        #                         self._active_tasks,
-        # [DISABLED] max_concurrent race-fix: semaphore in enter_task handles it
-        #                         self.limits.max_concurrent
-        # [DISABLED] orphaned closing paren
+        if self.limits.max_concurrent:
+            with self._active_lock:
+                if self._active_tasks >= self.limits.max_concurrent:
+                    raise ResourceExceeded(
+                        ResourceType.CONCURRENT_TASKS,
+                        self._active_tasks,
+                        self.limits.max_concurrent
+                    )
     
     def check_disk_space(self, path: str = ".") -> None:
         """检查磁盘空间 (P2 Fix: shutil.disk_usage 跨平台兼容)"""
@@ -253,23 +246,20 @@ class ResourceGuard:
         if self._task_semaphore:
             self._task_semaphore.release()
     
-
     def run_with_protection(self, func: Callable, *args, **kwargs):
-        """带资源保护执行
-
-        P1 Fix: enter_task() 在 check_limits() 之前执行，确保信号量和计数器一致
-        """
+        """带资源保护执行"""
         self.check_disk_space()
+        snapshot = self.monitor.get_current_snapshot()
+        self.check_limits(snapshot)
+        
         self.enter_task()
         try:
-            snapshot = self.monitor.get_current_snapshot()
-            self.check_limits(snapshot)
             self.monitor.record_snapshot()
             return func(*args, **kwargs)
         finally:
             self.exit_task()
             self.monitor.record_snapshot()
-
+    
     def get_guard_status(self) -> Dict:
         """获取守卫状态"""
         snap = self.monitor.get_current_snapshot()
@@ -296,20 +286,17 @@ class ResourceGuard:
 
 # 全局默认守卫
 _default_guard: Optional[ResourceGuard] = None
-_default_guard_lock = threading.Lock()
 
 
 def get_default_guard() -> ResourceGuard:
-    """获取默认资源守卫（线程安全）"""
+    """获取默认资源守卫"""
     global _default_guard
     if _default_guard is None:
-        with _default_guard_lock:
-            if _default_guard is None:
-                _default_guard = ResourceGuard(ResourceLimit(
-                    memory_mb=4096,    # 4GB
-                    cpu_time_sec=300,  # 5分钟
-                    max_concurrent=4,
-                ))
+        _default_guard = ResourceGuard(ResourceLimit(
+            memory_mb=4096,    # 4GB
+            cpu_time_sec=300,  # 5分钟
+            max_concurrent=4,
+        ))
     return _default_guard
 
 

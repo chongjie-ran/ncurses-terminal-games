@@ -220,7 +220,7 @@ class Session:
                     if b.type == "tool_result":
                         result.append({
                             "role": "tool",
-                            "tool_use_id": b.tool_use_id,
+                            "tool_call_id": b.tool_use_id,
                             "content": b.output or ""
                         })
             elif msg.role == MessageRole.SYSTEM:

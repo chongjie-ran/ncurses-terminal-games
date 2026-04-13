@@ -13,7 +13,7 @@ V3.3 P0 实现 (P2 Review Fix Applied)
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, TypeVar, Optional, List, Any
+from typing import Callable, TypeVar, Optional, List, Any, Coroutine
 import time
 import asyncio
 import threading
@@ -147,8 +147,12 @@ class RetryExecutor:
         error_msg = str(error).lower()
         error_type = type(error).__name__.lower()
         
+        # FileNotFoundError 可能因并发创建而暂时不可用，应重试
+        if isinstance(error, FileNotFoundError):
+            return ErrorSeverity.RECOVERABLE
+        
         # 致命错误: 不重试
-        fatal_patterns = ['permission', 'access denied', 'not found',
+        fatal_patterns = ['permission', 'access denied',
                          'invalid argument', 'authentication', 'unauthorized']
         if any(p in error_msg or p in error_type for p in fatal_patterns):
             return ErrorSeverity.FATAL
@@ -220,7 +224,7 @@ class RetryExecutor:
     
     async def execute_with_retry_async(
         self,
-        coro_func: Callable[[], T],
+        coro_func: Coroutine[Any, Any, T],
         on_retry: Optional[Callable[[int, Exception], None]] = None
     ) -> RetryResult:
         """异步执行带重试"""
@@ -292,7 +296,7 @@ def with_retry(config: RetryConfig = None, circuit_config: CircuitBreakerConfig 
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
             async def _call():
-                return func(*args, **kwargs)
+                return await func(*args, **kwargs)
             return await executor.execute_with_retry_async(_call)
         
         import asyncio

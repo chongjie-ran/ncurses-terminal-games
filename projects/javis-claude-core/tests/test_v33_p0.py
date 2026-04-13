@@ -112,9 +112,10 @@ class TestErrorSeverity:
         err = PermissionError("Permission denied")
         assert executor.classify_error(err) == ErrorSeverity.FATAL
 
-    def test_fatal_not_found(self, executor):
+    def test_file_not_found_recoverable(self, executor):
+        """FileNotFoundError 可能因并发创建而暂时不可用，应重试"""
         err = FileNotFoundError("File not found")
-        assert executor.classify_error(err) == ErrorSeverity.FATAL
+        assert executor.classify_error(err) == ErrorSeverity.RECOVERABLE
 
     def test_transient_resource_error(self, executor):
         err = Exception("Resource busy")
@@ -341,6 +342,38 @@ class TestResourceGuard:
         result = guard.run_with_protection(lambda: 42)
         assert result == 42
 
+    def test_run_with_protection_concurrent_limit(self):
+        """P1 Fix 验证: run_with_protection 并发限制
+        
+        问题: 之前 check_limits 在 enter_task 之前，check_limits 失败时
+        enter_task 未调用但 exit_task 仍会运行，导致 _active_tasks 计数错误。
+        修复: enter_task 在 check_limits 之前，确保信号量和计数器一致。
+        """
+        guard = ResourceGuard(ResourceLimit(max_concurrent=2))
+        results = []
+        errors = []
+        lock = threading.Lock()
+
+        def task():
+            try:
+                result = guard.run_with_protection(lambda: (time.sleep(0.05), 1)[1])
+                with lock:
+                    results.append(result)
+            except ResourceExceeded as e:
+                with lock:
+                    errors.append(e)
+
+        threads = [threading.Thread(target=task) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=5)
+
+        # 所有5个任务都应完成，无 ResourceExceeded
+        assert len(results) == 5, f'Expected 5 results, got {len(results)}. Errors: {errors}'
+        assert len(errors) == 0, f'Expected no errors, got {errors}'
+        assert results == [1, 1, 1, 1, 1]
+
     def test_guard_status(self):
         guard = ResourceGuard(ResourceLimit(memory_mb=4096, cpu_time_sec=300))
         status = guard.get_guard_status()
@@ -492,3 +525,124 @@ def executor_with_breaker():
     # Verify breaker is open
     assert executor.circuit_breaker.state == CircuitState.OPEN
     return executor
+
+
+
+
+# =============================================================================
+# 3. retry_executor 补测：覆盖异步装饰器和熔断器状态转换
+# =============================================================================
+
+class TestRetryExecutorExtended:
+    """retry_executor 扩展测试 — 覆盖剩余未覆盖行"""
+
+    def test_circuit_breaker_opens_after_threshold(self, executor):
+        """触发5次失败，熔断器从CLOSED转为OPEN（覆盖 line 93: self._state = value）"""
+        cb = CircuitBreaker(CircuitBreakerConfig(failure_threshold=5))
+        for _ in range(5):
+            cb.record_failure()
+        assert cb.state == CircuitState.OPEN
+        assert cb.can_execute() is False
+
+    def test_circuit_breaker_half_open_to_open(self, executor):
+        """熔断器从HALF_OPEN状态调用can_execute（覆盖 line 134: return True for HALF_OPEN）"""
+        cb = CircuitBreaker(CircuitBreakerConfig(failure_threshold=2))
+        cb.record_failure()
+        cb.record_failure()
+        assert cb.state == CircuitState.OPEN
+        cb._last_failure_time = time.time() - 1000  # force elapsed > recovery_timeout
+        cb._state = CircuitState.HALF_OPEN
+        cb._half_open_successes = 0
+        result = cb.can_execute()
+        assert result is True
+
+    def test_circuit_breaker_half_open_to_closed(self, executor):
+        """HALF_OPEN状态下连续成功转为CLOSED"""
+        cb = CircuitBreaker(CircuitBreakerConfig(
+            failure_threshold=2,
+            half_open_attempts=2,
+            recovery_timeout_sec=0
+        ))
+        cb._state = CircuitState.HALF_OPEN
+        cb._half_open_successes = 0
+        cb.record_success()
+        assert cb.state == CircuitState.HALF_OPEN
+        cb.record_success()
+        assert cb.state == CircuitState.CLOSED
+
+    @pytest.mark.asyncio
+    async def test_with_retry_decorator_async_function(self, executor):
+        """@with_retry装饰器应用于async函数（覆盖 lines 298-305: async_wrapper返回路径）"""
+        call_count = 0
+
+        @with_retry(RetryConfig(max_attempts=2, jitter=False, base_delay_ms=1))
+        async def async_func():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("temporary")
+            return "async done"
+
+        result = await async_func()
+        assert result.success is True
+        assert result.attempts == 2
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_with_retry_decorator_async_fatal(self, executor):
+        """@with_retry装饰器应用于async函数，遭遇FATAL错误不重试"""
+        @with_retry(RetryConfig(max_attempts=3, jitter=False, base_delay_ms=1))
+        async def async_fail():
+            raise PermissionError("Access denied")
+
+        result = await async_fail()
+        assert result.success is False
+        assert result.attempts == 1
+
+    def test_retry_config_no_jitter(self, executor):
+        """RetryConfig.get_delay 无jitter模式（确定性延迟）"""
+        cfg = RetryConfig(max_attempts=3, jitter=False, base_delay_ms=100, exponential_base=2.0)
+        d1 = cfg.get_delay(1)
+        d2 = cfg.get_delay(2)
+        d3 = cfg.get_delay(3)
+        assert d1 == 0.1
+        assert d2 == 0.2
+        assert d3 == 0.4
+        assert d1 == cfg.get_delay(1)  # deterministic
+
+    @pytest.mark.asyncio
+    async def test_retry_executor_async_with_callback(self, executor):
+        """异步execute_with_retry_async的on_retry回调（覆盖 line 134附近）"""
+        call_count = 0
+        retry_log = []
+
+        async def fail_twice():
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 2:
+                raise Exception("temp")
+            return "async recovered"
+
+        def on_retry_cb(attempt, exc):
+            retry_log.append((attempt, str(exc)))
+
+        cfg = RetryConfig(max_attempts=3, jitter=False, base_delay_ms=1)
+        ex = RetryExecutor(retry_config=cfg)
+        result = await ex.execute_with_retry_async(fail_twice, on_retry=on_retry_cb)
+        assert result.success is True
+        assert result.attempts == 3
+        assert len(retry_log) == 2
+        assert retry_log[0][0] == 1
+        assert retry_log[1][0] == 2
+
+    def test_error_classify_file_not_found_recoverable(self, executor):
+        """FileNotFoundError被分类为RECOVERABLE"""
+        ex = RetryExecutor()
+        assert ex.classify_error(FileNotFoundError("file not found")) == ErrorSeverity.RECOVERABLE
+
+    def test_error_classify_transient_patterns(self, executor):
+        """classify_error Transient模式覆盖"""
+        ex = RetryExecutor()
+        assert ex.classify_error(Exception("resource temporarily unavailable")) == ErrorSeverity.TRANSIENT
+        assert ex.classify_error(Exception("database locked")) == ErrorSeverity.TRANSIENT
+        assert ex.classify_error(Exception("connection pool exhausted")) == ErrorSeverity.TRANSIENT
