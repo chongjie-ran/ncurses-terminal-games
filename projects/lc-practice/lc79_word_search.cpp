@@ -1,49 +1,53 @@
-// LC79 Word Search - 回溯
-// 核心：方向矩阵 + 标记已访问 + 撤销选择
-#include <iostream>
+// LC79 Word Search
+// 回溯算法 - 2D board中搜索单词路径
 #include <vector>
 #include <string>
+#include <iostream>
 using namespace std;
 
 class Solution {
 public:
+    bool exist(vector<vector<char>>& board, string word) {
+        if (board.empty() || word.empty()) return false;
+        m = board.size(), n = board[0].size();
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                if (dfs(board, word, 0, i, j)) return true;
+            }
+        }
+        return false;
+    }
+private:
     int m, n;
-    vector<pair<int,int>> dirs = {{-1,0},{1,0},{0,-1},{0,1}};
+    const int dirs[4][2] = {{-1,0},{1,0},{0,-1},{0,1}};
     
-    bool dfs(vector<vector<char>>& board, string& word, int idx, int x, int y, vector<vector<bool>>& vis) {
-        if (idx == (int)word.size()) return true;
-        if (x<0||x>=m||y<0||y>=n||vis[x][y]||board[x][y]!=word[idx]) return false;
-        vis[x][y] = true;
-        for (auto [dx,dy]: dirs) {
-            if (dfs(board, word, idx+1, x+dx, y+dy, vis)) {
-                vis[x][y] = false;
+    bool dfs(vector<vector<char>>& board, const string& word, int idx, int x, int y) {
+        if (idx == word.size()) return true;
+        if (x < 0 || x >= m || y < 0 || y >= n || board[x][y] != word[idx]) return false;
+        
+        char c = board[x][y];
+        board[x][y] = '#'; // 标记访问
+        for (auto& d : dirs) {
+            if (dfs(board, word, idx+1, x+d[0], y+d[1])) {
+                board[x][y] = c; // 撤销
                 return true;
             }
         }
-        vis[x][y] = false;
-        return false;
-    }
-    
-    bool exist(vector<vector<char>>& board, string word) {
-        if (word.empty()) return true;
-        m=board.size(), n=board[0].size();
-        vector<vector<bool>> vis(m, vector<bool>(n));
-        for (int i=0;i<m;i++) {
-            for (int j=0;j<n;j++) {
-                if (dfs(board, word, 0, i, j, vis)) return true;
-            }
-        }
+        board[x][y] = c; // 撤销
         return false;
     }
 };
 
 int main() {
-    Solution s;
-    vector<vector<char>> board = {{'A','B','C','E'},{'S','F','C','S'},{'A','D','E','E'}};
-    cout << "ABCCED: " << s.exist(board, "ABCCED") << endl; // true
-    cout << "SEE: " << s.exist(board, "SEE") << endl; // true
-    cout << "ABCB: " << s.exist(board, "ABCB") << endl; // false
-    cout << "ASF: " << s.exist(board, "ASF") << endl; // true
-    cout << "ASFC: " << s.exist(board, "ASFC") << endl; // true
+    Solution sol;
+    vector<vector<char>> board = {
+        {'A','B','C','E'},
+        {'S','F','C','S'},
+        {'A','D','E','E'}
+    };
+    
+    cout << (sol.exist(board, "ABCCED") ? "true" : "false") << endl;
+    cout << (sol.exist(board, "SEE") ? "true" : "false") << endl;
+    cout << (sol.exist(board, "ABCB") ? "true" : "false") << endl;
     return 0;
 }

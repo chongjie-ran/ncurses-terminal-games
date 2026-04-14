@@ -1,71 +1,55 @@
+// LC64 Minimum Path Sum - 经典DP
+// 问题：网格中从左上到右下，路径和最小，只能向右或向下
+// 状态：dp[i][j] = 到达(i,j)的最小路径和
+// 转移：dp[i][j] = grid[i][j] + min(dp[i-1][j], dp[i][j-1])
+// 初始化：dp[0][0]=grid[0][0], 第一行/列累加
 #include <iostream>
 #include <vector>
 #include <algorithm>
 using namespace std;
 
-// LC64 Minimum Path Sum - 2D DP
-// Time: O(m*n), Space: O(1) in-place
+// O(m*n) space
 int minPathSum(vector<vector<int>>& grid) {
     int m = grid.size(), n = grid[0].size();
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            if (i == 0 && j == 0) continue;
-            int up = (i > 0) ? grid[i-1][j] : INT_MAX;
-            int left = (j > 0) ? grid[i][j-1] : INT_MAX;
-            grid[i][j] += min(up, left);
+    vector<vector<int>> dp(m, vector<int>(n, 0));
+    dp[0][0] = grid[0][0];
+    for (int i = 1; i < m; i++) dp[i][0] = dp[i-1][0] + grid[i][0];
+    for (int j = 1; j < n; j++) dp[0][j] = dp[0][j-1] + grid[0][j];
+    for (int i = 1; i < m; i++) {
+        for (int j = 1; j < n; j++) {
+            dp[i][j] = grid[i][j] + min(dp[i-1][j], dp[i][j-1]);
         }
     }
-    return grid[m-1][n-1];
+    return dp[m-1][n-1];
 }
 
-// LC322 Coin Change - Unbounded Knapsack DP
-// Time: O(amount * n), Space: O(amount)
-int coinChange(vector<int>& coins, int amount) {
-    vector<int> dp(amount + 1, INT_MAX);
+// O(n) space optimization
+int minPathSumOptimized(vector<vector<int>>& grid) {
+    int m = grid.size(), n = grid[0].size();
+    vector<int> dp(n, INT_MAX);
     dp[0] = 0;
-    for (int coin : coins) {
-        for (int j = coin; j <= amount; j++) {
-            if (dp[j - coin] != INT_MAX) {
-                dp[j] = min(dp[j], dp[j - coin] + 1);
-            }
+    for (int i = 0; i < m; i++) {
+        dp[0] += grid[i][0];
+        for (int j = 1; j < n; j++) {
+            dp[j] = grid[i][j] + min(dp[j], dp[j-1]);
         }
     }
-    return dp[amount] == INT_MAX ? -1 : dp[amount];
-}
-
-// LC518 Coin Change 2 - Count combinations (order matters: coins in outer loop!)
-// Time: O(amount * n), Space: O(amount)
-int change(int amount, vector<int>& coins) {
-    vector<int> dp(amount + 1, 0);
-    dp[0] = 1;
-    for (int coin : coins) {
-        for (int j = coin; j <= amount; j++) {
-            dp[j] += dp[j - coin];
-        }
-    }
-    return dp[amount];
+    return dp[n-1];
 }
 
 int main() {
-    // Test LC64
-    vector<vector<int>> g1 = {{1,3,1},{1,5,1},{4,2,1}};
-    cout << "LC64: " << minPathSum(g1) << " (expect 7)" << endl;
-    vector<vector<int>> g2 = {{1,2,3},{4,5,6}};
-    cout << "LC64: " << minPathSum(g2) << " (expect 12)" << endl;
+    vector<vector<int>> grid = {
+        {1,3,1},
+        {1,5,1},
+        {4,2,1}
+    };
+    cout << "LC64 Minimum Path Sum" << endl;
+    cout << "Grid: [[1,3,1],[1,5,1],[4,2,1]]" << endl;
+    cout << "minPathSum: " << minPathSum(grid) << " (expected 7)" << endl;
+    cout << "minPathSumOptimized: " << minPathSumOptimized(grid) << " (expected 7)" << endl;
     
-    // Test LC322
-    vector<int> c1 = {1,2,5}; int a1 = 11;
-    cout << "LC322: " << coinChange(c1, a1) << " (expect 3)" << endl;
-    vector<int> c2 = {2}; int a2 = 3;
-    cout << "LC322: " << coinChange(c2, a2) << " (expect -1)" << endl;
-    vector<int> c3 = {1}; int a3 = 0;
-    cout << "LC322: " << coinChange(c3, a3) << " (expect 0)" << endl;
-    
-    // Test LC518
-    vector<int> c4 = {1,2,5}; int a4 = 5;
-    cout << "LC518: " << change(a4, c4) << " (expect 4)" << endl;
-    vector<int> c5 = {2}; int a5 = 3;
-    cout << "LC518: " << change(a5, c5) << " (expect 0)" << endl;
-    
+    vector<vector<int>> grid2 = {{1,2,3},{4,5,6}};
+    cout << "Grid: [[1,2,3],[4,5,6]]" << endl;
+    cout << "minPathSum: " << minPathSum(grid2) << " (expected 12)" << endl;
     return 0;
 }
