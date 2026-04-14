@@ -1,0 +1,143 @@
+name: CI/CD - WASM Games (Unified)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'games/power-broker-wasm/**'
+      - 'games/model-league-wasm/**'
+      - '.github/workflows/wasm-games-cicd.yml'
+  pull_request:
+    paths:
+      - 'games/power-broker-wasm/**'
+      - 'games/model-league-wasm/**'
+      - '.github/workflows/wasm-games-cicd.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-wasm-games
+  cancel-in-progress: true
+
+env:
+  EMSDK_VERSION: 3.1.51
+
+jobs:
+  test-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run C unit tests
+        run: |
+          echo "=== Power Broker tests ==="
+          cd games/power-broker-wasm
+          gcc -o game_test game_test.c game.c -lm -O0 && ./game_test
+          echo "=== Model League tests ==="
+          cd ../model-league-wasm
+          if [ -f game_test.c ]; then
+            gcc -o model_league_test game_test.c game.c -lm -O0 && ./model_league_test
+          fi
+
+  build:
+    needs: test-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git emsdk
+          cd emsdk && ./emsdk install ${{ env.EMSDK_VERSION }} && ./emsdk activate ${{ env.EMSDK_VERSION }}
+
+      - name: Build Power Broker WASM
+        run: |
+          source emsdk/emsdk_env.sh
+          cd games/power-broker-wasm && ./build.sh
+
+      - name: Build Model League WASM
+        run: |
+          source emsdk/emsdk_env.sh
+          cd games/model-league-wasm && ./build.sh
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-games-build
+          path: |
+            games/power-broker-wasm/index.html
+            games/power-broker-wasm/power_broker.wasm
+            games/power-broker-wasm/power_broker.js
+            games/model-league-wasm/index.html
+            games/model-league-wasm/model_league.wasm
+            games/model-league-wasm/model_league.js
+          retention-days: 7
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-games-build
+          path: dist
+      - name: Smoke test
+        run: |
+          echo "=== Artifact validation ==="
+          
+          # Power Broker
+          test -f dist/index.html && echo "OK index.html (PB)"
+          test -f dist/power_broker.wasm && echo "OK power_broker.wasm"
+          node -e "const fs=require('fs'); const j=fs.readFileSync('dist/power_broker.js','utf8'); if(!j.includes('WebAssembly'))process.exit(1); if(!j.includes('_wasm_new_game'))process.exit(1); console.log('PB JS ✓')"
+          node -e "const fs=require('fs'); const h=fs.readFileSync('dist/index.html','utf8'); if(!h.includes('算力经纪人'))process.exit(1); console.log('PB HTML ✓')"
+          
+          # Model League
+          test -f dist/model_league.wasm && echo "OK model_league.wasm"
+          node -e "const fs=require('fs'); const j=fs.readFileSync('dist/model_league.js','utf8'); if(!j.includes('WebAssembly'))process.exit(1); if(!j.includes('_wasm_init'))process.exit(1); console.log('ML JS ✓')"
+          
+          echo ""
+          echo "=== ALL PASSED ==="
+
+  deploy:
+    needs: smoke-test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-games-build
+          path: dist
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Organize into subdirectories
+        run: |
+          mkdir -p _games/power-broker _games/model-league
+          cp dist/power_broker.* _games/power-broker/ || true
+          # PB index.html needs special handling since same filename as ML
+          if [ -f dist/index.html ]; then
+            head -1 dist/index.html | grep -q "算力经纪人" && cp dist/index.html _games/power-broker/
+          fi
+          cp dist/model_league.* _games/model-league/ || true
+          if [ -f dist/index.html ]; then
+            head -1 dist/index.html | grep -q "模型联盟" && cp dist/index.html _games/model-league/
+          fi
+          echo "=== Deployed structure ==="
+          ls -la _games/power-broker/
+          ls -la _games/model-league/
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _games
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
