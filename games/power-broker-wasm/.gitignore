@@ -1,0 +1,14 @@
+# Build artifacts
+*.o
+*.wasm
+*.js
+!power_broker.wasm
+!power_broker.js
+
+# EMSDK
+../emsdk/
+emsdk/
+
+# OS
+.DS_Store
+*.swp

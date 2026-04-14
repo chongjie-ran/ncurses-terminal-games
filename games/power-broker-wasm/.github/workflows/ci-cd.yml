@@ -1,0 +1,131 @@
+name: CI/CD - Power Broker WASM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'games/power-broker-wasm/**'
+  pull_request:
+    paths:
+      - 'games/power-broker-wasm/**'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ../emsdk
+          cd ../emsdk
+          ./emsdk install 3.1.51
+          ./emsdk activate 3.1.51
+          echo "EMSCRIPTEN_ROOT=$(pwd)" >> $GITHUB_ENV
+          echo "$(pwd)/emsdk_env.sh" >> $GITHUB_ENV
+
+      - name: Build WASM
+        working-directory: games/power-broker-wasm
+        run: |
+          source ../emsdk/emsdk_env.sh
+          ./build.sh
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: power-broker-build
+          path: |
+            games/power-broker-wasm/index.html
+            games/power-broker-wasm/power_broker.wasm
+            games/power-broker-wasm/power_broker.js
+            games/power-broker-wasm/build.sh
+          retention-days: 7
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: power-broker-build
+          path: dist
+
+      - name: Smoke test - file integrity
+        run: |
+          echo "=== Artifact validation ==="
+          test -f dist/index.html && echo "✓ index.html ($(wc -c < dist/index.html) bytes)"
+          test -f dist/power_broker.wasm && echo "✓ power_broker.wasm"
+          test -f dist/power_broker.js && echo "✓ power_broker.js"
+          
+          # WASM binary validation
+          SIZE=$(stat -c%s dist/power_broker.wasm)
+          echo "WASM size: $SIZE bytes"
+          if [ "$SIZE" -lt 1000 ]; then echo "ERROR: WASM too small"; exit 1; fi
+          if [ "$SIZE" -gt 10485760 ]; then echo "ERROR: WASM too large"; exit 1; fi
+          echo "✓ WASM size valid (1KB - 10MB)"
+          
+          # JS validation
+          node -e "
+            const fs = require('fs');
+            const js = fs.readFileSync('dist/power_broker.js', 'utf8');
+            if (!js.includes('WebAssembly')) { console.error('No WebAssembly ref'); process.exit(1); }
+            if (!js.includes('_wasm_new_game')) { console.error('No game exports'); process.exit(1); }
+            console.log('✓ JS validates WASM exports');
+            if (!js.includes('power_broker.wasm')) { console.error('No WASM file ref'); process.exit(1); }
+            console.log('✓ JS references correct WASM filename');
+          "
+          
+          # HTML validation  
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('dist/index.html', 'utf8');
+            if (!html.includes('power_broker.js')) { console.error('No JS ref in HTML'); process.exit(1); }
+            if (!html.includes('算力经纪人')) { console.error('Missing game title'); process.exit(1); }
+            console.log('✓ HTML validates game structure');
+          "
+          
+          echo ""
+          echo "=== All smoke tests PASSED ==="
+
+  deploy:
+    needs: smoke-test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: power-broker-build
+          path: .
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
