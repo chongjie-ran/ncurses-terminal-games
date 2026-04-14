@@ -22,7 +22,7 @@ git-manager/
 ├── backend/
 │   ├── main.py
 │   ├── cli.py
-│   ├── api/routes.py
+
 │   ├── models/database.py
 │   ├── schemas/schemas.py
 │   └── core/
