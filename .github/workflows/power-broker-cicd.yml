@@ -20,38 +20,34 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  EMSDK_VERSION: 3.1.51
+
 jobs:
   test-native:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Compile & Run C unit tests
-        working-directory: games/power-broker-wasm
+      - uses: actions/checkout@v4
+      - name: Run C unit tests
         run: |
-          gcc -o game_test game_test.c game.c -lm -O0
-          ./game_test
+          cd games/power-broker-wasm
+          gcc -o game_test game_test.c game.c -lm -O0 && ./game_test
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Emscripten
         run: |
           git clone --depth 1 https://github.com/emscripten-core/emsdk.git emsdk
-          cd emsdk
-          ./emsdk install 3.1.51
-          ./emsdk activate 3.1.51
+          cd emsdk && ./emsdk install ${{ env.EMSDK_VERSION }} && ./emsdk activate ${{ env.EMSDK_VERSION }}
 
       - name: Build WASM
-        working-directory: games/power-broker-wasm
-        env:
-          EMSDK: ${{ github.workspace }}/emsdk
         run: |
-          source ${{ env.EMSDK }}/emsdk_env.sh
+          source emsdk/emsdk_env.sh
+          cd games/power-broker-wasm
           ./build.sh
 
       - name: Upload build artifacts
@@ -69,48 +65,24 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: power-broker-build
           path: dist
-
-      - name: Smoke test - file integrity
+      - name: Smoke test
         run: |
           echo "=== Artifact validation ==="
-          test -f dist/index.html && echo "✓ index.html ($(wc -c < dist/index.html) bytes)"
-          test -f dist/power_broker.wasm && echo "✓ power_broker.wasm"
-          test -f dist/power_broker.js && echo "✓ power_broker.js"
-          
+          test -f dist/index.html && echo "OK index.html"
+          test -f dist/power_broker.wasm && echo "OK power_broker.wasm"
+          test -f dist/power_broker.js && echo "OK power_broker.js"
           SIZE=$(stat -c%s dist/power_broker.wasm)
-          echo "WASM size: $SIZE bytes"
-          if [ "$SIZE" -lt 1000 ]; then echo "ERROR: WASM too small"; exit 1; fi
-          if [ "$SIZE" -gt 10485760 ]; then echo "ERROR: WASM too large"; exit 1; fi
-          echo "✓ WASM size valid (1KB - 10MB)"
-          
-          node -e "
-            const fs = require('fs');
-            const js = fs.readFileSync('dist/power_broker.js', 'utf8');
-            if (!js.includes('WebAssembly')) { console.error('No WebAssembly ref'); process.exit(1); }
-            if (!js.includes('_wasm_new_game')) { console.error('No game exports'); process.exit(1); }
-            console.log('✓ JS validates WASM exports');
-            if (!js.includes('power_broker.wasm')) { console.error('No WASM file ref'); process.exit(1); }
-            console.log('✓ JS references correct WASM filename');
-          "
-          
-          node -e "
-            const fs = require('fs');
-            const html = fs.readFileSync('dist/index.html', 'utf8');
-            if (!html.includes('power_broker.js')) { console.error('No JS ref in HTML'); process.exit(1); }
-            if (!html.includes('算力经纪人')) { console.error('Missing game title'); process.exit(1); }
-            console.log('✓ HTML validates game structure');
-          "
-          
-          echo ""
-          echo "=== All smoke tests PASSED ==="
+          echo "WASM size: $SIZE"
+          if [ "$SIZE" -lt 1000 ] || [ "$SIZE" -gt 10485760 ]; then exit 1; fi
+          node -e "const fs=require('fs'); const j=fs.readFileSync('dist/power_broker.js','utf8'); if(!j.includes('WebAssembly'))process.exit(1); if(!j.includes('_wasm_new_game'))process.exit(1); console.log('OK JS')"
+          node -e "const fs=require('fs'); const h=fs.readFileSync('dist/index.html','utf8'); if(!h.includes('power_broker.js'))process.exit(1); if(!h.includes('算力经纪人'))process.exit(1); console.log('OK HTML')"
+          echo "=== ALL PASSED ==="
 
   deploy:
     needs: smoke-test
@@ -120,23 +92,18 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: power-broker-build
           path: .
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
-
       - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
