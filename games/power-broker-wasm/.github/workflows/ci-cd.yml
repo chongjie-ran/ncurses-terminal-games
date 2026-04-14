@@ -19,6 +19,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test-native:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile & Run C unit tests
+        working-directory: games/power-broker-wasm
+        run: |
+          gcc -o game_test game_test.c game.c -lm -O0
+          ./game_test
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -27,17 +39,17 @@ jobs:
 
       - name: Setup Emscripten
         run: |
-          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ../emsdk
-          cd ../emsdk
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git emsdk
+          cd emsdk
           ./emsdk install 3.1.51
           ./emsdk activate 3.1.51
-          echo "EMSCRIPTEN_ROOT=$(pwd)" >> $GITHUB_ENV
-          echo "$(pwd)/emsdk_env.sh" >> $GITHUB_ENV
 
       - name: Build WASM
         working-directory: games/power-broker-wasm
+        env:
+          EMSDK: ${{ github.workspace }}/emsdk
         run: |
-          source ../emsdk/emsdk_env.sh
+          source ${{ env.EMSDK }}/emsdk_env.sh
           ./build.sh
 
       - name: Upload build artifacts
@@ -71,14 +83,12 @@ jobs:
           test -f dist/power_broker.wasm && echo "✓ power_broker.wasm"
           test -f dist/power_broker.js && echo "✓ power_broker.js"
           
-          # WASM binary validation
           SIZE=$(stat -c%s dist/power_broker.wasm)
           echo "WASM size: $SIZE bytes"
           if [ "$SIZE" -lt 1000 ]; then echo "ERROR: WASM too small"; exit 1; fi
           if [ "$SIZE" -gt 10485760 ]; then echo "ERROR: WASM too large"; exit 1; fi
           echo "✓ WASM size valid (1KB - 10MB)"
           
-          # JS validation
           node -e "
             const fs = require('fs');
             const js = fs.readFileSync('dist/power_broker.js', 'utf8');
@@ -89,7 +99,6 @@ jobs:
             console.log('✓ JS references correct WASM filename');
           "
           
-          # HTML validation  
           node -e "
             const fs = require('fs');
             const html = fs.readFileSync('dist/index.html', 'utf8');
