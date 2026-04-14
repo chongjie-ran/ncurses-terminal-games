@@ -1,0 +1,142 @@
+name: CI/CD - Model League WASM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'games/model-league-wasm/**'
+  pull_request:
+    paths:
+      - 'games/model-league-wasm/**'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test-native:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile & Run C unit tests
+        working-directory: games/model-league-wasm
+        run: |
+          gcc -o model_league_test game_test.c game.c -lm -O0
+          ./model_league_test
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git emsdk
+          cd emsdk
+          ./emsdk install 3.1.51
+          ./emsdk activate 3.1.51
+
+      - name: Build WASM
+        working-directory: games/model-league-wasm
+        env:
+          EMSDK: ${{ github.workspace }}/emsdk
+        run: |
+          export PATH="${{ env.EMSDK }}:$PATH"
+          emcc -c game.c -o game.o -O3
+          emcc -c wasm_main.c -o wasm_main.o -O3
+          emcc game.o wasm_main.o -o model_league.js -s WASM=1 \
+            -s 'EXPORTED_FUNCTIONS=["_wasm_init","_wasm_new_game","_wasm_get_state","_wasm_get_gold","_wasm_get_exp","_wasm_get_level","_wasm_get_cycle","_wasm_get_faction","_wasm_get_card_count","_wasm_card_owned","_wasm_card_atk","_wasm_card_def","_wasm_card_spd","_wasm_card_cost","_wasm_card_rarity","_wasm_card_skill","_wasm_card_lv","_wasm_card_name","_wasm_deck_size","_wasm_deck_card","_wasm_shop_buy","_wasm_deck_toggle","_wasm_upgrade_card","_wasm_set_faction","_wasm_battle_fight","_wasm_mine_gold","_wasm_next_cycle","_wasm_navigate","_wasm_back","_wasm_get_msg"]' \
+            -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=16MB -s MODULARIZE=0 -s STRICT=0 -s RESERVED_FUNCTION_POINTERS=20
+          rm -f game.o wasm_main.o
+          ls -lh model_league.wasm model_league.js
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-league-build
+          path: |
+            games/model-league-wasm/index.html
+            games/model-league-wasm/model_league.wasm
+            games/model-league-wasm/model_league.js
+          retention-days: 7
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: model-league-build
+          path: dist
+
+      - name: Smoke test - file integrity
+        run: |
+          echo "=== Artifact validation ==="
+          test -f dist/index.html && echo "✓ index.html ($(wc -c < dist/index.html) bytes)"
+          test -f dist/model_league.wasm && echo "✓ model_league.wasm"
+          test -f dist/model_league.js && echo "✓ model_league.js"
+          
+          SIZE=$(stat -c%s dist/model_league.wasm)
+          echo "WASM size: $SIZE bytes"
+          if [ "$SIZE" -lt 1000 ]; then echo "ERROR: WASM too small"; exit 1; fi
+          if [ "$SIZE" -gt 10485760 ]; then echo "ERROR: WASM too large"; exit 1; fi
+          echo "✓ WASM size valid"
+          
+          node -e "
+            const fs = require('fs');
+            const js = fs.readFileSync('dist/model_league.js', 'utf8');
+            if (!js.includes('WebAssembly')) { console.error('No WebAssembly ref'); process.exit(1); }
+            if (!js.includes('_wasm_init')) { console.error('No game exports'); process.exit(1); }
+            console.log('✓ JS validates WASM exports');
+          "
+          
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('dist/index.html', 'utf8');
+            if (!html.includes('model_league.js')) { console.error('No JS ref in HTML'); process.exit(1); }
+            if (!html.includes('模型联盟')) { console.error('Missing game title'); process.exit(1); }
+            console.log('✓ HTML validates game structure');
+          "
+          
+          echo "=== All smoke tests PASSED ==="
+
+  deploy:
+    needs: smoke-test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: model-league-build
+          path: .
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
