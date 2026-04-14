@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - 'games/power-broker-wasm/**'
+      - '.github/workflows/power-broker-cicd.yml'
   pull_request:
     paths:
       - 'games/power-broker-wasm/**'
+      - '.github/workflows/power-broker-cicd.yml'
 
 permissions:
   contents: read
@@ -31,8 +33,6 @@ jobs:
           cd ../emsdk
           ./emsdk install 3.1.51
           ./emsdk activate 3.1.51
-          echo "EMSCRIPTEN_ROOT=$(pwd)" >> $GITHUB_ENV
-          echo "$(pwd)/emsdk_env.sh" >> $GITHUB_ENV
 
       - name: Build WASM
         working-directory: games/power-broker-wasm
@@ -48,7 +48,6 @@ jobs:
             games/power-broker-wasm/index.html
             games/power-broker-wasm/power_broker.wasm
             games/power-broker-wasm/power_broker.js
-            games/power-broker-wasm/build.sh
           retention-days: 7
 
   smoke-test:
@@ -64,21 +63,19 @@ jobs:
           name: power-broker-build
           path: dist
 
-      - name: Smoke test - file integrity
+      - name: Smoke test
         run: |
           echo "=== Artifact validation ==="
           test -f dist/index.html && echo "✓ index.html ($(wc -c < dist/index.html) bytes)"
           test -f dist/power_broker.wasm && echo "✓ power_broker.wasm"
           test -f dist/power_broker.js && echo "✓ power_broker.js"
           
-          # WASM binary validation
           SIZE=$(stat -c%s dist/power_broker.wasm)
           echo "WASM size: $SIZE bytes"
           if [ "$SIZE" -lt 1000 ]; then echo "ERROR: WASM too small"; exit 1; fi
           if [ "$SIZE" -gt 10485760 ]; then echo "ERROR: WASM too large"; exit 1; fi
-          echo "✓ WASM size valid (1KB - 10MB)"
+          echo "✓ WASM size valid"
           
-          # JS validation
           node -e "
             const fs = require('fs');
             const js = fs.readFileSync('dist/power_broker.js', 'utf8');
@@ -89,7 +86,6 @@ jobs:
             console.log('✓ JS references correct WASM filename');
           "
           
-          # HTML validation  
           node -e "
             const fs = require('fs');
             const html = fs.readFileSync('dist/index.html', 'utf8');
