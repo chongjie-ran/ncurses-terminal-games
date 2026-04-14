@@ -195,3 +195,28 @@ void wasm_end_day(void) {
 }
 
 void wasm_return_to_menu(void) { g.state = STATE_MENU; }
+
+// === Missing exports (declared in game.h) ===
+int wasm_get_init_assets(void) { return g.init_assets; }
+
+const char* wasm_get_ach_name(int idx) {
+    if (idx < 0 || idx >= N_ACHS) return "";
+    return ACH_NAME[idx];
+}
+
+const char* wasm_get_ach_desc(int idx) {
+    if (idx < 0 || idx >= N_ACHS) return "";
+    return ACH_DESC[idx];
+}
+
+void wasm_save_game(void) {
+    // Stub: save state to localStorage (implemented in JS)
+}
+
+void wasm_load_save(void) {
+    // Stub: load state from localStorage (implemented in JS)
+}
+
+int wasm_save_size(void) { return 0; }
+void wasm_write_save(char* buf, int max_len) { buf[0] = 0; }
+int wasm_read_save(const char* buf, int len) { (void)buf; (void)len; return 0; }
