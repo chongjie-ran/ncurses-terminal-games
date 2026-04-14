@@ -17,8 +17,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-power-broker
+  cancel-in-progress: true
 
 env:
   EMSDK_VERSION: 3.1.51
@@ -38,18 +38,15 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Emscripten
         run: |
           git clone --depth 1 https://github.com/emscripten-core/emsdk.git emsdk
           cd emsdk && ./emsdk install ${{ env.EMSDK_VERSION }} && ./emsdk activate ${{ env.EMSDK_VERSION }}
-
       - name: Build WASM
         run: |
           source emsdk/emsdk_env.sh
           cd games/power-broker-wasm
           ./build.sh
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -58,7 +55,6 @@ jobs:
             games/power-broker-wasm/index.html
             games/power-broker-wasm/power_broker.wasm
             games/power-broker-wasm/power_broker.js
-            games/power-broker-wasm/build.sh
           retention-days: 7
 
   smoke-test:
@@ -97,13 +93,15 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: power-broker-build
-          path: .
-      - name: Setup Pages
+          path: dist
+      - name: Deploy to GitHub Pages subdirectory
         uses: actions/configure-pages@v5
+      - name: Create subdirectory
+        run: mkdir -p _games/power-broker && cp dist/* _games/power-broker/
       - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
-      - name: Deploy to GitHub Pages
+          path: _games/power-broker
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
