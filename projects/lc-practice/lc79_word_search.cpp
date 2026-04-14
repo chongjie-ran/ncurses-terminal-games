@@ -1,9 +1,5 @@
-// LC79 - Word Search
-// 分类: DFS + Backtracking
-// 难度: Medium
-// 思路: 在2D网格中找单词，允许上下左右移动，不能重复使用同一格子
-// 对每个起点DFS，用原位标记(改为'#')防止重复访问，回溯时恢复
-
+// LC79 Word Search - 回溯
+// 核心：方向矩阵 + 标记已访问 + 撤销选择
 #include <iostream>
 #include <vector>
 #include <string>
@@ -12,24 +8,42 @@ using namespace std;
 class Solution {
 public:
     int m, n;
-    bool exist(vector<vector<char>>& board, string word) {
-        m = board.size(), n = board[0].size();
-        for(int i=0;i<m;i++)
-            for(int j=0;j<n;j++)
-                if(dfs(board, word, i, j, 0))
-                    return true;
+    vector<pair<int,int>> dirs = {{-1,0},{1,0},{0,-1},{0,1}};
+    
+    bool dfs(vector<vector<char>>& board, string& word, int idx, int x, int y, vector<vector<bool>>& vis) {
+        if (idx == (int)word.size()) return true;
+        if (x<0||x>=m||y<0||y>=n||vis[x][y]||board[x][y]!=word[idx]) return false;
+        vis[x][y] = true;
+        for (auto [dx,dy]: dirs) {
+            if (dfs(board, word, idx+1, x+dx, y+dy, vis)) {
+                vis[x][y] = false;
+                return true;
+            }
+        }
+        vis[x][y] = false;
         return false;
     }
-    bool dfs(vector<vector<char>>& board, const string& word, int i, int j, int idx) {
-        if(idx == word.size()) return true;
-        if(i<0||i>=m||j<0||j>=n||board[i][j]!=word[idx]) return false;
-        char c = board[i][j];
-        board[i][j] = '#';
-        bool res = dfs(board, word, i+1, j, idx+1)
-                 || dfs(board, word, i-1, j, idx+1)
-                 || dfs(board, word, i, j+1, idx+1)
-                 || dfs(board, word, i, j-1, idx+1);
-        board[i][j] = c;
-        return res;
+    
+    bool exist(vector<vector<char>>& board, string word) {
+        if (word.empty()) return true;
+        m=board.size(), n=board[0].size();
+        vector<vector<bool>> vis(m, vector<bool>(n));
+        for (int i=0;i<m;i++) {
+            for (int j=0;j<n;j++) {
+                if (dfs(board, word, 0, i, j, vis)) return true;
+            }
+        }
+        return false;
     }
 };
+
+int main() {
+    Solution s;
+    vector<vector<char>> board = {{'A','B','C','E'},{'S','F','C','S'},{'A','D','E','E'}};
+    cout << "ABCCED: " << s.exist(board, "ABCCED") << endl; // true
+    cout << "SEE: " << s.exist(board, "SEE") << endl; // true
+    cout << "ABCB: " << s.exist(board, "ABCB") << endl; // false
+    cout << "ASF: " << s.exist(board, "ASF") << endl; // true
+    cout << "ASFC: " << s.exist(board, "ASFC") << endl; // true
+    return 0;
+}
