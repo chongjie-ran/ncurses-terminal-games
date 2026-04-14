@@ -21,6 +21,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test-native:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile & Run C unit tests
+        working-directory: games/power-broker-wasm
+        run: |
+          gcc -o game_test game_test.c game.c -lm -O0
+          ./game_test
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -29,15 +41,17 @@ jobs:
 
       - name: Setup Emscripten
         run: |
-          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ../emsdk
-          cd ../emsdk
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git emsdk
+          cd emsdk
           ./emsdk install 3.1.51
           ./emsdk activate 3.1.51
 
       - name: Build WASM
         working-directory: games/power-broker-wasm
+        env:
+          EMSDK: ${{ github.workspace }}/emsdk
         run: |
-          source ../emsdk/emsdk_env.sh
+          source ${{ env.EMSDK }}/emsdk_env.sh
           ./build.sh
 
       - name: Upload build artifacts
@@ -48,6 +62,7 @@ jobs:
             games/power-broker-wasm/index.html
             games/power-broker-wasm/power_broker.wasm
             games/power-broker-wasm/power_broker.js
+            games/power-broker-wasm/build.sh
           retention-days: 7
 
   smoke-test:
@@ -63,7 +78,7 @@ jobs:
           name: power-broker-build
           path: dist
 
-      - name: Smoke test
+      - name: Smoke test - file integrity
         run: |
           echo "=== Artifact validation ==="
           test -f dist/index.html && echo "✓ index.html ($(wc -c < dist/index.html) bytes)"
@@ -74,7 +89,7 @@ jobs:
           echo "WASM size: $SIZE bytes"
           if [ "$SIZE" -lt 1000 ]; then echo "ERROR: WASM too small"; exit 1; fi
           if [ "$SIZE" -gt 10485760 ]; then echo "ERROR: WASM too large"; exit 1; fi
-          echo "✓ WASM size valid"
+          echo "✓ WASM size valid (1KB - 10MB)"
           
           node -e "
             const fs = require('fs');
