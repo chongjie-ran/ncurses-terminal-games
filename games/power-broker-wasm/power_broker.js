@@ -1414,6 +1414,9 @@ var _wasm_get_event_impact = Module['_wasm_get_event_impact'] = makeInvalidEarly
 var _wasm_player_action = Module['_wasm_player_action'] = makeInvalidEarlyAccess('_wasm_player_action');
 var _wasm_end_day = Module['_wasm_end_day'] = makeInvalidEarlyAccess('_wasm_end_day');
 var _wasm_return_to_menu = Module['_wasm_return_to_menu'] = makeInvalidEarlyAccess('_wasm_return_to_menu');
+var _wasm_get_init_assets = Module['_wasm_get_init_assets'] = makeInvalidEarlyAccess('_wasm_get_init_assets');
+var _wasm_get_ach_name = Module['_wasm_get_ach_name'] = makeInvalidEarlyAccess('_wasm_get_ach_name');
+var _wasm_get_ach_desc = Module['_wasm_get_ach_desc'] = makeInvalidEarlyAccess('_wasm_get_ach_desc');
 var __wasm_init = Module['__wasm_init'] = makeInvalidEarlyAccess('__wasm_init');
 var __wasm_new_game = Module['__wasm_new_game'] = makeInvalidEarlyAccess('__wasm_new_game');
 var __wasm_get_state = Module['__wasm_get_state'] = makeInvalidEarlyAccess('__wasm_get_state');
@@ -1465,6 +1468,9 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports['wasm_player_action'] != 'undefined', 'missing Wasm export: wasm_player_action');
   assert(typeof wasmExports['wasm_end_day'] != 'undefined', 'missing Wasm export: wasm_end_day');
   assert(typeof wasmExports['wasm_return_to_menu'] != 'undefined', 'missing Wasm export: wasm_return_to_menu');
+  assert(typeof wasmExports['wasm_get_init_assets'] != 'undefined', 'missing Wasm export: wasm_get_init_assets');
+  assert(typeof wasmExports['wasm_get_ach_name'] != 'undefined', 'missing Wasm export: wasm_get_ach_name');
+  assert(typeof wasmExports['wasm_get_ach_desc'] != 'undefined', 'missing Wasm export: wasm_get_ach_desc');
   assert(typeof wasmExports['_wasm_init'] != 'undefined', 'missing Wasm export: _wasm_init');
   assert(typeof wasmExports['_wasm_new_game'] != 'undefined', 'missing Wasm export: _wasm_new_game');
   assert(typeof wasmExports['_wasm_get_state'] != 'undefined', 'missing Wasm export: _wasm_get_state');
@@ -1513,6 +1519,9 @@ function assignWasmExports(wasmExports) {
   _wasm_player_action = Module['_wasm_player_action'] = createExportWrapper('wasm_player_action', 2);
   _wasm_end_day = Module['_wasm_end_day'] = createExportWrapper('wasm_end_day', 0);
   _wasm_return_to_menu = Module['_wasm_return_to_menu'] = createExportWrapper('wasm_return_to_menu', 0);
+  _wasm_get_init_assets = Module['_wasm_get_init_assets'] = createExportWrapper('wasm_get_init_assets', 0);
+  _wasm_get_ach_name = Module['_wasm_get_ach_name'] = createExportWrapper('wasm_get_ach_name', 1);
+  _wasm_get_ach_desc = Module['_wasm_get_ach_desc'] = createExportWrapper('wasm_get_ach_desc', 1);
   __wasm_init = Module['__wasm_init'] = createExportWrapper('_wasm_init', 0);
   __wasm_new_game = Module['__wasm_new_game'] = createExportWrapper('_wasm_new_game', 1);
   __wasm_get_state = Module['__wasm_get_state'] = createExportWrapper('_wasm_get_state', 0);
