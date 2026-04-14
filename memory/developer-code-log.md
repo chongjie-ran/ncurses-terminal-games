@@ -3015,3 +3015,43 @@ tests/gateway/ -v → 43 passed in 0.61s
 - [ ] 与主人确认游戏方向
 
 *悟通自主检查完成 | 2026-04-15 01:19 CST*
+
+---
+
+## LC51 N-Queens (2026-04-15 02:10)
+
+**commit**: cf98da6
+
+**问题**: N皇后 - 在N×N棋盘放N个皇后互不攻击
+**分类**: 回溯
+**复杂度**: O(N!)
+
+**三路禁用标记**:
+| 标记 | 含义 | 索引公式 |
+|------|------|----------|
+| cols[col] | 列冲突 | col |
+| diag1 | 主对角线 (row-col唯一) | row-col+n-1 |
+| diag2 | 副对角线 (row+col唯一) | row+col |
+
+**核心模式**:
+```cpp
+void backtrack(int row) {
+    if (row == n) { results.push_back(board); return; }
+    for (int col = 0; col < n; ++col) {
+        int d1 = row - col + n - 1, d2 = row + col;
+        if (cols[col] || diag1[d1] || diag2[d2]) continue;
+        board[row][col] = 'Q';
+        cols[col] = diag1[d1] = diag2[d2] = true;
+        backtrack(row + 1);
+        board[row][col] = '.';
+        cols[col] = diag1[d1] = diag2[d2] = false;
+    }
+}
+```
+
+**验证结果**: ✅ 5/5通过
+- n=1: 1解 ✅
+- n=2: 0解 ✅
+- n=3: 0解 ✅
+- n=4: 2解 ✅
+- n=8: 92解 ✅
