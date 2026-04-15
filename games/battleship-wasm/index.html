@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Battleship - 战舰大战</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Courier New', monospace; background: #0a1628; color: #e0e0e0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+h1 { color: #4fc3f7; text-shadow: 0 0 10px #4fc3f7; margin-bottom: 5px; }
+.subtitle { color: #78909c; font-size: 14px; margin-bottom: 15px; }
+.status { background: #1a2a40; border: 1px solid #4fc3f7; border-radius: 8px; padding: 10px 20px; margin-bottom: 15px; font-size: 14px; text-align: center; }
+.status .phase { color: #ffcc02; font-weight: bold; }
+.status .msg { color: #81c784; margin-top: 4px; }
+.boards { display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px; }
+.board-section { text-align: center; }
+.board-title { color: #4fc3f7; margin-bottom: 8px; font-size: 14px; }
+.grid { display: grid; grid-template-columns: repeat(10, 36px); gap: 2px; }
+.cell { width: 36px; height: 36px; border: 1px solid #2a4a6a; background: #0d1f35; cursor: pointer; transition: all 0.15s; font-size: 16px; text-align: center; line-height: 36px; }
+.cell:hover { background: #1a3a5a; box-shadow: 0 0 5px #4fc3f7; }
+.cell.ship { background: #1a5a3a; }
+.cell.hit { background: #c62828; color: white; }
+.cell.miss { background: #263238; color: #546e7a; }
+.cell.hit::after { content: '💥'; }
+.cell.miss::after { content: '◦'; }
+.cell.water-known { background: #0d1f35; }
+.cell.sunk { background: #b71c1c; box-shadow: 0 0 4px #b71c1c; }
+.cell.placing { background: #1a3a5a; border-color: #4fc3f7; }
+.cell.invalid { background: #4a1a1a; }
+.row-label, .col-label { display: flex; justify-content: center; }
+.labels-row { grid-template-columns: 20px repeat(10, 36px); gap: 2px; display: flex; margin-left: 20px; }
+.label-cell { width: 36px; height: 20px; text-align: center; line-height: 20px; color: #78909c; font-size: 11px; }
+.label-row { width: 20px; height: 36px; text-align: center; line-height: 36px; color: #78909c; font-size: 11px; }
+.ship-list { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
+.ship-item { background: #1a3a5a; border: 1px solid #2a4a6a; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+.ship-item.current { border-color: #ffcc02; color: #ffcc02; }
+.ship-item.placed { background: #1a5a3a; border-color: #4caf50; color: #81c784; }
+.ship-item.placed::after { content: ' ✓'; }
+.orient-btn { background: #1a2a40; border: 1px solid #4fc3f7; color: #4fc3f7; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.orient-btn:hover { background: #2a4a6a; }
+.info-bar { display: flex; gap: 20px; justify-content: center; font-size: 13px; margin-bottom: 10px; }
+.info-item { color: #78909c; }
+.info-item span { color: #ffcc02; font-weight: bold; }
+.score-section { display: flex; gap: 30px; font-size: 14px; }
+.score-player { color: #81c784; }
+.score-enemy { color: #ef5350; }
+button.action-btn { background: #1565c0; border: none; color: white; padding: 8px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; margin: 5px; }
+button.action-btn:hover { background: #1976d2; }
+.game-over-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+.game-over-title { font-size: 36px; margin-bottom: 15px; }
+.win { color: #4caf50; }
+.lose { color: #f44336; }
+</style>
+</head>
+<body>
+<h1>⚓ BATTLESHIP 战舰大战</h1>
+<p class="subtitle">部署舰队 → 炮击敌舰 → 消灭敌方全部舰船</p>
+<div class="status">
+  <div class="phase" id="phase">部署舰队中...</div>
+  <div class="msg" id="msg">点击网格放置战舰 (横向)</div>
+</div>
+<div class="info-bar">
+  <div class="info-item">你的战绩: <span id="playerScore">0</span> 命中 / <span id="playerSunk">0</span> 舰沉没</div>
+  <div class="info-item">敌方战绩: <span id="enemyScore">0</span> 命中 / <span id="enemySunk">0</span> 舰沉没</div>
+</div>
+<div class="ship-list" id="shipList"></div>
+<div style="text-align:center;margin-bottom:10px;">
+  <button class="orient-btn" id="orientBtn" onclick="toggleOrient()">▶ 横向</button>
+</div>
+<div class="boards">
+  <div class="board-section">
+    <div class="board-title">🎯 你的舰队 (点击炮击)</div>
+    <div id="playerBoard" class="grid"></div>
+  </div>
+  <div class="board-section">
+    <div class="board-title">🔒 敌方海域 (点击炮击)</div>
+    <div id="enemyBoard" class="grid"></div>
+  </div>
+</div>
+<div class="score-section">
+  <div class="score-player">✅ 你的命中: <span id="myHits">0</span></div>
+  <div class="score-enemy">❌ 敌方命中: <span id="enemyHits">0</span></div>
+</div>
+
+<script>
+var Module = {};
+fetch('battleship.wasm').then(r => r.arrayBuffer()).then(bytes => {
+  WebAssembly.instantiate(bytes, {}).then(result => {
+    var wasm = result.instance.exports;
+    var mem = wasm.memory;
+    var GAME_SIZE = 10, NUM_SHIPS = 5;
+    var SHIP_NAMES = ['Carrier(5)', 'Battleship(4)', 'Cruiser(3)', 'Submarine(3)', 'Destroyer(2)'];
+    var SHIP_LENGTHS = [5,4,3,3,2];
+    
+    function ptr2obj(ptr) {
+      var g = {};
+      var view = new DataView(mem.buffer);
+      for (var i = 0; i < GAME_SIZE; i++)
+        for (var j = 0; j < GAME_SIZE; j++)
+          g.grid[i] = g.grid[i] || [];
+      var gridBase = ptr;
+      var enemyGridBase = ptr + GAME_SIZE * GAME_SIZE * 4;
+      var shipsBase = ptr + GAME_SIZE * GAME_SIZE * 8;
+      
+      g.grid = [];
+      for (var r = 0; r < GAME_SIZE; r++) {
+        g.grid[r] = [];
+        for (var c = 0; c < GAME_SIZE; c++)
+          g.grid[r][c] = view.getInt32(gridBase + (r * GAME_SIZE + c) * 4, true);
+      }
+      g.enemyGrid = [];
+      for (var r = 0; r < GAME_SIZE; r++) {
+        g.enemyGrid[r] = [];
+        for (var c = 0; c < GAME_SIZE; c++)
+          g.enemyGrid[r][c] = view.getInt32(enemyGridBase + (r * GAME_SIZE + c) * 4, true);
+      }
+      g.gameState = view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8, true);
+      g.currentShip = view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 4, true);
+      g.playerScore = view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 8, true);
+      g.enemyScore = view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 12, true);
+      g.shipsSunk = view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 16, true);
+      g.enemyShipsSunk = view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 20, true);
+      return g;
+    }
+    
+    var TOTAL_MEM = GAME_SIZE * GAME_SIZE * 8 * 2 + 100;
+    var gamePtr = wasm.allocate(TOTAL_MEM);
+    var WATER = 0, HIT = 1, MISS = 2, SHIP = 3;
+    var PLACING = 0, PLAYING = 1;
+    
+    wasm.init_game(gamePtr);
+    var horizontal = true;
+    var currentShip = 0;
+    var phase = 'placing';
+    
+    function getGrid(ptr, which) {
+      var view = new DataView(mem.buffer);
+      var base = which === 'player' ? ptr : ptr + GAME_SIZE * GAME_SIZE * 4;
+      var result = [];
+      for (var r = 0; r < GAME_SIZE; r++) {
+        result[r] = [];
+        for (var c = 0; c < GAME_SIZE; c++)
+          result[r][c] = view.getInt32(base + (r * GAME_SIZE + c) * 4, true);
+      }
+      return result;
+    }
+    
+    function getGameState(ptr) {
+      var view = new DataView(mem.buffer);
+      return {
+        gameState: view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8, true),
+        currentShip: view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 4, true),
+        playerScore: view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 8, true),
+        enemyScore: view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 12, true),
+        shipsSunk: view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 16, true),
+        enemyShipsSunk: view.getInt32(ptr + GAME_SIZE * GAME_SIZE * 8 + 20, true)
+      };
+    }
+    
+    function render() {
+      var pGrid = getGrid(gamePtr, 'player');
+      var eGrid = getGrid(gamePtr, 'enemy');
+      var gs = getGameState(gamePtr);
+      
+      ['playerBoard','enemyBoard'].forEach((id, idx) => {
+        var grid = idx === 0 ? pGrid : eGrid;
+        var el = document.getElementById(id);
+        el.innerHTML = '';
+        for (var r = 0; r < GAME_SIZE; r++) {
+          for (var c = 0; c < GAME_SIZE; c++) {
+            var cell = document.createElement('div');
+            cell.className = 'cell';
+            var v = grid[r][c];
+            if (v === SHIP) cell.classList.add('ship');
+            if (v === HIT) cell.classList.add('hit');
+            if (v === MISS) cell.classList.add('miss');
+            cell.dataset.row = r; cell.dataset.col = c;
+            cell.dataset.board = idx === 0 ? 'player' : 'enemy';
+            el.appendChild(cell);
+          }
+        }
+      });
+      
+      document.getElementById('playerScore').textContent = gs.playerScore;
+      document.getElementById('enemyScore').textContent = gs.enemyScore;
+      document.getElementById('playerSunk').textContent = gs.shipsSunk;
+      document.getElementById('enemySunk').textContent = gs.enemyShipsSunk;
+      document.getElementById('myHits').textContent = gs.playerScore;
+      document.getElementById('enemyHits').textContent = gs.enemyScore;
+      
+      if (gs.gameState === PLAYING && phase === 'placing') {
+        phase = 'playing';
+        document.getElementById('phase').textContent = '⚔️ 战斗中!';
+        document.getElementById('msg').textContent = '点击右侧敌方海域进行炮击!';
+      }
+      
+      updateShipList();
+    }
+    
+    function updateShipList() {
+      var gs = getGameState(gamePtr);
+      var el = document.getElementById('shipList');
+      el.innerHTML = '';
+      for (var i = 0; i < NUM_SHIPS; i++) {
+        var item = document.createElement('div');
+        item.className = 'ship-item';
+        item.textContent = SHIP_NAMES[i];
+        if (i === gs.currentShip && gs.gameState === PLACING) item.classList.add('current');
+        if (i < gs.currentShip) item.classList.add('placed');
+        el.appendChild(item);
+      }
+    }
+    
+    window.toggleOrient = function() {
+      horizontal = !horizontal;
+      document.getElementById('orientBtn').textContent = horizontal ? '▶ 横向' : '▼ 纵向';
+      document.getElementById('msg').textContent = horizontal ? '点击网格放置战舰 (横向)' : '点击网格放置战舰 (纵向)';
+    };
+    
+    document.getElementById('playerBoard').addEventListener('click', e => {
+      if (phase !== 'placing') return;
+      var row = parseInt(e.target.dataset.row);
+      var col = parseInt(e.target.dataset.col);
+      var gs = getGameState(gamePtr);
+      if (gs.currentShip >= NUM_SHIPS) return;
+      var result = wasm.place_ship(gamePtr, gs.currentShip, row, col, horizontal ? 1 : 0);
+      if (result) {
+        currentShip++;
+        if (currentShip >= NUM_SHIPS) {
+          document.getElementById('phase').textContent = '⚔️ 战斗中!';
+          document.getElementById('msg').textContent = '点击右侧敌方海域进行炮击!';
+        }
+      }
+      render();
+    });
+    
+    document.getElementById('enemyBoard').addEventListener('click', e => {
+      var gs = getGameState(gamePtr);
+      if (gs.gameState !== PLAYING) return;
+      var row = parseInt(e.target.dataset.row);
+      var col = parseInt(e.target.dataset.col);
+      if (isNaN(row) || isNaN(col)) return;
+      var result = wasm.fire_at(gamePtr, row, col);
+      render();
+      if (result === 1) showGameOver(true);
+      else if (result === 2) showGameOver(false);
+    });
+    
+    function showGameOver(playerWins) {
+      var overlay = document.createElement('div');
+      overlay.className = 'game-over-overlay';
+      overlay.innerHTML = '<div class="game-over-title ' + (playerWins ? 'win' : 'lose') + '">' +
+        (playerWins ? '🏆 胜利!' : '💀 失败!') + '</div>' +
+        '<p style="color:#78909c;margin-bottom:20px;">' +
+        '你的命中: ' + getGameState(gamePtr).playerScore + ' | 敌方命中: ' + getGameState(gamePtr).enemyScore +
+        '</p>' +
+        '<button class="action-btn" onclick="location.reload()">再玩一局</button>';
+      document.body.appendChild(overlay);
+    }
+    
+    render();
+    updateShipList();
+  });
+});
+</script>
+</body>
+</html>

@@ -68,3 +68,8 @@ EMSCRIPTEN_KEEPALIVE
 int get_enemy_ships_sunk(Game* g) {
     return g->enemyShipsSunk;
 }
+
+EMSCRIPTEN_KEEPALIVE
+void reset_game(Game* g) {
+    initGame(g);
+}

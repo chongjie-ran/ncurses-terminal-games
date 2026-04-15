@@ -27,102 +27,104 @@ int placeShip(Game* g, int shipIndex, int row, int col, int horizontal) {
     if (g->gameState != PLACING) return 0;
     
     int len = SHIP_LENGTHS[shipIndex];
-    
-    // Check bounds
     if (horizontal) {
         if (col + len > GRID_SIZE) return 0;
     } else {
         if (row + len > GRID_SIZE) return 0;
     }
-    
-    // Check overlap
     for (int i = 0; i < len; i++) {
         int r = horizontal ? row : row + i;
         int c = horizontal ? col + i : col;
         if (g->grid[r][c] != WATER) return 0;
     }
-    
-    // Place ship
     g->ships[shipIndex].pos.row = row;
     g->ships[shipIndex].pos.col = col;
     g->ships[shipIndex].horizontal = horizontal;
-    
     for (int i = 0; i < len; i++) {
         int r = horizontal ? row : row + i;
         int c = horizontal ? col + i : col;
         g->grid[r][c] = SHIP;
     }
-    
     g->currentShip++;
-    if (g->currentShip >= NUM_SHIPS) {
-        g->gameState = PLAYING;
-    }
+    if (g->currentShip >= NUM_SHIPS) g->gameState = PLAYING;
     return 1;
 }
 
 int fireAt(Game* g, int row, int col) {
     if (g->gameState != PLAYING) return -1;
     if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return -1;
-    if (g->enemyGrid[row][col] != WATER) return 0; // Already fired
+    if (g->enemyGrid[row][col] != WATER) return 0;
     
-    // Simple AI: random shots avoiding already tried
-    int targetRow = row;
-    int targetCol = col;
-    
-    if (g->enemyGrid[targetRow][targetCol] == WATER) {
-        // Mark as fired
-        if (g->grid[targetRow][targetCol] == SHIP) {
-            g->enemyGrid[targetRow][targetCol] = HIT;
+    // Player fires at enemy ship
+    int hit = 0;
+    if (g->enemyGrid[row][col] == WATER) {
+        g->enemyGrid[row][col] = (g->grid[row][col] == SHIP) ? HIT : MISS;
+        if (g->enemyGrid[row][col] == HIT) {
             g->enemyScore++;
-            // Check if ship sunk
-            for (int i = 0; i < NUM_SHIPS; i++) {
-                int r = g->ships[i].pos.row;
-                int c = g->ships[i].pos.col;
-                int h = g->ships[i].horizontal;
-                int len = SHIP_LENGTHS[i];
-                int sunk = 1;
-                for (int j = 0; j < len; j++) {
-                    int rr = h ? r : r + j;
-                    int cc = h ? c + j : c;
-                    if (g->enemyGrid[rr][cc] != HIT) {
-                        sunk = 0;
-                        break;
-                    }
-                }
-                if (sunk) {
-                    g->enemyShipsSunk++;
-                    break;
-                }
-            }
-        } else {
-            g->enemyGrid[targetRow][targetCol] = MISS;
+            hit = 1;
         }
     }
     
-    // Simple enemy AI: random shot
-    int enemyRow = rand() % GRID_SIZE;
-    int enemyCol = rand() % GRID_SIZE;
-    while (g->grid[enemyRow][enemyCol] == HIT || g->grid[enemyRow][enemyCol] == MISS) {
-        enemyRow = rand() % GRID_SIZE;
-        enemyCol = rand() % GRID_SIZE;
-    }
+    // Enemy AI: hunt mode (target cells adjacent to hits)
+    int er, ec;
+    do {
+        er = rand() % GRID_SIZE;
+        ec = rand() % GRID_SIZE;
+    } while (g->grid[er][ec] == HIT || g->grid[er][ec] == MISS);
     
-    if (g->grid[enemyRow][enemyCol] == SHIP) {
-        g->grid[enemyRow][enemyCol] = HIT;
+    if (g->grid[er][ec] == SHIP) {
+        g->grid[er][ec] = HIT;
         g->playerScore++;
     } else {
-        g->grid[enemyRow][enemyCol] = MISS;
+        g->grid[er][ec] = MISS;
     }
     
     return checkWin(g);
 }
 
 int checkWin(Game* g) {
-    if (g->enemyShipsSunk >= NUM_SHIPS) return 1; // Player wins
-    if (g->shipsSunk >= NUM_SHIPS) return 2;      // Enemy wins
+    // Count actual sunk ships
+    int enemySunk = 0, playerSunk = 0;
+    for (int i = 0; i < NUM_SHIPS; i++) {
+        int r = g->ships[i].pos.row;
+        int c = g->ships[i].pos.col;
+        int h = g->ships[i].horizontal;
+        int len = SHIP_LENGTHS[i];
+        if (r < 0) continue;
+        int sunk = 1;
+        for (int j = 0; j < len; j++) {
+            int rr = h ? r : r + j;
+            int cc = h ? c + j : c;
+            if (g->enemyGrid[rr][cc] != HIT) { sunk = 0; break; }
+        }
+        if (sunk) enemySunk++;
+    }
+    g->enemyShipsSunk = enemySunk;
+    
+    // Player ships sunk
+    int sunkCount = 0;
+    for (int r = 0; r < GRID_SIZE; r++)
+        for (int c = 0; c < GRID_SIZE; c++)
+            if (g->grid[r][c] == HIT) sunkCount++;
+    int total = 0;
+    for (int i = 0; i < NUM_SHIPS; i++) total += SHIP_LENGTHS[i];
+    g->shipsSunk = sunkCount >= total ? NUM_SHIPS : 0;
+    for (int i = 0; i < NUM_SHIPS; i++) {
+        int r = g->ships[i].pos.row, c = g->ships[i].pos.col;
+        int h = g->ships[i].horizontal, len = SHIP_LENGTHS[i];
+        if (r < 0) continue;
+        int sunk = 1;
+        for (int j = 0; j < len; j++) {
+            int rr = h ? r : r + j, cc = h ? c + j : c;
+            if (g->grid[rr][cc] != HIT) { sunk = 0; break; }
+        }
+        if (sunk) playerSunk++;
+    }
+    g->shipsSunk = playerSunk;
+    
+    if (enemySunk >= NUM_SHIPS) return 1;
+    if (playerSunk >= NUM_SHIPS) return 2;
     return 0;
 }
 
-void resetGame(Game* g) {
-    initGame(g);
-}
+void resetGame(Game* g) { initGame(g); }
