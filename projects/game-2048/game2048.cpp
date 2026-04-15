@@ -91,8 +91,11 @@ public:
 
     // Slide and merge a single row to the left
     // Returns {moved, score_gained}
+    // BUG-FIX: use merged[] to prevent a tile from merging twice in one move
+    // Original bug: write_idx-- after merge caused next tile to overwrite merged position
     std::pair<bool, int> slide_row_left(std::array<int, GRID_SIZE>& row) {
         std::array<int, GRID_SIZE> new_row = {};
+        bool merged[GRID_SIZE] = {false};
         int write_idx = 0;
         int gained = 0;
         bool moved = false;
@@ -100,15 +103,15 @@ public:
         for (int i = 0; i < GRID_SIZE; ++i) {
             if (row[i] == 0) continue;
             
-            if (write_idx > 0 && new_row[write_idx - 1] == row[i] && row[i] > 0) {
-                // Merge
+            if (write_idx > 0 && new_row[write_idx - 1] == row[i] && !merged[write_idx - 1]) {
+                // Merge: combine with previous tile (only once per tile per move)
                 new_row[write_idx - 1] *= 2;
                 gained += new_row[write_idx - 1];
-                write_idx--;
+                merged[write_idx - 1] = true;  // Mark as merged
                 moved = true;
             } else {
                 new_row[write_idx++] = row[i];
-                if (write_idx - 1 != i) moved = true;
+                if (i >= write_idx) moved = true;
             }
         }
 
