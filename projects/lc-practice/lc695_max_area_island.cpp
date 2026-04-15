@@ -1,10 +1,9 @@
-// LC695 - Max Area of Island
-// 分类: DFS/BFS
-// 难度: Medium
-// 依赖: LC200 Number of Islands
-// 思路: 和LC200类似，但用DFS返回岛屿面积，求最大值
-// 时间: O(m*n), 空间: O(m*n)
-
+// LC695 Max Area of Island
+// Medium | DFS/BFS
+// 问题: grid中1的连通区域面积，求最大面积
+// 思路: 遍历每个格子，是1则DFS计算岛屿面积，取max
+// 技巧: grid[i][j]=0标记已访问，避免额外visited数组
+// 复杂度: O(mn)时间，O(mn)空间(递归栈)
 #include <iostream>
 #include <vector>
 using namespace std;
@@ -12,46 +11,35 @@ using namespace std;
 class Solution {
 public:
     int maxAreaOfIsland(vector<vector<int>>& grid) {
-        int m = grid.size(), n = grid[0].size();
-        int maxArea = 0;
-        
-        function<int(int,int)> dfs = [&](int r, int c) -> int {
-            if (r < 0 || r >= m || c < 0 || c >= n || grid[r][c] == 0)
-                return 0;
-            grid[r][c] = 0; // 标记已访问
-            return 1 + dfs(r+1, c) + dfs(r-1, c) + dfs(r, c+1) + dfs(r, c-1);
-        };
-        
+        if (grid.empty()) return 0;
+        int m = grid.size(), n = grid[0].size(), maxArea = 0;
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
                 if (grid[i][j] == 1) {
-                    int area = dfs(i, j);
-                    maxArea = max(maxArea, area);
+                    maxArea = max(maxArea, dfs(grid, i, j, m, n));
                 }
             }
         }
         return maxArea;
     }
+private:
+    int dfs(vector<vector<int>>& grid, int i, int j, int m, int n) {
+        if (i < 0 || i >= m || j < 0 || j >= n || grid[i][j] == 0) return 0;
+        grid[i][j] = 0; // 标记已访问
+        return 1 + dfs(grid, i+1, j, m, n) + dfs(grid, i-1, j, m, n)
+                   + dfs(grid, i, j+1, m, n) + dfs(grid, i, j-1, m, n);
+    }
 };
 
 int main() {
     Solution sol;
-    
-    // Test 1: single island
-    vector<vector<int>> g1 = {{1,1,0,0,0},{1,1,0,0,0},{0,0,0,1,1},{0,0,0,0,0}};
+    vector<vector<int>> g1 = {{1,1},{1,1}};
     cout << sol.maxAreaOfIsland(g1) << endl; // 4
-    
-    // Test 2: all 1s 2x3
-    vector<vector<int>> g2 = {{1,1,1},{1,1,1}};
-    cout << sol.maxAreaOfIsland(g2) << endl; // 6
-    
-    // Test 3: single cell
+    vector<vector<int>> g2 = {{0,1,0},{1,1,1},{0,1,0}};
+    cout << sol.maxAreaOfIsland(g2) << endl; // 5
     vector<vector<int>> g3 = {{1}};
     cout << sol.maxAreaOfIsland(g3) << endl; // 1
-    
-    // Test 4: all zeros
     vector<vector<int>> g4 = {{0,0},{0,0}};
     cout << sol.maxAreaOfIsland(g4) << endl; // 0
-    
     return 0;
 }
