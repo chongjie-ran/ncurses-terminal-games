@@ -3211,3 +3211,66 @@ for (int price : prices) {
 - ⏳ V3.4 - 等待授权
 
 *悟通自主检查完成 | 2026-04-15 10:51 CST*
+
+## 悟通自主检查 - 2026-04-15 11:55
+
+### BUG-010 game-2048 合并行Bug修复 ✅ 已提交
+
+**问题**: 游戏2048滑动时相同数字方块会在同一轮合并多次
+**根因**: write_idx-- 后下一个方块覆盖合并位置
+**修复**: 使用 merged[] 数组标记已合并位置，防止双合并
+**验证**: 2,2,2,2 → 4,4 (修复前: 8) ✅
+
+```cpp
+// Fix: 添加 merged[] 数组
+bool merged[GRID_SIZE] = {false};
+if (write_idx > 0 && new_row[write_idx - 1] == row[i] && !merged[write_idx - 1]) {
+    new_row[write_idx - 1] *= 2;
+    merged[write_idx - 1] = true;  // 防双合并
+}
+```
+
+### Git提交记录 (今日)
+| Commit | 说明 |
+|--------|------|
+| ebeade1 | fix(game-2048): BUG-010 merge fix |
+| 328f7fa | feat(battleship-wasm): complete WASM build |
+| 9d0a028 | chore(wasm-game-builder): deps + test spec |
+
+### 今日LC练习完成
+| 题目 | 类型 | 结果 |
+|------|------|------|
+| LC91 Decode Ways | DP-Catalan | ✅ 7/7通过 |
+| LC96 Unique BST | DP-Catalan | ✅ 7/7通过 |
+
+### DP专题进度
+- [x] 路径DP (LC62/63)
+- [x] 背包DP (LC322/416)
+- [x] LIS (LC300)
+- [x] LCS (LC1143)
+- [x] 编辑距离 (LC72)
+- [x] 股票买卖 (LC121/122/123/188/309/714)
+- [x] 区间DP (LC312)
+- [x] Catalan/BST (LC91/LC96)
+- [ ] 状压DP
+- [ ] 树形DP
+
+### 项目状态
+- javis-claude-core: ✅ clean + pushed
+- game-2048: ✅ BUG-010 fixed + committed
+- battleship-wasm: ✅ built + committed
+- V3.4: ⏳ 等待授权
+- power-broker: ✅
+- model-league: ✅
+
+### 待提交SC汇报
+
+**悟通自主检查完成 - 2026-04-15 11:55**
+
+1. ✅ BUG-010 game-2048合并行修复已提交 (commit ebeade1)
+2. ✅ battleship-wasm WASM构建完成已提交 (commit 328f7fa)
+3. ✅ LC91/LC96 Catalan DP 7/7通过
+4. ✅ 3个commit已push到origin/main
+5. ✅ javis-claude-core clean
+
+*悟通自主检查完成 | 2026-04-15 11:55 CST*
