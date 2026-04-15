@@ -1,58 +1,48 @@
-// LC22: Generate Parentheses
-// Pattern: Backtracking / Recursion / Stack
-// Difficulty: Medium
-// Date: 2026-04-01
-
+// LC22 Generate Parentheses - 2026-04-15 07:08
+// 回溯：左右括号数量平衡
 #include <iostream>
 #include <vector>
 #include <string>
+#include <functional>
 using namespace std;
 
-// Backtracking approach
-// Key insight: at each step, can add '(' if open < n, add ')' if close < open
-void backtrack(vector<string>& result, string& current, int open, int close, int n) {
-    if (current.size() == n * 2) {
-        result.push_back(current);
-        return;
+class Solution {
+public:
+    vector<string> generateParenthesis(int n) {
+        vector<string> result;
+        string path;
+        function<void(int,int)> backtrack = [&](int left, int right) {
+            if (path.size() == 2 * n) {
+                result.push_back(path);
+                return;
+            }
+            if (left < n) {
+                path.push_back('(');
+                backtrack(left + 1, right);
+                path.pop_back();
+            }
+            if (right < left) {
+                path.push_back(')');
+                backtrack(left, right + 1);
+                path.pop_back();
+            }
+        };
+        backtrack(0, 0);
+        return result;
     }
-    
-    // Can add '(' if we haven't used all n
-    if (open < n) {
-        current.push_back('(');
-        backtrack(result, current, open + 1, close, n);
-        current.pop_back();
-    }
-    
-    // Can add ')' if we have more open than close
-    if (close < open) {
-        current.push_back(')');
-        backtrack(result, current, open, close + 1, n);
-        current.pop_back();
-    }
-}
-
-vector<string> generateParenthesis(int n) {
-    vector<string> result;
-    string current;
-    backtrack(result, current, 0, 0, n);
-    return result;
-}
+};
 
 int main() {
-    // Test n=3 (standard)
-    auto r3 = generateParenthesis(3);
-    cout << "n=3: " << r3.size() << " combinations" << endl;
-    for (auto& s : r3) cout << "  " << s << endl;
+    Solution s;
+    auto r = s.generateParenthesis(3);
+    cout << "n=3: " << r.size() << " combinations" << endl;
+    for (auto& str : r) cout << str << endl;
     
-    // Test n=1
-    auto r1 = generateParenthesis(1);
-    cout << "n=1: ";
-    for (auto& s : r1) cout << s << " ";
-    cout << endl;
+    auto r2 = s.generateParenthesis(1);
+    cout << "\nn=1: " << r2.size() << " combinations" << endl;
+    for (auto& str : r2) cout << str << endl;
     
-    // Catlan number check: C_n = (2n)!/(n!(n+1)!)
-    // n=3: C_3 = 5 ✓
-    cout << "\nCatalan numbers: n=1->1, n=2->2, n=3->5, n=4->14" << endl;
-    
+    auto r4 = s.generateParenthesis(4);
+    cout << "\nn=4: " << r4.size() << " combinations (expected 14)" << endl;
     return 0;
 }

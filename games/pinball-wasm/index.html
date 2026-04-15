@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pinball WASM</title>
+<style>
+body { background:#111; margin:0; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; }
+canvas { border:2px solid #333; background:#1a1a2e; }
+#ui { position:absolute; top:10px; left:10px; color:#fff; }
+</style>
+</head>
+<body>
+<div id="ui">Score: <span id="score">0</span> Lives: <span id="lives">3</span></div>
+<canvas id="c" width="400" height="700"></canvas>
+<script>
+Module = {};
+fetch('pinball.wasm').then(r => r.arrayBuffer()).then(buf => {
+    Module.wasmBinary = buf;
+    importScripts('pinball.js');
+});
+const C = document.getElementById('c'), X = C.getContext('2d');
+let W = {}, keys = {}, LB = 0, RB = 0;
+
+document.addEventListener('keydown', e => { keys[e.keyCode] = 1; if(e.keyCode==90) LB=1; if(e.keyCode==88) RB=1; });
+document.addEventListener('keyup', e => { keys[e.keyCode] = 0; if(e.keyCode==90) LB=0; if(e.keyCode==88) RB=0; });
+
+function render() {
+    X.clearRect(0,0,400,700);
+    X.fillStyle = '#fff';
+    // Draw bumpers
+    const bc = Module.get_bumper_count ? Module.get_bumper_count() : 5;
+    for(let i=0;i<bc;i++){
+        const bx=Module.get_bumper_x(i), by=Module.get_bumper_y(i), br=Module.get_bumper_radius_i();
+        X.beginPath(); X.arc(bx,by,br,0,Math.PI*2);
+        X.fillStyle = Module.get_bumper_hit(i) ? '#f80' : '#e33'; X.fill();
+    }
+    // Draw ball
+    if(Module.get_ball_active()){
+        X.beginPath(); X.arc(Module.get_ball_x(), Module.get_ball_y(), Module.get_ball_radius(), 0, Math.PI*2);
+        X.fillStyle='#fff'; X.fill();
+    }
+    // Draw paddle
+    const px=Module.get_paddle_x(), pw=Module.get_paddle_width(), ph=Module.get_paddle_height();
+    X.fillStyle='#0af'; X.fillRect(px-pw/2, 640, pw, ph);
+    // Draw flippers
+    X.strokeStyle='#0af'; X.lineWidth=6;
+    X.beginPath(); X.moveTo(Module.get_left_flipper_x(), 660);
+    X.lineTo(Module.get_left_flipper_x()+50*Math.cos(Module.get_left_flipper_angle()), 660+50*Math.sin(Module.get_left_flipper_angle()));
+    X.stroke();
+    // UI
+    if(Module.get_score) document.getElementById('score').textContent = Module.get_score();
+    if(Module.get_lives) document.getElementById('lives').textContent = Module.get_lives();
+}
+function loop() {
+    const dt = 1/60;
+    for(let k in keys) if(keys[k]) Module.set_key(k, 1);
+    Module.set_left_flipper(LB);
+    Module.set_right_flipper(RB);
+    Module.game_tick(dt);
+    render();
+    requestAnimationFrame(loop);
+}
+Module.onRuntimeInitialized = () => { Module.game_reset(); loop(); };
+</script>
+</body>
+</html>

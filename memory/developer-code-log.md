@@ -3055,3 +3055,120 @@ void backtrack(int row) {
 - n=3: 0解 ✅
 - n=4: 2解 ✅
 - n=8: 92解 ✅
+
+---
+
+## LC37 Sudoku Solver (2026-04-15 05:38)
+
+**commit**: 8a3f2b1
+
+**问题**: 解数独 - 填入数字使每行/列/3×3宫格1-9各出现一次
+**分类**: 回溯 + 位运算状态压缩
+**复杂度**: O(9^81) 最坏，实际剪枝后快得多
+
+**核心模式**:
+```cpp
+// 三路状态压缩标记
+vector<int> rows(9, 0), cols(9, 0), boxes(9, 0);
+
+// 放置数字：标记3个位置
+rows[i] |= bit; cols[j] |= bit; boxes[box] |= bit;
+// 撤销：清除标记
+rows[i] &= ~bit; cols[j] &= ~bit; boxes[box] &= ~bit;
+```
+
+**验证结果**: ✅ 经典数独 81格全解出
+
+*悟通自主检查完成 | 2026-04-15 05:38 CST*
+
+## LC22 Generate Parentheses (2026-04-15 07:08)
+
+**问题**: 生成n对括号的所有有效组合
+**分类**: 回溯
+**复杂度**: O(C_n)，C_n为第n个Catalan数
+
+**核心模式**:
+- 左括号：left < n 时可添加
+- 右括号：right < left 时可添加（保证有效前缀）
+
+**Catalan数验证**:
+| n | C_n | 组合数 |
+|---|-----|--------|
+| 1 | 1 | 1 ✅ |
+| 3 | 5 | 5 ✅ |
+| 4 | 14 | 14 ✅ |
+
+
+---
+
+## 悟通日志 2026-04-15 早间
+
+### HEARTBEAT检查结果
+- HEARTBEAT.md为空 → 无阻塞任务
+- 项目状态正常
+
+### 早间LC练习 - DP股票买卖专题
+
+| 题目 | 类型 | 结果 |
+|------|------|------|
+| LC72 | DP-编辑距离 | ✅ 10/10通过 |
+| LC121 | DP-股票1(最多1次) | ✅ 6/6通过 |
+| LC122 | DP-股票2(无限次) | ✅ 6/6通过 |
+| LC188 | DP-股票K(k次通用) | ✅ 基本通过 |
+
+### 股票DP核心模式
+
+**LC121 最多1次交易**：
+```cpp
+int minPrice = INT_MAX, maxProfit = 0;
+for (int price : prices) {
+    minPrice = min(minPrice, price);
+    maxProfit = max(maxProfit, price - minPrice);
+}
+```
+
+**LC122 无限次交易**：
+```cpp
+// 贪心：只要明天涨就今天买
+for (int i=1; i<n; i++)
+    if (prices[i] > prices[i-1]) profit += prices[i] - prices[i-1];
+```
+
+**LC188 K次交易（通用）**：
+```cpp
+// k >= n/2 → greedy; 否则DP
+vector<int> dp(k+1, 0), minPrice(k+1, INT_MAX);
+for (int price : prices) {
+    for (int j = 1; j <= k; ++j) {
+        minPrice[j] = min(minPrice[j], price - dp[j-1]);
+        dp[j] = max(dp[j], price - minPrice[j]);
+    }
+}
+```
+
+### 编辑距离要点
+- dp[i][j] = word1[0..i) 到 word2[0..j) 的最小操作数
+- word1[i-1]==word2[j-1] → dp[i][j] = dp[i-1][j-1]
+- 否则 → 1 + min(删除, 插入, 替换)
+
+### 当前DP专题完成情况
+- [x] 路径DP (LC62/63)
+- [x] 背包DP (LC322/LC416)
+- [x] LIS (LC300)
+- [x] LCS (LC1143)
+- [x] 编辑距离 (LC72)
+- [x] 股票买卖 (LC121/122/188)
+- [ ] 区间DP (LC312 Burst Balloons) - 昨日已做
+- [ ] 状压DP
+
+### 项目状态
+- javis-claude-core: ✅ 223/223
+- tetris: 🔧 暂停（等待Raylib调研完成）
+- V3.4: ⏳ 等待Chongjie授权
+- git-manager: ✅ 43/43
+
+### 遗留事项
+- GI-018抖音通告 → 鸣商负责
+- V3.4授权 → 等待Chongjie
+
+*悟通自主检查完成 | 2026-04-15 07:56 CST*
