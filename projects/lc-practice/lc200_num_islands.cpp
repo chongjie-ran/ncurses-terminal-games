@@ -1,110 +1,44 @@
-// LC200 Number of Islands
-// Medium | DFS/BFS/Union-Find
 #include <iostream>
 #include <vector>
 using namespace std;
 
-// 方法1: DFS
-void dfs(vector<vector<char>>& grid, int i, int j) {
-    int m = grid.size(), n = grid[0].size();
-    if (i < 0 || i >= m || j < 0 || j >= n || grid[i][j] == '0') return;
-    grid[i][j] = '0';  // 标记已访问
-    dfs(grid, i+1, j);
-    dfs(grid, i-1, j);
-    dfs(grid, i, j+1);
-    dfs(grid, i, j-1);
+// 200. Number of Islands
+// 洪水填充(DFS/BFS)：遍历网格，碰到'1'则DFS填掉整个岛屿，计数+1
+// 复杂度：O(M*N) 时间, O(M*N) 空间(递归栈)
+
+// 方向：上下左右
+const int DIR[4][2] = {{-1,0},{1,0},{0,-1},{0,1}};
+
+void dfs(vector<vector<char>>& grid, int i, int j, int m, int n) {
+    if (i<0||i>=m||j<0||j>=n||grid[i][j]!='1') return;
+    grid[i][j] = '0'; // 填掉
+    for (auto& d : DIR) {
+        dfs(grid, i+d[0], j+d[1], m, n);
+    }
 }
 
-int numIslands1(vector<vector<char>>& grid) {
+int numIslands(vector<vector<char>>& grid) {
     if (grid.empty()) return 0;
-    int m = grid.size(), n = grid[0].size(), count = 0;
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            if (grid[i][j] == '1') {
+    int m=grid.size(), n=grid[0].size(), count=0;
+    for (int i=0;i<m;i++) {
+        for (int j=0;j<n;j++) {
+            if (grid[i][j]=='1') {
                 count++;
-                dfs(grid, i, j);
+                dfs(grid, i, j, m, n);
             }
         }
     }
     return count;
 }
 
-// 方法2: Union-Find
-class UnionFind {
-public:
-    UnionFind(int m, int n, vector<vector<char>>& grid) {
-        parent.resize(m * n);
-        rank.resize(m * n, 0);
-        count = 0;
-        for (int i = 0; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                int id = i * n + j;
-                parent[id] = id;
-                if (grid[i][j] == '1') count++;
-            }
-        }
-    }
-    
-    int find(int x) {
-        if (parent[x] != x) parent[x] = find(parent[x]);
-        return parent[x];
-    }
-    
-    void unite(int x, int y) {
-        int px = find(x), py = find(y);
-        if (px == py) return;
-        if (rank[px] < rank[py]) swap(px, py);
-        parent[py] = px;
-        if (rank[px] == rank[py]) rank[px]++;
-        count--;
-    }
-    
-    int getCount() { return count; }
-    
-private:
-    vector<int> parent, rank;
-    int count;
-};
-
-int numIslands2(vector<vector<char>>& grid) {
-    if (grid.empty()) return 0;
-    int m = grid.size(), n = grid[0].size();
-    UnionFind uf(m, n, grid);
-    vector<pair<int,int>> dirs = {{1,0},{-1,0},{0,1},{0,-1}};
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            if (grid[i][j] == '1') {
-                int id = i * n + j;
-                for (auto [dx, dy] : dirs) {
-                    int ni = i + dx, nj = j + dy;
-                    if (ni >= 0 && ni < m && nj >= 0 && nj < n && grid[ni][nj] == '1') {
-                        uf.unite(id, ni * n + nj);
-                    }
-                }
-            }
-        }
-    }
-    return uf.getCount();
-}
-
 int main() {
-    vector<vector<char>> g1 = {
-        {'1','1','1','1','0'},
-        {'1','1','0','1','0'},
-        {'1','1','0','0','0'},
-        {'0','0','0','0','0'}
-    };
-    cout << numIslands1(g1) << endl; // 1
-    cout << numIslands2(g1) << endl; // 1
-    
-    vector<vector<char>> g2 = {
+    // 测试
+    vector<vector<char>> grid = {
         {'1','1','0','0','0'},
         {'1','1','0','0','0'},
         {'0','0','1','0','0'},
         {'0','0','0','1','1'}
     };
-    cout << numIslands1(g2) << endl; // 3
-    cout << numIslands2(g2) << endl; // 3
-    
+    cout << "Islands: " << numIslands(grid) << endl; // 3
     return 0;
 }

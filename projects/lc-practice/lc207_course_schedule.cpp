@@ -1,75 +1,61 @@
-// LC207 Course Schedule - 拓扑排序 (BFS/DFS)
-// 2026-03-31 07:45
-// 判断是否有环 + 返回学习顺序
+// LC207 Course Schedule - 课程表 (检测有向图环 / 拓扑排序)
+#include <iostream>
 #include <vector>
 #include <queue>
 using namespace std;
 
-// BFS拓扑排序 (Kahn算法)
-bool canFinishBFS(int numCourses, vector<vector<int>>& prerequisites) {
+// 方法1: BFS拓扑排序 (Kahn算法) - 统计能完成的课程数
+bool canFinish1(int numCourses, vector<pair<int,int>>& prerequisites) {
     vector<vector<int>> adj(numCourses);
     vector<int> indegree(numCourses, 0);
     for (auto& p : prerequisites) {
-        adj[p[1]].push_back(p[0]);  // p[1] -> p[0]
-        indegree[p[0]]++;
+        adj[p.second].push_back(p.first);
+        indegree[p.first]++;
     }
     
     queue<int> q;
     for (int i = 0; i < numCourses; i++)
         if (indegree[i] == 0) q.push(i);
     
-    int visited = 0;
+    int count = 0;
     while (!q.empty()) {
         int u = q.front(); q.pop();
-        visited++;
+        count++;
         for (int v : adj[u]) {
-            indegree[v]--;
-            if (indegree[v] == 0) q.push(v);
+            if (--indegree[v] == 0) q.push(v);
         }
     }
-    return visited == numCourses;
+    return count == numCourses;
 }
 
-// DFS检测环
-bool dfs(int u, vector<vector<int>>& adj, vector<int>& state, vector<int>& order) {
+// 方法2: DFS检测环
+bool dfsCycle(int u, vector<vector<int>>& adj, vector<int>& state) {
     state[u] = 1; // visiting
     for (int v : adj[u]) {
-        if (state[v] == 1) return false; // 环
-        if (state[v] == 0 && !dfs(v, adj, state, order)) return false;
+        if (state[v] == 1) return true;  // 环
+        if (state[v] == 0 && dfsCycle(v, adj, state)) return true;
     }
     state[u] = 2; // done
-    order.push_back(u);
-    return true;
+    return false;
 }
 
-bool canFinishDFS(int numCourses, vector<vector<int>>& prerequisites) {
+bool canFinish2(int numCourses, vector<pair<int,int>>& prerequisites) {
     vector<vector<int>> adj(numCourses);
-    for (auto& p : prerequisites)
-        adj[p[1]].push_back(p[0]);
-    
+    for (auto& p : prerequisites) adj[p.second].push_back(p.first);
     vector<int> state(numCourses, 0); // 0=unvisited, 1=visiting, 2=done
-    vector<int> order;
-    
-    for (int i = 0; i < numCourses; i++) {
-        if (state[i] == 0) {
-            if (!dfs(i, adj, state, order)) return false;
-        }
-    }
+    for (int i = 0; i < numCourses; i++)
+        if (state[i] == 0 && dfsCycle(i, adj, state)) return false;
     return true;
 }
 
-// 返回学习顺序 (LC210)
-vector<int> findOrder(int numCourses, vector<vector<int>>& prerequisites) {
-    vector<vector<int>> adj(numCourses);
-    for (auto& p : prerequisites)
-        adj[p[1]].push_back(p[0]);
+int main() {
+    vector<pair<int,int>> pre1 = {{1,0},{0,1}}; // 环: 0->1->0
+    cout << canFinish1(2, pre1) << endl; // 0
+    cout << canFinish2(2, pre1) << endl; // 0
     
-    vector<int> state(numCourses, 0), order;
-    for (int i = 0; i < numCourses; i++) {
-        if (state[i] == 0) {
-            if (!dfs(i, adj, state, order)) return {}; // 有环
-        }
-    }
-    reverse(order.begin(), order.end()); // 逆序得到正确顺序
-    return order;
+    vector<pair<int,int>> pre2 = {{1,0},{2,1},{3,2}}; // 链
+    cout << canFinish1(4, pre2) << endl; // 1
+    cout << canFinish2(4, pre2) << endl; // 1
+    
+    return 0;
 }
