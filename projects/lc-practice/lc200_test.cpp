@@ -1,38 +1,12 @@
-// LC200 Number of Islands
-// Medium | DFS/BFS/Union-Find
+// LC200 Number of Islands - Fixed
 #include <iostream>
 #include <vector>
 using namespace std;
 
-// 方法1: DFS
-void dfs(vector<vector<char>>& grid, int i, int j) {
-    int m = grid.size(), n = grid[0].size();
-    if (i < 0 || i >= m || j < 0 || j >= n || grid[i][j] == '0') return;
-    grid[i][j] = '0';  // 标记已访问
-    dfs(grid, i+1, j);
-    dfs(grid, i-1, j);
-    dfs(grid, i, j+1);
-    dfs(grid, i, j-1);
-}
-
-int numIslands1(vector<vector<char>>& grid) {
-    if (grid.empty()) return 0;
-    int m = grid.size(), n = grid[0].size(), count = 0;
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            if (grid[i][j] == '1') {
-                count++;
-                dfs(grid, i, j);
-            }
-        }
-    }
-    return count;
-}
-
-// 方法2: Union-Find
+// Union-Find
 class UnionFind {
 public:
-    UnionFind(int m, int n, vector<vector<char>>& grid) {
+    UnionFind(int m, int n, const vector<vector<char>>& grid) {
         parent.resize(m * n);
         rank.resize(m * n, 0);
         count = 0;
@@ -66,7 +40,7 @@ private:
     int count;
 };
 
-int numIslands2(vector<vector<char>>& grid) {
+int numIslandsUF(vector<vector<char>>& grid) {
     if (grid.empty()) return 0;
     int m = grid.size(), n = grid[0].size();
     UnionFind uf(m, n, grid);
@@ -75,8 +49,8 @@ int numIslands2(vector<vector<char>>& grid) {
         for (int j = 0; j < n; j++) {
             if (grid[i][j] == '1') {
                 int id = i * n + j;
-                for (auto [dx, dy] : dirs) {
-                    int ni = i + dx, nj = j + dy;
+                for (auto d : dirs) {
+                    int ni = i + d.first, nj = j + d.second;
                     if (ni >= 0 && ni < m && nj >= 0 && nj < n && grid[ni][nj] == '1') {
                         uf.unite(id, ni * n + nj);
                     }
@@ -94,8 +68,7 @@ int main() {
         {'1','1','0','0','0'},
         {'0','0','0','0','0'}
     };
-    cout << numIslands1(g1) << endl; // 1
-    cout << numIslands2(g1) << endl; // 1
+    cout << numIslandsUF(g1) << endl; // 1
     
     vector<vector<char>> g2 = {
         {'1','1','0','0','0'},
@@ -103,8 +76,7 @@ int main() {
         {'0','0','1','0','0'},
         {'0','0','0','1','1'}
     };
-    cout << numIslands1(g2) << endl; // 3
-    cout << numIslands2(g2) << endl; // 3
+    cout << numIslandsUF(g2) << endl; // 3
     
     return 0;
 }

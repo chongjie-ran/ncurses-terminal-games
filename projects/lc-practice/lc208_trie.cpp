@@ -1,62 +1,56 @@
-// LC208 Implement Trie (Prefix Tree)
-// Medium - Trie
+// LC208 实现Trie（前缀树）
+#include <iostream>
+#include <unordered_map>
 #include <string>
-#include <vector>
 using namespace std;
 
-class TrieNode {
-public:
-    TrieNode* children[26];
-    bool is_end;
-    TrieNode() {
-        for (int i = 0; i < 26; i++) children[i] = nullptr;
-        is_end = false;
-    }
-};
-
 class Trie {
-    TrieNode* root;
+private:
+    struct Node {
+        unordered_map<char, Node*> children;
+        bool isEnd = false;
+    };
+    Node* root;
 public:
-    Trie() { root = new TrieNode(); }
+    Trie() { root = new Node(); }
     
     void insert(string word) {
-        TrieNode* node = root;
+        Node* node = root;
         for (char c : word) {
-            int idx = c - 'a';
-            if (!node->children[idx]) node->children[idx] = new TrieNode();
-            node = node->children[idx];
+            if (!node->children.count(c)) {
+                node->children[c] = new Node();
+            }
+            node = node->children[c];
         }
-        node->is_end = true;
+        node->isEnd = true;
     }
     
     bool search(string word) {
-        TrieNode* node = root;
+        Node* node = root;
         for (char c : word) {
-            int idx = c - 'a';
-            if (!node->children[idx]) return false;
-            node = node->children[idx];
+            if (!node->children.count(c)) return false;
+            node = node->children[c];
         }
-        return node->is_end;
+        return node->isEnd;
     }
     
     bool startsWith(string prefix) {
-        TrieNode* node = root;
+        Node* node = root;
         for (char c : prefix) {
-            int idx = c - 'a';
-            if (!node->children[idx]) return false;
-            node = node->children[idx];
+            if (!node->children.count(c)) return false;
+            node = node->children[c];
         }
         return true;
     }
 };
 
-/**
- * 核心洞察:
- * - Trie是前缀树,每个节点有26个子指针(字母表)
- * - insert: 沿路径走,没有就创建,最后标记end
- * - search: 沿路径走,不存在返回false,存在但不是end也返回false
- * - startsWith: 同search但不检查end
- * 
- * 时间复杂度: O(n) per operation, n=word/prefix长度
- * 空间复杂度: O(ALPHABET_SIZE * n) 最坏情况
- */
+int main() {
+    Trie trie;
+    trie.insert("apple");
+    cout << trie.search("apple") << endl;    // 1
+    cout << trie.search("app") << endl;      // 0
+    cout << trie.startsWith("app") << endl;  // 1
+    trie.insert("app");
+    cout << trie.search("app") << endl;      // 1
+    return 0;
+}
