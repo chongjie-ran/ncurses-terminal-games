@@ -27,6 +27,11 @@ int battleship_get_ships_sunk(void) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+int battleship_get_computer_ships_sunk(void) {
+    return battleship_get_computer_ships_sunk_impl();
+}
+
+EMSCRIPTEN_KEEPALIVE
 int battleship_get_hit_count(void) {
     return battleship_get_hit_count_impl();
 }
@@ -49,4 +54,9 @@ int battleship_place_ship(int ship_idx, int row, int col, int horizontal) {
 EMSCRIPTEN_KEEPALIVE
 int battleship_shoot(int row, int col) {
     return battleship_shoot_impl(row, col);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int battleship_computer_turn(void) {
+    return battleship_computer_turn_impl();
 }

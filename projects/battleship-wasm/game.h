@@ -22,8 +22,8 @@
 // Game states
 #define STATE_PLACING  0
 #define STATE_PLAYING  1
-#define STATE_WIN       2
-#define STATE_LOSE      3
+#define STATE_WIN      2
+#define STATE_LOSE     3
 
 // Internal types
 typedef struct {
@@ -58,8 +58,9 @@ int  battleship_get_ships_sunk_impl(void);
 int  battleship_get_hit_count_impl(void);
 int  battleship_get_miss_count_impl(void);
 int  battleship_get_ship_count_impl(void);
+int  battleship_get_computer_ships_sunk_impl(void);
 int  battleship_place_ship_impl(int ship_idx, int row, int col, int horizontal);
 int  battleship_shoot_impl(int row, int col);
-int  battleship_check_win_impl(void);
+int  battleship_computer_turn_impl(void);
 
 #endif // GAME_H

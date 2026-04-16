@@ -109,6 +109,8 @@
   <div class="status-item"><span class="status-label">Hits:</span><span class="status-value" id="hits">0</span></div>
   <div class="status-item"><span class="status-label">Misses:</span><span class="status-value" id="misses">0</span></div>
   <div class="status-item"><span class="status-label">Sunk:</span><span class="status-value" id="sunk">0</span></div>
+  <div class="status-item"><span class="status-label">Enemy Down:</span><span class="status-value" id="enemy-sunk">0</span></div>
+  <div class="status-item"><span class="status-label">Hits Taken:</span><span class="status-value" id="hits-taken">0</span></div>
 </div>
 
 <div class="phase-banner" id="phase-banner">🚢 Phase 1: Place Your Ships</div>
@@ -393,13 +395,23 @@ function onEnemyBoardClick(r, c) {
   const result = Module._battleship_shoot(r, c);
   if (result === -1) return; // Already shot or invalid
 
-  renderBoards();
-  updateStatusBar();
-
-  const newState = Module._battleship_get_game_state();
-  if (newState === 2) { // WIN
+  let newState = Module._battleship_get_game_state();
+  if (newState === 2) {
+    renderBoards();
+    updateStatusBar();
     showResult(true);
+    return;
   }
+
+  // Computer's turn
+  setTimeout(() => {
+    if (!gameReady) return;
+    Module._battleship_computer_turn();
+    newState = Module._battleship_get_game_state();
+    renderBoards();
+    updateStatusBar();
+    if (newState === 3) showResult(false);
+  }, 400);
 }
 
 function renderBoards() {
@@ -437,6 +449,13 @@ function updateStatusBar() {
   document.getElementById('hits').textContent = Module._battleship_get_hit_count();
   document.getElementById('misses').textContent = Module._battleship_get_miss_count();
   document.getElementById('sunk').textContent = Module._battleship_get_ships_sunk();
+  document.getElementById('enemy-sunk').textContent = Module._battleship_get_computer_ships_sunk();
+  // Hits taken = computer hits on player board (board_type=2)
+  let taken = 0;
+  for (let r = 0; r < BOARD_SIZE; r++)
+    for (let c = 0; c < BOARD_SIZE; c++)
+      if (Module._battleship_get_cell(2, r, c) === 2) taken++;
+  document.getElementById('hits-taken').textContent = taken;
 }
 
 function showResult(win) {
@@ -448,7 +467,7 @@ function showResult(win) {
   const hits = Module._battleship_get_hit_count();
   const misses = Module._battleship_get_miss_count();
   const sunk = Module._battleship_get_ships_sunk();
-  stats.textContent = 'Hits: ' + hits + ' | Misses: ' + misses + ' | Ships Sunk: ' + sunk + '/' + SHIPS.length;
+  stats.textContent = 'Your Hits: ' + hits + ' | Misses: ' + misses + ' | Enemy Ships Down: ' + enemySunk + '/' + SHIPS.length;
   overlay.classList.remove('hidden');
 }
 
