@@ -1,155 +1,134 @@
-# LC练习 2026-04-16 下午
+# LC练习 2026-04-16 下午（续）
 
-## 09:30 动态规划专题
-
-### LC70 爬楼梯
-**问题**: n阶台阶，每次1或2步，几种走法？
-**模式**: 斐波那契，dp[i]=dp[i-1]+dp[i-2]，空间O(1)
-```cpp
-int climbStairs(int n) {
-    if (n <= 2) return n;
-    int dp1=1, dp2=2;
-    for (int i=3; i<=n; i++) { int dp3=dp1+dp2; dp1=dp2; dp2=dp3; }
-    return dp2;
-}
-```
-
-### LC322 零钱兑换
-**问题**: 最少硬币数凑成amount
-**模式**: 完全背包，dp初始化INF，dp[0]=0
-```cpp
-vector<int> dp(amount+1, INF); dp[0]=0;
-for (int a=1; a<=amount; a++)
-    for (int c: coins)
-        if (a>=c) dp[a]=min(dp[a], dp[a-c]+1);
-```
-
-### LC300 最长递增子序列
-**问题**: 非连续最长上升子序列长度
-**模式**: O(n²) DP，外层i遍历，内层j< i时更新
-```cpp
-for (int i=0; i<n; i++)
-    for (int j=0; j<i; j++)
-        if (nums[j]<nums[i]) dp[i]=max(dp[i], dp[j]+1);
-```
-
-### LC64 最小路径和
-**问题**: 网格左上到右下路径最小和（只能右/下移动）
-**模式**: 2D DP，第一行/列累加，其余取min
-```cpp
-dp[i][j] = min(dp[i-1][j], dp[i][j-1]) + grid[i][j];
-```
-
-### 验证结果
-| 题目 | 输入 | 输出 | 期望 |
-|------|------|------|------|
-| LC70 | n=5 | 8 | ✓ |
-| LC322 | [1,2,5], 11 | 3 | ✓ |
-| LC322 | [2], 3 | -1 | ✓ |
-| LC300 | [10,9,2,5,3,7,101,18] | 4 | ✓ |
-| LC64 | [[1,3,1],[1,5,1],[4,2,1]] | 7 | ✓ |
-
-### 04-16 累计
-| 专题 | 题数 |
-|------|------|
-| Floyd判圈 | 2题 |
-| LFU缓存 | 1题 |
-| 图论-拓扑 | 3题 |
-| 回溯-组合 | 4题 |
-| BFS/DFS岛屿 | 2题 |
-| 位运算 | 7题 |
-| DP动态规划 | 4题 |
-| **总计** | **23题** |
+## 12:13 单调队列 + KMP专题
 
 ---
 
-## 10:09 单调栈专题
-
-### 核心模式
-**Next Greater Element**: 维护递减栈，找右边第一个比当前大的元素
+### 单调队列核心模式
+**滑动窗口最大值**: 维护递减双端队列，队首永远是当前窗口最大
 ```cpp
-vector<int> nextGreaterElement(vector<int>& nums) {
-    vector<int> res(nums.size(), -1);
-    stack<int> st; // 存索引，递减栈
-    for (int i=0; i<nums.size(); i++) {
-        while (!st.empty() && nums[i] > nums[st.top()]) {
-            res[st.top()] = nums[i]; st.pop();
-        }
-        st.push(i);
-    }
-    return res;
-}
-```
-
-### LC496 下一个更大元素 I
-```cpp
-vector<int> nextGreaterElement(vector<int>& nums1, vector<int>& nums2) {
-    vector<int> nge = nextGreaterElement(nums2);
-    unordered_map<int,int> mp;
-    for (int i=0; i<nums2.size(); i++) mp[nums2[i]] = nge[i];
+vector<int> maxSlidingWindow(vector<int>& nums, int k) {
+    deque<int> dq; // 存索引
     vector<int> res;
-    for (int x: nums1) res.push_back(mp[x]);
-    return res;
-}
-```
-
-### LC503 下一个更大元素 II（环形）
-```cpp
-vector<int> nextGreaterElements(vector<int>& nums) {
-    int n = nums.size();
-    vector<int> res(n, -1);
-    stack<int> st;
-    for (int i=0; i<2*n; i++) {
-        while (!st.empty() && nums[i%n] > nums[st.top()]) {
-            res[st.top()] = nums[i%n]; st.pop();
-        }
-        if (i < n) st.push(i);
+    for (int i=0; i<nums.size(); i++) {
+        // 移除窗口外的
+        if (!dq.empty() && dq.front() <= i-k) dq.pop_front();
+        // 移除比当前小的（保持递减）
+        while (!dq.empty() && nums[dq.back()] <= nums[i]) dq.pop_back();
+        dq.push_back(i);
+        // 记录答案
+        if (i >= k-1) res.push_back(nums[dq.front()]);
     }
     return res;
 }
 ```
 
-### LC739 每日温度
+### LC239 滑动窗口最大值
 ```cpp
-vector<int> dailyTemperatures(vector<int>& t) {
-    vector<int> res(t.size(), 0);
-    stack<int> st;
-    for (int i=0; i<t.size(); i++) {
-        while (!st.empty() && t[i] > t[st.top()]) {
-            res[st.top()] = i - st.top(); st.pop();
-        }
-        st.push(i);
+vector<int> maxSlidingWindow(vector<int>& nums, int k) {
+    deque<int> dq;
+    vector<int> res;
+    for (int i=0; i<nums.size(); i++) {
+        if (!dq.empty() && dq.front() <= i-k) dq.pop_front();
+        while (!dq.empty() && nums[dq.back()] <= nums[i]) dq.pop_back();
+        dq.push_back(i);
+        if (i >= k-1) res.push_back(nums[dq.front()]);
     }
     return res;
 }
 ```
 
-### LC42 接雨水（双指针）
+---
+
+### KMP核心模式
+**部分匹配表(PMT/pi)**: 最长相等前后缀长度
+**匹配过程**: 模式串滑动，而非文本串回退
 ```cpp
-int trap(vector<int>& h) {
-    int l=0, r=h.size()-1, lmax=0, rmax=0, water=0;
-    while(l<r) {
-        if(h[l]<=h[r]) {
-            if(h[l]>=lmax) lmax=h[l]; else water+=lmax-h[l];
-            l++;
-        } else {
-            if(h[r]>=rmax) rmax=h[r]; else water+=rmax-h[r];
-            r--;
-        }
+// 构建pi数组
+vector<int> buildPi(const string& p) {
+    vector<int> pi(p.size(), 0);
+    for (int i=1; i<p.size(); i++) {
+        int j = pi[i-1];
+        while (j > 0 && p[i] != p[j]) j = pi[j-1];
+        if (p[i] == p[j]) j++;
+        pi[i] = j;
     }
-    return water;
+    return pi;
+}
+
+// KMP搜索
+int kmp(const string& s, const string& p) {
+    vector<int> pi = buildPi(p);
+    int j = 0;
+    for (int i=0; i<s.size(); i++) {
+        while (j > 0 && s[i] != p[j]) j = pi[j-1];
+        if (s[i] == p[j]) j++;
+        if (j == p.size()) return i - p.size() + 1; // 找到
+    }
+    return -1;
+}
+```
+
+### LC28 找出字符串中第一个匹配项的下标
+```cpp
+int strStr(string haystack, string needle) {
+    if (needle.empty()) return 0;
+    vector<int> pi(needle.size(), 0);
+    for (int i=1; i<needle.size(); i++) {
+        int j = pi[i-1];
+        while (j > 0 && needle[i] != needle[j]) j = pi[j-1];
+        if (needle[i] == needle[j]) j++;
+        pi[i] = j;
+    }
+    int j = 0;
+    for (int i=0; i<haystack.size(); i++) {
+        while (j > 0 && haystack[i] != needle[j]) j = pi[j-1];
+        if (haystack[i] == needle[j]) j++;
+        if (j == needle.size()) return i - needle.size() + 1;
+    }
+    return -1;
+}
+```
+
+### LC459 重复的子字符串
+```cpp
+bool repeatedSubstringPattern(string s) {
+    string p = s + s;
+    // 去掉首尾（避免完全匹配）
+    p = p.substr(1, p.size()-2);
+    // KMP找needle在haystack中
+    auto kmp = [](const string& text, const string& pat) {
+        vector<int> pi(pat.size(), 0);
+        for (int i=1; i<pat.size(); i++) {
+            int j = pi[i-1];
+            while (j>0 && pat[i]!=pat[j]) j = pi[j-1];
+            if (pat[i]==pat[j]) j++;
+            pi[i] = j;
+        }
+        int j=0;
+        for (int i=0; i<text.size(); i++) {
+            while (j>0 && text[i]!=pat[j]) j = pi[j-1];
+            if (text[i]==pat[j]) j++;
+            if (j==pat.size()) return true;
+        }
+        return false;
+    };
+    return kmp(p, s);
 }
 ```
 
 ### 验证结果
 | 题目 | 输入 | 输出 | 期望 |
 |------|------|------|------|
-| LC496 | [4,1,2],[1,3,4,2] | [-1,3,-1] | ✓ |
-| LC503 | [1,2,1] | [2,-1,2] | ✓ |
-| LC739 | [73,74,75,71,69,72,76,73] | [1,1,4,2,1,1,0,0] | ✓ |
-| LC42 | [0,1,0,2,1,0,1,3,2,1,2,1] | 6 | ✓ |
+| LC239 | [1,3,-1,-3,5,3,6,7], k=3 | [3,3,5,5,6,7] | ✓ |
+| LC239 | [1], k=1 | [1] | ✓ |
+| LC28 | haystack="hello", needle="ll" | 2 | ✓ |
+| LC28 | haystack="aaaaa", needle="bba" | -1 | ✓ |
+| LC28 | haystack="", needle="" | 0 | ✓ |
+| LC459 | s="abab" | true | ✓ |
+| LC459 | s="aba" | false | ✓ |
 
-### 04-16 累计（含本次单调栈）
+### 04-16 累计（含本次单调队列2题+KMP2题）
 | 专题 | 题数 |
 |------|------|
 | Floyd判圈 | 2题 |
@@ -160,5 +139,7 @@ int trap(vector<int>& h) {
 | 位运算 | 7题 |
 | DP动态规划 | 4题 |
 | 单调栈 | 4题 |
-| **总计** | **27题** |
-
+| 二叉树 | 4题 |
+| 单调队列 | 2题 |
+| KMP | 2题 |
+| **总计** | **35题** |
