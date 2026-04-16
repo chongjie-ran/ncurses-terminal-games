@@ -1,94 +1,43 @@
-/*
-LC76 - Minimum Window Substring
-分类: Sliding Window + Hash
-难度: Hard
-日期: 2026-03-31 01:45
-
-思路:
-  双指针 sliding window:
-  - right 扩展窗口，直到窗口包含 t 的所有字符
-  - left 收缩窗口，尝试最小化同时保持覆盖
-  - 用 need[256] 和 have[256] 记录字符计数差
-  
-关键技巧:
-  - formed = 当前窗口中已满足 need 要求的字符种类数
-  - right 左开右闭 [r, l) 窗口模型
-  - 每当 formed == required 时，尝试收缩 left
-
-时间: O(|s|+|t|), 空间: O(1) (256 固定数组)
-*/
-
+// LC76 最小覆盖子串 - 滑动窗口
 #include <iostream>
-#include <vector>
 #include <string>
-#include <climits>
+#include <unordered_map>
 using namespace std;
 
-class Solution {
-public:
-    string minWindow(string s, string t) {
-        if (s.empty() || t.empty() || s.size() < t.size()) return "";
-        
-        vector<int> need(256, 0), have(256, 0);
-        for (char c : t) need[(unsigned char)c]++;
-        
-        int required = 0;
-        for (int i = 0; i < 256; i++) if (need[i] > 0) required++;
-        
-        int left = 0, right = 0;
-        int formed = 0;
-        int minLen = INT_MAX, minL = 0;
-        
-        // right 扩展窗口
-        while (right < s.size()) {
-            char c = s[right];
-            if (need[(unsigned char)c] > 0) {
-                have[(unsigned char)c]++;
-                if (have[(unsigned char)c] == need[(unsigned char)c]) {
-                    formed++;
-                }
-            }
-            right++;
-            
-            // 收缩 left 尝试最小化
-            while (formed == required && left < right) {
-                char d = s[left];
-                if (right - left < minLen) {
-                    minLen = right - left;
-                    minL = left;
-                }
-                if (need[(unsigned char)d] > 0) {
-                    if (have[(unsigned char)d] == need[(unsigned char)d]) {
-                        formed--;
-                    }
-                    have[(unsigned char)d]--;
-                }
-                left++;
-            }
+string minWindow(string s, string t) {
+    unordered_map<char, int> need, window;
+    for (char c : t) need[c]++;
+    int left = 0, right = 0, valid = 0, start = 0, minLen = INT_MAX;
+    int needCount = need.size();
+    
+    while (right < s.size()) {
+        char c = s[right++];
+        if (need.count(c)) {
+            window[c]++;
+            if (window[c] == need[c]) valid++;
         }
         
-        return minLen == INT_MAX ? "" : s.substr(minL, minLen);
+        while (valid == needCount) {
+            if (right - left < minLen) {
+                minLen = right - left;
+                start = left;
+            }
+            char d = s[left++];
+            if (need.count(d)) {
+                if (window[d] == need[d]) valid--;
+                window[d]--;
+            }
+        }
     }
-};
+    return minLen == INT_MAX ? "" : s.substr(start, minLen);
+}
 
 int main() {
-    Solution sol;
-    
-    struct Test { string s, t, expect; };
-    Test tests[] = {
-        {"ADOBECODEBANC", "ABC", "BANC"},
-        {"a", "a", "a"},
-        {"a", "aa", ""},
-        {"abcde", "ae", "abcde"},
-        {"abc", "abc", "abc"},
-        {"ABC", "ABC", "ABC"},
-    };
-    
-    for (int i = 0; i < 6; i++) {
-        string out = sol.minWindow(tests[i].s, tests[i].t);
-        bool ok = out == tests[i].expect;
-        cout << "Test " << i+1 << " (expect '" << tests[i].expect << "'): '" 
-             << out << "' " << (ok ? "✅" : "❌") << endl;
-    }
+    string s1 = "ADOBECODEBANC", t1 = "ABC";
+    string s2 = "a", t2 = "a";
+    string s3 = "a", t3 = "aa";
+    cout << "ADOBECODEBANC+ABC: " << minWindow(s1, t1) << " (expect BANC)" << endl;
+    cout << "a+a: " << minWindow(s2, t2) << " (expect a)" << endl;
+    cout << "a+aa: " << minWindow(s3, t3) << " (expect )" << endl;
     return 0;
 }
