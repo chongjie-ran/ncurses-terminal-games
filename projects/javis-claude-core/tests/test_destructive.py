@@ -192,7 +192,7 @@ class TestTimeoutInterrupt:
     def test_nested_retry_with_backoff(self):
         """重试有退避"""
         executor = RetryExecutor(
-            retry_config=RetryConfig(max_attempts=3, jitter=False, base_delay_ms=10)
+            retry_config=RetryConfig(max_attempts=3, jitter=False, base_delay_ms=100)
         )
         attempts = []
         

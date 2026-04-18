@@ -236,6 +236,16 @@ class TestSession:
         tool_calls = [m for m in api_msgs if "content" in m]
         assert len(tool_calls) >= 1
 
+    def test_get_messages_for_api_system(self, empty_session):
+        """SYSTEM消息转换为API格式"""
+        empty_session.messages = [
+            ConversationMessage(role=MessageRole.SYSTEM, blocks=[ContentBlock.text_block("system prompt")])
+        ]
+        api_msgs = empty_session.get_messages_for_api()
+        assert len(api_msgs) == 1
+        assert api_msgs[0]["role"] == "system"
+        assert api_msgs[0]["content"] == "system prompt"
+
 
 class TestSessionEdgeCases:
     """Session 边界条件测试"""
