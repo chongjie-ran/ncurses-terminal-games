@@ -17,15 +17,19 @@ class TestCompactionResult:
     """CompactionResult 测试"""
 
     def test_create(self):
+        compacted_sess = Session()
+        compacted_sess.messages = [
+            ConversationMessage(role=MessageRole.USER, blocks=[ContentBlock.text_block("sum")])
+        ]
         result = CompactionResult(
             original_messages=10,
-            compacted_messages=3,
+            compacted_session=compacted_sess,
             original_tokens=1000,
             compacted_tokens=200,
             summary="Test summary"
         )
         assert result.original_messages == 10
-        assert result.compacted_messages == 3
+        assert result.compacted_messages == 1  # len of compacted_sess.messages
         assert result.original_tokens == 1000
         assert result.compacted_tokens == 200
 

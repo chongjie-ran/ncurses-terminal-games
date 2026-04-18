@@ -14,10 +14,15 @@ from src.session import Session, ConversationMessage, ContentBlock
 @dataclass
 class CompactionResult:
     original_messages: int
-    compacted_messages: int
+    compacted_session: Session  # 实际的压缩后会话对象
     original_tokens: int
     compacted_tokens: int
     summary: str
+
+    @property
+    def compacted_messages(self) -> int:
+        """保留向后兼容：返回压缩后的消息数"""
+        return len(self.compacted_session.messages)
 
 
 class SessionCompactor:
@@ -49,7 +54,7 @@ class SessionCompactor:
         if len(session.messages) <= keep_count:
             return CompactionResult(
                 original_messages=original_count,
-                compacted_messages=original_count,
+                compacted_session=session,
                 original_tokens=original_tokens,
                 compacted_tokens=original_tokens,
                 summary="No compaction needed",
@@ -71,7 +76,7 @@ class SessionCompactor:
         
         return CompactionResult(
             original_messages=original_count,
-            compacted_messages=len(compacted.messages),
+            compacted_session=compacted,
             original_tokens=original_tokens,
             compacted_tokens=compacted_tokens,
             summary=summary,
