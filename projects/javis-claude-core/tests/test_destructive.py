@@ -190,24 +190,35 @@ class TestTimeoutInterrupt:
         assert cb.state == CircuitState.HALF_OPEN
 
     def test_nested_retry_with_backoff(self):
-        """重试有退避"""
+        """重试有退避 - 使用mock确保确定性"""
+        import unittest.mock as mock
+        
+        sleep_calls = []
+        original_sleep = time.sleep
+        
+        def mock_sleep(delay):
+            sleep_calls.append(delay)
+        
         executor = RetryExecutor(
             retry_config=RetryConfig(max_attempts=3, jitter=False, base_delay_ms=100)
         )
-        attempts = []
         
+        attempts = []
         def failing_func():
             attempts.append(time.time())
             raise Exception("fail")
         
-        result = executor.execute_with_retry(failing_func)
+        with mock.patch.object(time, 'sleep', mock_sleep):
+            result = executor.execute_with_retry(failing_func)
+        
         assert result.success is False
         assert len(attempts) == 3
-        # 验证退避
-        if len(attempts) >= 3:
-            interval1 = attempts[1] - attempts[0]
-            interval2 = attempts[2] - attempts[1]
-            assert interval2 >= interval1  # 指数退避
+        # 验证指数退避: 使用mock后的确定性sleep_calls
+        # delay1 = 100 * 2^0 = 100ms = 0.1s
+        # delay2 = 100 * 2^1 = 200ms = 0.2s
+        assert len(sleep_calls) == 2, f"Expected 2 sleep calls, got {sleep_calls}"
+        assert sleep_calls[1] >= sleep_calls[0] * 1.5, \
+            f"Expected exponential backoff: {sleep_calls[1]} >= {sleep_calls[0]} * 1.5"
 
 
 # =============================================================================
