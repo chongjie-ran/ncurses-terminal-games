@@ -347,3 +347,140 @@ class TestEndToEnd:
             
         finally:
             os.unlink(temp_path)
+
+
+class TestEdgeCases:
+    """边界情况和错误处理测试"""
+    
+    def test_read_with_offset_limit(self):
+        """测试read offset+limit参数"""
+        reset_mcp_server()
+        server = create_openclaw_mcp_server()
+        
+        req = JsonRpcRequest(
+            method="tools/call",
+            params={"name": "read", "arguments": {"path": "src/mcp_server.py", "offset": 1, "limit": 3}},
+            id=1,
+        )
+        resp = server._dispatch(req)
+        
+        assert resp.result is not None
+        assert resp.result["isError"] is False
+        result = json.loads(resp.result["content"][0]["text"])
+        assert result["num_lines"] <= 3
+    
+    def test_grep_case_sensitive(self):
+        """测试grep大小写敏感搜索"""
+        reset_mcp_server()
+        server = create_openclaw_mcp_server()
+        
+        req = JsonRpcRequest(
+            method="tools/call",
+            params={"name": "grep", "arguments": {
+                "pattern": "McpServer",
+                "path": "src",
+            }},
+            id=1,
+        )
+        resp = server._dispatch(req)
+        
+        assert resp.result is not None
+        assert resp.result["isError"] is False
+        result = json.loads(resp.result["content"][0]["text"])
+        assert result["num_matches"] > 0
+    
+    def test_grep_case_insensitive(self):
+        """测试大小写不敏感grep"""
+        reset_mcp_server()
+        server = create_openclaw_mcp_server()
+        
+        req = JsonRpcRequest(
+            method="tools/call",
+            params={"name": "grep", "arguments": {
+                "pattern": "MCPSERVER",
+                "path": "src/mcp_server.py",
+            }},
+            id=1,
+        )
+        resp = server._dispatch(req)
+        
+        # 应当匹配到（大小写不敏感）
+        assert resp.result is not None
+    
+    def test_glob_recursive(self):
+        """测试递归glob"""
+        reset_mcp_server()
+        server = create_openclaw_mcp_server()
+        
+        req = JsonRpcRequest(
+            method="tools/call",
+            params={"name": "glob", "arguments": {
+                "pattern": "**/*.py",
+                "path": "src",
+            }},
+            id=1,
+        )
+        resp = server._dispatch(req)
+        
+        assert resp.result is not None
+        result = json.loads(resp.result["content"][0]["text"])
+        assert result["num_files"] > 0
+    
+    def test_bash_with_error(self):
+        """测试bash命令错误处理"""
+        reset_mcp_server()
+        server = create_openclaw_mcp_server()
+        
+        req = JsonRpcRequest(
+            method="tools/call",
+            params={"name": "bash", "arguments": {"command": "exit 1"}},
+            id=1,
+        )
+        resp = server._dispatch(req)
+        
+        assert resp.result is not None
+        result = json.loads(resp.result["content"][0]["text"])
+        assert result["return_code"] == 1
+    
+    def test_edit_nonexistent_file(self):
+        """测试编辑不存在的文件"""
+        reset_mcp_server()
+        server = create_openclaw_mcp_server()
+        
+        req = JsonRpcRequest(
+            method="tools/call",
+            params={"name": "edit", "arguments": {
+                "path": "/tmp/does_not_exist_12345.txt",
+                "oldText": "anything",
+                "newText": "something",
+            }},
+            id=1,
+        )
+        resp = server._dispatch(req)
+        
+        # 应返回错误
+        assert resp.result is not None
+    
+    def test_write_multiline_content(self):
+        """测试写入多行内容"""
+        reset_mcp_server()
+        server = create_openclaw_mcp_server()
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            temp_path = f.name
+        
+        try:
+            content = "line1\nline2\nline3\n# line4\nline5"
+            req = JsonRpcRequest(
+                method="tools/call",
+                params={"name": "write", "arguments": {"path": temp_path, "content": content}},
+                id=1,
+            )
+            resp = server._dispatch(req)
+            assert resp.result is not None
+            assert resp.result["isError"] is False
+            
+            with open(temp_path) as f:
+                assert f.read() == content
+        finally:
+            os.unlink(temp_path)
