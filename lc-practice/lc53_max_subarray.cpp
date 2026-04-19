@@ -1,33 +1,75 @@
-// LC53 Maximum Subarray - Kadane's Algorithm
-// O(n) time, O(1) space
+// LC53 Maximum Subarray (Kadane's Algorithm)
+// 核心：dp[i] = max(dp[i-1] + nums[i], nums[i])
 #include <iostream>
 #include <vector>
+#include <climits>
 using namespace std;
 
-int maxSubArray(vector<int>& nums) {
-    int best = nums[0], cur = nums[0];
-    for (int i = 1; i < (int)nums.size(); i++) {
-        cur = max(nums[i], cur + nums[i]);
-        best = max(best, cur);
+// 方法1：Kadane's Algorithm (最优)
+class Solution1 {
+public:
+    int maxSubArray(vector<int>& nums) {
+        int maxSum = nums[0];
+        int current = nums[0];
+        for (int i = 1; i < nums.size(); i++) {
+            current = max(current + nums[i], nums[i]);
+            maxSum = max(maxSum, current);
+        }
+        return maxSum;
     }
-    return best;
-}
+};
+
+// 方法2：分治法
+class Solution2 {
+public:
+    int maxSubArray(vector<int>& nums) {
+        return divideConquer(nums, 0, (int)nums.size() - 1);
+    }
+    
+private:
+    int divideConquer(const vector<int>& nums, int left, int right) {
+        if (left == right) return nums[left];
+        int mid = left + (right - left) / 2;
+        
+        int leftMax = divideConquer(nums, left, mid);
+        int rightMax = divideConquer(nums, mid + 1, right);
+        
+        int leftSum = 0, leftBest = INT_MIN;
+        for (int i = mid; i >= left; i--) {
+            leftSum += nums[i];
+            leftBest = max(leftBest, leftSum);
+        }
+        
+        int rightSum = 0, rightBest = INT_MIN;
+        for (int i = mid + 1; i <= right; i++) {
+            rightSum += nums[i];
+            rightBest = max(rightBest, rightSum);
+        }
+        
+        int crossMax = leftBest + rightBest;
+        return max({leftMax, rightMax, crossMax});
+    }
+};
 
 int main() {
-    vector<int> t1 = {-2,1,-3,4,-1,2,1,-5,4};
-    cout << "Test1: " << maxSubArray(t1) << " (expected 6)" << endl;
+    vector<int> nums = {-2,1,-3,4,-1,2,1,-5,4};
     
-    vector<int> t2 = {1};
-    cout << "Test2: " << maxSubArray(t2) << " (expected 1)" << endl;
+    cout << "LC53 Maximum Subarray:" << endl;
+    cout << "nums: [-2,1,-3,4,-1,2,1,-5,4]" << endl;
     
-    vector<int> t3 = {5,4,-1,7,8};
-    cout << "Test3: " << maxSubArray(t3) << " (expected 23)" << endl;
+    Solution1 sol1;
+    int r1 = sol1.maxSubArray(nums);
+    cout << "Kadane: " << r1 << " (expected 6: [4,-1,2,1])" << endl;
     
-    vector<int> t4 = {-1};
-    cout << "Test4: " << maxSubArray(t4) << " (expected -1)" << endl;
+    Solution2 sol2;
+    int r2 = sol2.maxSubArray(nums);
+    cout << "分治: " << r2 << " ✓" << endl;
     
-    vector<int> t5 = {-2,-1};
-    cout << "Test5: " << maxSubArray(t5) << " (expected -1)" << endl;
+    vector<int> single = {5};
+    cout << "\n边界: [5] -> " << sol1.maxSubArray(single) << " (expected 5)" << endl;
+    
+    vector<int> allNeg = {-3,-1,-2};
+    cout << "全负: [-3,-1,-2] -> " << sol1.maxSubArray(allNeg) << " (expected -1)" << endl;
     
     return 0;
 }

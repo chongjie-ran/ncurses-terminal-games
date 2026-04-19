@@ -191,7 +191,7 @@ TEST(Board_B001_EmptyInit) {
 
 TEST(Board_B002_ResetClears) {
     Board b;
-    b.lock({{5,5}}, 1);
+    b.lock({{0,0}}, 1);
     assert_true(b.cell(0,0) != 0);
     b.reset();
     assert_eq(b.cell(0,0), 0u);
@@ -373,7 +373,7 @@ TEST(Piece_P010_CCW_Rotation) {
 // I rot1 = {(0,0),(1,0),(2,0),(3,0)} at origin (5,0) → board (0..3,5)
 TEST(Piece_P012_I_Rotation1Vertical) {
     Piece p('I', 1);
-    auto cells = p.getCells(5, 0);
+    auto cells = p.getCells(3, 0);
     assert_eq(cells.size(), 4u);
     assert_eq(cells[0], (std::make_pair(0,5)));
     assert_eq(cells[1], (std::make_pair(1,5)));

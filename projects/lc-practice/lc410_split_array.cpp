@@ -1,65 +1,68 @@
-// LC410 Split Array - 最大子数组和的最小值
-// 关键词: 二分搜索
+// LC410 Split Array Largest Sum
 // 难度: Hard
+// 核心: 二分搜索 + 贪心验证
+// 思路: 
+//   - 答案范围: [max(nums), sum(nums)]
+//   - 二分搜索最大和的最小值
+//   - 贪心: 尽可能填满每个子数组，超限时开新子数组
+//   - 验证: 能否在限制下分成<=m个子数组
 
 #include <iostream>
 #include <vector>
 using namespace std;
 
-// 二分搜索: 找最大子数组和的最小值
-// m个子子数组，每个和 <= mid
-bool canSplit(const vector<int>& nums, int m, int mid) {
-    int count = 1;  // 至少1个子数组
-    int sum = 0;
-    for (int num : nums) {
-        sum += num;
-        if (sum > mid) {
-            count++;
-            sum = num;
-            if (count > m) return false;
-        }
-    }
-    return true;
-}
-
 int splitArray(vector<int>& nums, int m) {
-    // 二分搜索范围: [max(nums), sum(nums)]
-    int left = 0, right = 0;
+    long long lo = 0, hi = 0;
     for (int num : nums) {
-        left = max(left, num);
-        right += num;
+        lo = max(lo, (long long)num);
+        hi += num;
     }
     
-    while (left < right) {
-        int mid = left + (right - left) / 2;
-        if (canSplit(nums, m, mid)) {
-            right = mid;  // 可以分割，尝试更小的最大值
+    while (lo < hi) {
+        long long mid = (lo + hi) / 2;
+        int cnt = 1;
+        long long sum = 0;
+        
+        for (int num : nums) {
+            if (sum + num > mid) {
+                cnt++;
+                sum = num;
+            } else {
+                sum += num;
+            }
+        }
+        
+        if (cnt <= m) {
+            hi = mid;  // 可以分成<=m段，尝试更小的最大值
         } else {
-            left = mid + 1;  // 不行，需要更大的最大值
+            lo = mid + 1;  // 需要更多段，必须增大最大值
         }
     }
-    return left;
+    return (int)lo;
 }
 
-// 测试
 int main() {
-    // 测试1: nums = [7,2,5,10,8], m = 2
-    // 划分: [7,2,5] 和 [10,8] → 最大和=18
-    // 划分: [7,2,5,10] 和 [8] → 最大和=24
-    // 划分: [7,2] 和 [5,10,8] → 最大和=23
-    // 最优: [7,2,5] 和 [10,8] → 18
+    // 测试1: [7,2,5,10,8], m=2 -> 18
+    // 分法: [7,2,5,10]和[8]，最大和=18
     vector<int> nums1 = {7, 2, 5, 10, 8};
-    cout << splitArray(nums1, 2) << endl;  // 18
+    cout << "7,2,5,10,8 m=2 -> " << splitArray(nums1, 2) << " (期望18)" << endl;
     
-    // 测试2: nums = [1,2,3,4,5], m = 2
-    // 最优: [1,2,3] 和 [4,5] → 最大和=9
+    // 测试2: [1,2,3,4,5], m=2 -> 9
+    // 分法: [1,2,3,4]和[5]，最大和=9 或 [1,2,3]和[4,5]最大和=9
     vector<int> nums2 = {1, 2, 3, 4, 5};
-    cout << splitArray(nums2, 2) << endl;  // 9
+    cout << "1,2,3,4,5 m=2 -> " << splitArray(nums2, 2) << " (期望9)" << endl;
     
-    // 测试3: nums = [1,4,4], m = 3
-    // 划分: [1],[4],[4] → 最大和=4
+    // 测试3: [1,4,4], m=3 -> 4
     vector<int> nums3 = {1, 4, 4};
-    cout << splitArray(nums3, 3) << endl;  // 4
+    cout << "1,4,4 m=3 -> " << splitArray(nums3, 3) << " (期望4)" << endl;
+    
+    // 测试4: [1,2,3,4,5], m=1 -> 15
+    vector<int> nums4 = {1, 2, 3, 4, 5};
+    cout << "1,2,3,4,5 m=1 -> " << splitArray(nums4, 1) << " (期望15)" << endl;
+    
+    // 测试5: [1,2,3,4,5], m=5 -> 4
+    vector<int> nums5 = {1, 2, 3, 4, 5};
+    cout << "1,2,3,4,5 m=5 -> " << splitArray(nums5, 5) << " (期望4)" << endl;
     
     return 0;
 }

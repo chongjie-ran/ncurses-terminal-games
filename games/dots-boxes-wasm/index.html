@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dots and Boxes - 点格棋</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d1117; color: #e6edf3;
+  font-family: 'Courier New', monospace;
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  padding: 20px;
+}
+h1 { color: #58a6ff; margin-bottom: 4px; font-size: 24px; letter-spacing: 2px; }
+.subtitle { color: #484f58; font-size: 12px; margin-bottom: 16px; }
+.info-bar {
+  display: flex; gap: 20px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap;
+}
+.player-score {
+  background: #161b22; border: 2px solid #30363d; border-radius: 10px;
+  padding: 10px 18px; text-align: center; min-width: 90px;
+}
+.player-score.active { border-color: #ffcc02; box-shadow: 0 0 12px rgba(255,204,2,0.3); }
+.score-label { font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+.score-value { font-size: 28px; font-weight: bold; }
+.p0 .score-value { color: #ff6b6b; }
+.p1 .score-value { color: #4ecdc4; }
+.p2 .score-value { color: #ffe66d; }
+.turn-indicator {
+  font-size: 12px; padding: 6px 14px; border-radius: 20px;
+  background: #1c2128; border: 1px solid #30363d;
+}
+canvas {
+  cursor: pointer; border-radius: 8px;
+  background: #0d1117; display: block;
+}
+.msg-line {
+  height: 24px; margin-top: 12px; font-size: 14px; color: #3fb950;
+  text-align: center;
+}
+.controls { margin-top: 14px; display: flex; gap: 10px; }
+button {
+  padding: 8px 24px; font-size: 14px; border-radius: 8px;
+  border: none; cursor: pointer; font-family: inherit;
+  background: #238636; color: #fff; transition: background 0.2s;
+}
+button:hover { background: #2ea043; }
+button.secondary { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+button.secondary:hover { background: #30363d; }
+.hint { color: #484f58; font-size: 11px; margin-top: 10px; text-align: center; }
+.status-row { display: flex; gap: 14px; font-size: 13px; color: #8b949e; margin-bottom: 10px; }
+#loading { color: #58a6ff; font-size: 18px; }
+</style>
+</head>
+<body>
+<h1>⚪ DOTS & BOXES</h1>
+<div class="subtitle">点格棋 · 三人对战</div>
+
+<div class="status-row">
+  <span>Boxes: <span id="boxesDone">0</span>/16</span>
+  <span id="turnLabel">Turn: Player 1</span>
+</div>
+
+<div class="info-bar" id="scoresBar">
+  <div class="player-score p0 active" id="ps0">
+    <div class="score-label">🔴 Player 1</div>
+    <div class="score-value" id="s0">0</div>
+  </div>
+  <div class="player-score p1" id="ps1">
+    <div class="score-label">🔵 Player 2</div>
+    <div class="score-value" id="s1">0</div>
+  </div>
+  <div class="player-score p2" id="ps2">
+    <div class="score-label">🟡 Player 3</div>
+    <div class="score-value" id="s2">0</div>
+  </div>
+</div>
+
+<div id="loading">Loading WASM...</div>
+<div id="gameUI" style="display:none">
+  <canvas id="canvas"></canvas>
+  <div class="msg-line" id="msg"></div>
+  <div class="controls">
+    <button onclick="doReset()">🔄 New Game</button>
+  </div>
+  <div class="hint">Left-click on a line between dots to draw · Complete a box to score and go again</div>
+</div>
+
+<script src="dots_boxes.js"></script>
+<script>
+const DOTS_ROWS = 4, DOTS_COLS = 4;
+const CELL = 60;
+const DOT_R = 5;
+const EDGE_HIT = 10;
+const ROWS = DOTS_ROWS + 1;
+const COLS = DOTS_COLS + 1;
+const H_EDGES = DOTS_ROWS + 1;
+const V_EDGES = DOTS_COLS + 1;
+
+const PLAYER_COLORS = ['#ff6b6b', '#4ecdc4', '#ffe66d'];
+const PLAYER_NAMES  = ['Player 1', 'Player 2', 'Player 3'];
+
+let canvas, ctx;
+let pendingEdge = null;
+let ready = false;
+
+// ---------- WASM bridge via Module ----------
+function doReset() {
+  if (!ready) return;
+  Module.ccall('db_reset', null, [], []);
+  render();
+  updateUI();
+  document.getElementById('msg').textContent = '';
+}
+
+function drawEdgeH(r, c) { return Module.ccall('db_click_h', 'number', ['number','number'], [r, c]); }
+function drawEdgeV(r, c) { return Module.ccall('db_click_v', 'number', ['number','number'], [r, c]); }
+function getCell(r, c) { return Module.ccall('db_cell', 'number', ['number','number'], [r, c]); }
+function getScore(p) { return Module.ccall('db_score', 'number', ['number'], [p]); }
+function getPlayer() { return Module.ccall('db_player', 'number', [], []); }
+function getPhase() { return Module.ccall('db_phase', 'number', [], []); }
+function getBoxesDone() { return Module.ccall('db_boxes_done', 'number', [], []); }
+
+// ---------- Render ----------
+function render() {
+  if (!ready) return;
+  canvas.width  = COLS * CELL;
+  canvas.height = ROWS * CELL;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw box fills
+  for (let r = 0; r < DOTS_ROWS; r++) {
+    for (let c = 0; c < DOTS_COLS; c++) {
+      let cell = getCell(r*2+1, c*2+1);
+      if (cell >= 8 && cell <= 10) {
+        let player = cell - 8;
+        ctx.fillStyle = PLAYER_COLORS[player] + '55';
+        ctx.fillRect(c*CELL + 3, r*CELL + 3, CELL - 6, CELL - 6);
+      }
+    }
+  }
+
+  // Draw horizontal edges
+  for (let r = 0; r < H_EDGES; r++) {
+    for (let c = 0; c < DOTS_COLS; c++) {
+      let cell = getCell(r*2, c*2+1);
+      let drawn = (cell >= 2 && cell <= 4);
+      ctx.beginPath();
+      ctx.moveTo(c * CELL, r * CELL);
+      ctx.lineTo((c+1) * CELL, r * CELL);
+      ctx.strokeStyle = drawn ? '#58a6ff' : '#30363d';
+      ctx.lineWidth = drawn ? 3 : 2;
+      if (!drawn) ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Draw vertical edges
+  for (let r = 0; r < DOTS_ROWS; r++) {
+    for (let c = 0; c < V_EDGES; c++) {
+      let cell = getCell(r*2+1, c*2);
+      let drawn = (cell >= 5 && cell <= 7);
+      ctx.beginPath();
+      ctx.moveTo(c * CELL, r * CELL);
+      ctx.lineTo(c * CELL, (r+1) * CELL);
+      ctx.strokeStyle = drawn ? '#58a6ff' : '#30363d';
+      ctx.lineWidth = drawn ? 3 : 2;
+      if (!drawn) ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Draw dots
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      ctx.beginPath();
+      ctx.arc(c * CELL, r * CELL, DOT_R, 0, Math.PI * 2);
+      ctx.fillStyle = '#8b949e';
+      ctx.fill();
+    }
+  }
+
+  // Hover highlight
+  if (pendingEdge && getPhase() === 0) {
+    let {type, r, c} = pendingEdge;
+    ctx.beginPath();
+    if (type === 'h') { ctx.moveTo(c*CELL, r*CELL); ctx.lineTo((c+1)*CELL, r*CELL); }
+    else              { ctx.moveTo(c*CELL, r*CELL); ctx.lineTo(c*CELL, (r+1)*CELL); }
+    ctx.strokeStyle = '#ffcc02'; ctx.lineWidth = 4; ctx.stroke();
+  }
+}
+
+// ---------- UI update ----------
+function updateUI() {
+  for (let i = 0; i < 3; i++) {
+    document.getElementById('s'+i).textContent = getScore(i);
+    document.getElementById('ps'+i).classList.toggle('active', getPlayer() === i);
+  }
+  document.getElementById('boxesDone').textContent = getBoxesDone();
+  document.getElementById('turnLabel').textContent = 'Turn: ' + PLAYER_NAMES[getPlayer()];
+}
+
+// ---------- Input ----------
+function canvasPos(e) {
+  let rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function findEdge(x, y) {
+  for (let r = 0; r < H_EDGES; r++) {
+    for (let c = 0; c < DOTS_COLS; c++) {
+      if (Math.abs(y - r*CELL) < EDGE_HIT && x > c*CELL && x < (c+1)*CELL) {
+        return {type:'h', r, c};
+      }
+    }
+  }
+  for (let r = 0; r < DOTS_ROWS; r++) {
+    for (let c = 0; c < V_EDGES; c++) {
+      if (Math.abs(x - c*CELL) < EDGE_HIT && y > r*CELL && y < (r+1)*CELL) {
+        return {type:'v', r, c};
+      }
+    }
+  }
+  return null;
+}
+
+canvas = document.getElementById('canvas');
+ctx = canvas.getContext('2d');
+
+// Wait for WASM to be ready
+Module['onRuntimeInitialized'] = () => {
+  ready = true;
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('gameUI').style.display = 'block';
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('click', onClick);
+  canvas.addEventListener('mouseleave', () => { pendingEdge = null; render(); });
+  doReset();
+};
+
+function onMove(e) {
+  let {x, y} = canvasPos(e);
+  let edge = findEdge(x, y);
+  if (!edge) { pendingEdge = null; render(); return; }
+  let cell = getCell(edge.r*2 + (edge.type==='h'?0:1), edge.c*2 + (edge.type==='h'?1:0));
+  let drawn = edge.type==='h' ? (cell>=2&&cell<=4) : (cell>=5&&cell<=7);
+  pendingEdge = drawn ? null : edge;
+  render();
+}
+
+function onClick(e) {
+  if (!ready || getPhase() !== 0) return;
+  let {x, y} = canvasPos(e);
+  let edge = findEdge(x, y);
+  if (!edge) return;
+  let rv = edge.type==='h' ? drawEdgeH(edge.r, edge.c) : drawEdgeV(edge.r, edge.c);
+  if (rv === 1) return; // already drawn
+
+  let player = getPlayer();
+  let phase = getPhase();
+  let msg = '';
+  if (phase === 1) {
+    let maxScore = 0, winner = 0;
+    for (let i = 0; i < 3; i++) { let s = getScore(i); if (s > maxScore) { maxScore = s; winner = i; } }
+    let tied = getScore(0) === getScore(1) && getScore(1) === getScore(2);
+    msg = tied ? '🤝 Game Over! It\'s a TIE!' : `🏆 Game Over! ${PLAYER_NAMES[winner]} WINS with ${maxScore} boxes!`;
+  } else {
+    msg = `🔵 ${PLAYER_NAMES[player]}'s turn`;
+  }
+  document.getElementById('msg').textContent = msg;
+  render();
+  updateUI();
+}
+</script>
+</body>
+</html>

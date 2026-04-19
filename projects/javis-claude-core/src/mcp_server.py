@@ -18,10 +18,15 @@ import uuid
 import logging
 import asyncio
 import threading
+import os
 from aiohttp import web
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Import real executors for OpenClaw tools
+from .bash_executor import BashExecutor, BashCommandInput
+from .file_ops import FileOps
 
 
 # ============================================================================
@@ -476,8 +481,281 @@ def reset_mcp_server() -> None:
             _mcp_server = None
 
 
+# ============================================================================
+# OpenClaw Real Tool Handlers (V3.4 Phase2)
+# ============================================================================
+
+# Global executors for tool handlers
+_bash_executor = BashExecutor()
+_file_ops = FileOps()
+
+
+def _tool_handler_wrapper(name: str, impl: Callable[[Dict[str, Any]], Any]) -> Callable[[Dict[str, Any]], ToolResult]:
+    """Wrap a tool implementation to return ToolResult"""
+    def wrapper(args: Dict[str, Any]) -> ToolResult:
+        try:
+            result = impl(args)
+            # Convert result to string if needed
+            if isinstance(result, str):
+                content = result
+            elif hasattr(result, 'to_dict'):
+                content = json.dumps(result.to_dict(), ensure_ascii=False)
+            else:
+                content = json.dumps(result, ensure_ascii=False, default=str)
+            return ToolResult(content=[{"type": "text", "text": content}])
+        except Exception as e:
+            logger.error(f"Tool '{name}' failed: {e}")
+            return ToolResult(
+                content=[{"type": "text", "text": f"Error: {str(e)}"}],
+                is_error=True,
+            )
+    return wrapper
+
+
+# ---- bash tool handler ----
+def _bash_impl(args: Dict[str, Any]) -> str:
+    """Execute a bash command"""
+    cmd = args.get("command", "")
+    if not cmd:
+        raise ValueError("Missing 'command' argument")
+    timeout = args.get("timeout", 60000)  # default 60s in ms
+    input_obj = BashCommandInput(command=cmd, timeout=timeout)
+    result = _bash_executor.execute(input_obj)
+    if result.interrupted:
+        return json.dumps({
+            "success": False,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "interrupted": True,
+            "return_code": None,
+        })
+    return json.dumps({
+        "success": result.success,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "return_code": result.return_code,
+        "interrupted": False,
+    })
+
+
+# ---- read tool handler ----
+def _read_impl(args: Dict[str, Any]) -> str:
+    """Read a file"""
+    path = args.get("path")
+    if not path:
+        raise ValueError("Missing 'path' argument")
+    offset = args.get("offset")
+    limit = args.get("limit")
+    result = FileOps.read_file(path, offset=offset, limit=limit)
+    return json.dumps({
+        "file_path": result.file.file_path,
+        "content": result.file.content,
+        "num_lines": result.file.num_lines,
+        "start_line": result.file.start_line,
+        "total_lines": result.file.total_lines,
+    }, ensure_ascii=False)
+
+
+# ---- write tool handler ----
+def _write_impl(args: Dict[str, Any]) -> str:
+    """Write a file"""
+    path = args.get("path")
+    content = args.get("content")
+    if not path:
+        raise ValueError("Missing 'path' argument")
+    if content is None:
+        raise ValueError("Missing 'content' argument")
+    result = FileOps.write_file(path, content)
+    return json.dumps({
+        "file_path": result.file_path,
+        "content": result.content,
+        "type": "write",
+        "original_file": result.original_file,
+    }, ensure_ascii=False)
+
+
+# ---- edit tool handler ----
+def _edit_impl(args: Dict[str, Any]) -> str:
+    """Edit a file"""
+    path = args.get("path")
+    old_text = args.get("oldText")
+    new_text = args.get("newText")
+    if not path:
+        raise ValueError("Missing 'path' argument")
+    if old_text is None or new_text is None:
+        raise ValueError("Missing 'oldText' or 'newText' argument")
+    replace_all = args.get("replace_all", False)
+    result = FileOps.edit_file(path, old_text, new_text, replace_all=replace_all)
+    return json.dumps({
+        "file_path": result.file_path,
+        "old_string": result.old_string,
+        "new_string": result.new_string,
+        "original_file": result.original_file,
+        "replace_all": result.replace_all,
+    }, ensure_ascii=False)
+
+
+# ---- exec tool handler (same as bash) ----
+def _exec_impl(args: Dict[str, Any]) -> str:
+    """Execute a command (alias for bash)"""
+    return _bash_impl(args)
+
+
+# ---- glob tool handler ----
+def _glob_impl(args: Dict[str, Any]) -> str:
+    """Glob file matching"""
+    pattern = args.get("pattern", "*")
+    path = args.get("path")
+    result = FileOps.glob_search(pattern, path=path)
+    return json.dumps({
+        "duration_ms": result.duration_ms,
+        "num_files": result.num_files,
+        "filenames": result.filenames,
+        "truncated": result.truncated,
+    }, ensure_ascii=False)
+
+
+# ---- grep tool handler ----
+def _grep_impl(args: Dict[str, Any]) -> str:
+    """Grep search"""
+    pattern = args.get("pattern", "")
+    if not pattern:
+        raise ValueError("Missing 'pattern' argument")
+    path = args.get("path")
+    case_insensitive = args.get("case_insensitive", False)
+    result = FileOps.grep_search(pattern, path=path, case_insensitive=case_insensitive)
+    return json.dumps({
+        "num_files": result.num_files,
+        "filenames": result.filenames,
+        "content": result.content,
+        "num_lines": result.num_lines,
+        "num_matches": result.num_matches,
+    }, ensure_ascii=False)
+
+
+# ============================================================================
+# Tool Registration
+# ============================================================================
+
+def register_openclaw_tools(server: McpServer) -> None:
+    """
+    Register all OpenClaw tools (bash, read, write, edit, exec, glob, grep)
+    
+    These use the real BashExecutor and FileOps implementations.
+    """
+    tools = [
+        (
+            "bash",
+            "Execute a bash command",
+            {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "The bash command to execute"},
+                    "timeout": {"type": "integer", "description": "Timeout in milliseconds", "default": 60000},
+                },
+                "required": ["command"],
+            },
+            _tool_handler_wrapper("bash", _bash_impl),
+        ),
+        (
+            "read",
+            "Read a file",
+            {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path to read"},
+                    "offset": {"type": "integer", "description": "Starting line offset"},
+                    "limit": {"type": "integer", "description": "Max lines to read"},
+                },
+                "required": ["path"],
+            },
+            _tool_handler_wrapper("read", _read_impl),
+        ),
+        (
+            "write",
+            "Write content to a file",
+            {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path to write"},
+                    "content": {"type": "string", "description": "Content to write"},
+                },
+                "required": ["path", "content"],
+            },
+            _tool_handler_wrapper("write", _write_impl),
+        ),
+        (
+            "edit",
+            "Edit a file by replacing old text with new text",
+            {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path to edit"},
+                    "oldText": {"type": "string", "description": "Text to find and replace"},
+                    "newText": {"type": "string", "description": "Replacement text"},
+                    "replace_all": {"type": "boolean", "description": "Replace all occurrences", "default": False},
+                },
+                "required": ["path", "oldText", "newText"],
+            },
+            _tool_handler_wrapper("edit", _edit_impl),
+        ),
+        (
+            "exec",
+            "Execute a command (alias for bash)",
+            {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "The command to execute"},
+                    "timeout": {"type": "integer", "description": "Timeout in milliseconds", "default": 60000},
+                },
+                "required": ["command"],
+            },
+            _tool_handler_wrapper("exec", _exec_impl),
+        ),
+        (
+            "glob",
+            "Find files matching a glob pattern",
+            {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Glob pattern (e.g., *.py)"},
+                    "path": {"type": "string", "description": "Base directory to search"},
+                },
+                "required": ["pattern"],
+            },
+            _tool_handler_wrapper("glob", _glob_impl),
+        ),
+        (
+            "grep",
+            "Search for text in files",
+            {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Regex pattern to search"},
+                    "path": {"type": "string", "description": "Directory to search in"},
+                    "case_insensitive": {"type": "boolean", "description": "Case insensitive search", "default": False},
+                },
+                "required": ["pattern"],
+            },
+            _tool_handler_wrapper("grep", _grep_impl),
+        ),
+    ]
+    
+    for name, description, schema, handler in tools:
+        server.register_tool(name, description, schema, handler)
+        logger.info(f"Registered OpenClaw tool: {name}")
+
+
+def create_openclaw_mcp_server(host: str = "127.0.0.1", port: int = 8080) -> McpServer:
+    """Create and configure an MCP server with OpenClaw tools"""
+    server = get_mcp_server(host=host, port=port)
+    register_openclaw_tools(server)
+    return server
+
+
 __all__ = [
     'McpServer', 'McpError', 'ToolDefinition', 'ToolCall', 'ToolResult',
     'JsonRpcRequest', 'JsonRpcResponse', 'JsonRpcError', 'JsonRpcErrorCode',
-    'get_mcp_server', 'reset_mcp_server',
+    'get_mcp_server', 'reset_mcp_server', 'register_openclaw_tools',
+    'create_openclaw_mcp_server',
 ]
