@@ -1,55 +1,37 @@
 #include <iostream>
 #include <vector>
-#include <algorithm>
 using namespace std;
 
-// LC198 House Robber - 1D DP (pick or skip pattern)
-// Time: O(n), Space: O(1)
+// LC198 House Robber
+// 问题：选择不相邻的 houses 求最大金额
+// 核心：dp[i] = max(dp[i-1], dp[i-2] + nums[i])
+// 空间优化：只保留前两个状态
+
 int rob(vector<int>& nums) {
-    int prev2 = 0, prev1 = 0; // dp[i-2], dp[i-1]
-    for (int n : nums) {
-        int cur = max(prev1, prev2 + n);
+    int n = nums.size();
+    if (n == 0) return 0;
+    if (n == 1) return nums[0];
+    
+    int prev2 = 0;  // dp[i-2]
+    int prev1 = 0;  // dp[i-1]
+    
+    for (int i = 0; i < n; i++) {
+        int curr = max(prev1, prev2 + nums[i]);
         prev2 = prev1;
-        prev1 = cur;
+        prev1 = curr;
     }
     return prev1;
 }
 
-// LC213 House Robber II - circular array (house 0 and n-1 cannot both be picked)
-// Time: O(n), Space: O(1)
-int rob2(vector<int>& nums) {
-    if (nums.size() == 1) return nums[0];
-    // Case 1: rob [0..n-2], Case 2: rob [1..n-1]
-    int prev2_1 = 0, prev1_1 = 0; // for [0..n-2]
-    int prev2_2 = 0, prev1_2 = 0; // for [1..n-1]
-    
-    for (int i = 0; i < nums.size() - 1; i++) {
-        int cur = max(prev1_1, prev2_1 + nums[i]);
-        prev2_1 = prev1_1;
-        prev1_1 = cur;
-    }
-    for (int i = 1; i < nums.size(); i++) {
-        int cur = max(prev1_2, prev2_2 + nums[i]);
-        prev2_2 = prev1_2;
-        prev1_2 = cur;
-    }
-    return max(prev1_1, prev1_2);
-}
-
 int main() {
-    // Test House Robber
-    vector<int> t1 = {1,2,3,1};
-    cout << "LC198: " << rob(t1) << " (expect 4)" << endl;
-    vector<int> t2 = {2,7,9,3,1};
-    cout << "LC198: " << rob(t2) << " (expect 12)" << endl;
+    vector<int> nums1 = {1,2,3,1};
+    cout << rob(nums1) << endl;  // 4 (2+3)
     
-    // Test House Robber II
-    vector<int> t3 = {2,3,2};
-    cout << "LC213: " << rob2(t3) << " (expect 3)" << endl;
-    vector<int> t4 = {1,2,3,1};
-    cout << "LC213: " << rob2(t4) << " (expect 4)" << endl;
-    vector<int> t5 = {1,2,3};
-    cout << "LC213: " << rob2(t5) << " (expect 3)" << endl;
+    vector<int> nums2 = {2,7,9,3,1};
+    cout << rob(nums2) << endl;  // 12 (2+9+1)
+    
+    vector<int> nums3 = {2,1,1,2};
+    cout << rob(nums3) << endl;  // 4 (2+2)
     
     return 0;
 }

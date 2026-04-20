@@ -2,6 +2,9 @@
 pytest配置和共享fixtures
 """
 import pytest
+import os
+
+PROJECT_ROOT = "/Users/chongjieran/.openclaw/workspace-developer/projects/javis-claude-core"
 
 from src.session import Session, MessageRole, ContentBlock, ConversationMessage, TokenUsage
 from src.runtime import ConversationRuntime, ToolExecutor, ToolError, RuntimeError
@@ -68,6 +71,15 @@ def session_with_error():
         is_error=True
     )
     return session
+
+
+@pytest.fixture(autouse=True)
+def set_cwd_to_project_root():
+    """自动设置工作目录为项目根目录，确保相对路径测试正确解析"""
+    old_cwd = os.getcwd()
+    os.chdir(PROJECT_ROOT)
+    yield
+    os.chdir(old_cwd)
 
 
 @pytest.fixture
