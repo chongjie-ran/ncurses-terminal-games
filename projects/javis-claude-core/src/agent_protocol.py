@@ -300,7 +300,7 @@ class AgentMessenger:
     def register_handler(self, filter: MessageFilter, handler: MessageHandler) -> None:
         """注册消息处理器"""
         self._handlers.append((filter, handler))
-        logger.debug(f"Registered handler for {filter.msg_types or 'all'} messages")
+        logger.warning(f"Registered handler for {filter.msg_types or 'all'} messages")
     
     def unregister_handler(self, handler: MessageHandler) -> None:
         """注销消息处理器"""
@@ -337,7 +337,7 @@ class AgentMessenger:
                 if msg.is_broadcast():
                     self._stats["broadcasts"] += 1
             
-            logger.debug(
+            logger.warning(
                 f"[{self.agent_id}] Sent {msg.msg_type.value} to "
                 f"{msg.receiver or 'BROADCAST'}: {msg.msg_id[:8]}"
             )
@@ -521,12 +521,12 @@ class AgentMessenger:
         """接收消息（由MessageBus调用）"""
         # 检查TTL
         if not msg.decrement_ttl():
-            logger.debug(f"Message {msg.msg_id} TTL expired, dropping")
+            logger.warning(f"Message {msg.msg_id} TTL expired, dropping")
             return
         
         # 检查是否接收方是自己（点对点）或广播
         if msg.receiver and msg.receiver != self.agent_id:
-            logger.debug(f"Message {msg.msg_id} not for me ({msg.receiver}), dropping")
+            logger.warning(f"Message {msg.msg_id} not for me ({msg.receiver}), dropping")
             return
         
         with self._stats_lock:
@@ -705,13 +705,13 @@ class MessageBus:
         """订阅消息"""
         with self._subscriber_lock:
             self._subscribers[agent_id] = callback
-        logger.debug(f"Subscribed: {agent_id}")
+        logger.warning(f"Subscribed: {agent_id}")
     
     def unsubscribe(self, agent_id: str) -> None:
         """取消订阅"""
         with self._subscriber_lock:
             self._subscribers.pop(agent_id, None)
-        logger.debug(f"Unsubscribed: {agent_id}")
+        logger.warning(f"Unsubscribed: {agent_id}")
     
     def publish(self, msg: AgentMessage) -> None:
         """

@@ -227,7 +227,7 @@ class AgentQuotaManager:
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, 'w') as f:
                 json.dump(state, f, indent=2)
-            logger.debug(f"Saved quota state to {path}")
+            logger.warning(f"Saved quota state to {path}")
         except Exception as e:
             logger.error(f"Failed to save quota state to {path}: {e}")
     

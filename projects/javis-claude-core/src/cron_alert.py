@@ -337,12 +337,12 @@ class CronAlertManager:
             bool: 是否发送成功
         """
         if not self._config.enabled:
-            logger.debug("Cron alert disabled, skipping")
+            logger.warning("Cron alert disabled, skipping")
             return False
         
         # 跳过超时错误（如果配置不告警超时）
         if error_type == "timeout" and not self._config.alert_on_timeout:
-            logger.debug(f"Timeout error for task '{task_name}', skipping alert")
+            logger.warning(f"Timeout error for task '{task_name}', skipping alert")
             return False
         
         # 检查去重
