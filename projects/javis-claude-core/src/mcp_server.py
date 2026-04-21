@@ -22,6 +22,8 @@ import os
 from aiohttp import web
 from datetime import datetime
 
+from execution_trace import warn as _et_warn
+
 logger = logging.getLogger(__name__)
 
 # Import real executors for OpenClaw tools
@@ -308,7 +310,7 @@ class McpServer:
             body = await request.text()
             data = json.loads(body)
         except json.JSONDecodeError as e:
-            logger.warning(f"JSON parse error: {e}")
+            _et_warn(f"JSON parse error: {e}")
             return web.json_response(
                 JsonRpcResponse(
                     id=None,
@@ -414,7 +416,7 @@ class McpServer:
     async def start(self) -> None:
         """启动 MCP Server"""
         if self._running:
-            logger.warning("MCP Server already running")
+            _et_warn("MCP Server already running")
             return
         
         app = await self._create_app()

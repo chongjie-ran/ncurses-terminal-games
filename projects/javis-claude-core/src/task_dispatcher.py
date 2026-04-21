@@ -29,6 +29,8 @@ from .agent_protocol import (
 )
 from .exceptions import FallbackSummaryError
 
+from execution_trace import warn as _et_warn
+
 logger = logging.getLogger(__name__)
 
 
@@ -557,7 +559,7 @@ class TaskDispatcher:
                     subtask_result = future.result(timeout=subtask.timeout_seconds)
                     subtask_results.append(subtask_result)
                 except FuturesTimeoutError:
-                    logger.warning(f"[Dispatcher] subtask {subtask.task_id} timeout")
+                    _et_warn(f"[Dispatcher] subtask {subtask.task_id} timeout")
                     subtask_results.append(SubTaskResult(
                         task_id=subtask.task_id,
                         agent_id=subtask.assigned_agent or "unknown",
@@ -668,7 +670,7 @@ class TaskDispatcher:
             except Exception as e:
                 last_error = str(e)
                 retry_count = attempt + 1
-                logger.warning(f"[Dispatcher] subtask {subtask.task_id} attempt {attempt+1} "
+                _et_warn(f"[Dispatcher] subtask {subtask.task_id} attempt {attempt+1} "
                                f"failed: {e}, retrying...")
 
         # 所有重试都失败

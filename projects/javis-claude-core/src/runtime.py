@@ -31,6 +31,8 @@ from .cron_alert import (
     get_default_alert_manager as get_alert_manager,
 )
 
+from execution_trace import warn as _et_warn
+
 logger = logging.getLogger(__name__)
 
 
@@ -220,7 +222,7 @@ class ConversationRuntime:
             self._record_usage()
             
         except QuotaExceeded as e:
-            logger.warning(f"Quota exceeded for agent '{self.agent_id}': {e}")
+            _et_warn(f"Quota exceeded for agent '{self.agent_id}': {e}")
             raise
         except Exception as e:
             # 发送告警

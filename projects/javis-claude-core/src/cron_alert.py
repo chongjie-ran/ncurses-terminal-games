@@ -22,6 +22,8 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
+from execution_trace import warn as _et_warn
+
 logger = logging.getLogger(__name__)
 
 
@@ -112,7 +114,7 @@ class FeishuWebhookChannel(AlertChannel):
         """
         webhook_url = self._get_webhook_url()
         if not webhook_url:
-            logger.warning("Feishu webhook URL not configured, alert not sent")
+            _et_warn("Feishu webhook URL not configured, alert not sent")
             return False
         
         # 构建消息体
@@ -165,9 +167,9 @@ class FeishuWebhookChannel(AlertChannel):
                         logger.info(f"Feishu alert sent successfully: {title}")
                         return True
                     else:
-                        logger.warning(f"Feishu alert API error: {result}")
+                        _et_warn(f"Feishu alert API error: {result}")
             except urllib.error.URLError as e:
-                logger.warning(f"Feishu alert request failed (attempt {attempt+1}): {e}")
+                _et_warn(f"Feishu alert request failed (attempt {attempt+1}): {e}")
                 if attempt < 2:
                     time.sleep(1 * (attempt + 1))  # 指数退避
             except Exception as e:
@@ -258,7 +260,7 @@ class CronAlertManager:
         """从JSON文件加载配置"""
         path = Path(path)
         if not path.exists():
-            logger.warning(f"Cron alert config file not found: {path}")
+            _et_warn(f"Cron alert config file not found: {path}")
             return
         
         try:
@@ -337,12 +339,12 @@ class CronAlertManager:
             bool: 是否发送成功
         """
         if not self._config.enabled:
-            logger.warning("Cron alert disabled, skipping")
+            _et_warn("Cron alert disabled, skipping")
             return False
         
         # 跳过超时错误（如果配置不告警超时）
         if error_type == "timeout" and not self._config.alert_on_timeout:
-            logger.warning(f"Timeout error for task '{task_name}', skipping alert")
+            _et_warn(f"Timeout error for task '{task_name}', skipping alert")
             return False
         
         # 检查去重
@@ -397,7 +399,7 @@ class CronAlertManager:
         if success:
             logger.info(f"Cron alert sent for task '{task_name}'")
         else:
-            logger.warning(f"Failed to send cron alert for task '{task_name}'")
+            _et_warn(f"Failed to send cron alert for task '{task_name}'")
         
         return success
     

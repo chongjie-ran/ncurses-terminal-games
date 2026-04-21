@@ -24,6 +24,8 @@ import logging
 import re
 import traceback
 
+from execution_trace import warn as _et_warn
+
 logger = logging.getLogger(__name__)
 
 
@@ -345,7 +347,7 @@ class FallbackErrorTranslator:
                     if detail:
                         return detail
                 except Exception as e:
-                    logger.warning(f"Translator for {exc_type.__name__} raised: {e}")
+                    _et_warn(f"Translator for {exc_type.__name__} raised: {e}")
         
         # 策略2: 错误消息模式匹配
         error_msg = str(error)
@@ -356,7 +358,7 @@ class FallbackErrorTranslator:
                     if detail:
                         return detail
                 except Exception as e:
-                    logger.warning(f"Pattern translator for '{pattern}' raised: {e}")
+                    _et_warn(f"Pattern translator for '{pattern}' raised: {e}")
         
         return None
     
@@ -367,7 +369,7 @@ class FallbackErrorTranslator:
         if detail:
             return detail
         
-        logger.warning(f"No friendly translation for {type(error).__name__}: {error}")
+        _et_warn(f"No friendly translation for {type(error).__name__}: {error}")
         return FallbackErrorDetail(
             category=ErrorCategory.UNKNOWN,
             title="操作失败",

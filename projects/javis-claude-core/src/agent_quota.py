@@ -20,6 +20,8 @@ import json
 import os
 from pathlib import Path
 
+from execution_trace import warn as _et_warn
+
 logger = logging.getLogger(__name__)
 
 
@@ -192,7 +194,7 @@ class AgentQuotaManager:
         """从JSON文件加载配额配置"""
         path = Path(path)
         if not path.exists():
-            logger.warning(f"Quota config file not found: {path}")
+            _et_warn(f"Quota config file not found: {path}")
             return
         
         try:
@@ -227,7 +229,7 @@ class AgentQuotaManager:
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, 'w') as f:
                 json.dump(state, f, indent=2)
-            logger.warning(f"Saved quota state to {path}")
+            _et_warn(f"Saved quota state to {path}")
         except Exception as e:
             logger.error(f"Failed to save quota state to {path}: {e}")
     
@@ -416,7 +418,7 @@ class AgentQuotaManager:
                 if limit and new_value > limit and usage.exceeded_at is None:
                     usage.exceeded_at = time.time()
                     self._notify(agent_id, quota_type, new_value, limit, is_warning=False)
-                    logger.warning(
+                    _et_warn(
                         f"Agent '{agent_id}' quota exceeded: "
                         f"{quota_type.value}={new_value}/{limit}"
                     )

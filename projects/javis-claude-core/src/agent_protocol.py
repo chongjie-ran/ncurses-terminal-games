@@ -23,6 +23,8 @@ import json
 import queue
 import time
 
+from execution_trace import warn as _et_warn
+
 logger = logging.getLogger(__name__)
 
 
@@ -300,7 +302,7 @@ class AgentMessenger:
     def register_handler(self, filter: MessageFilter, handler: MessageHandler) -> None:
         """注册消息处理器"""
         self._handlers.append((filter, handler))
-        logger.warning(f"Registered handler for {filter.msg_types or 'all'} messages")
+        _et_warn(f"Registered handler for {filter.msg_types or 'all'} messages")
     
     def unregister_handler(self, handler: MessageHandler) -> None:
         """注销消息处理器"""
@@ -326,7 +328,7 @@ class AgentMessenger:
         
         # TTL检查
         if msg.ttl <= 0:
-            logger.warning(f"Message {msg.msg_id} TTL exhausted, dropping")
+            _et_warn(f"Message {msg.msg_id} TTL exhausted, dropping")
             return False
         
         try:
@@ -337,7 +339,7 @@ class AgentMessenger:
                 if msg.is_broadcast():
                     self._stats["broadcasts"] += 1
             
-            logger.warning(
+            _et_warn(
                 f"[{self.agent_id}] Sent {msg.msg_type.value} to "
                 f"{msg.receiver or 'BROADCAST'}: {msg.msg_id[:8]}"
             )
@@ -521,12 +523,12 @@ class AgentMessenger:
         """接收消息（由MessageBus调用）"""
         # 检查TTL
         if not msg.decrement_ttl():
-            logger.warning(f"Message {msg.msg_id} TTL expired, dropping")
+            _et_warn(f"Message {msg.msg_id} TTL expired, dropping")
             return
         
         # 检查是否接收方是自己（点对点）或广播
         if msg.receiver and msg.receiver != self.agent_id:
-            logger.warning(f"Message {msg.msg_id} not for me ({msg.receiver}), dropping")
+            _et_warn(f"Message {msg.msg_id} not for me ({msg.receiver}), dropping")
             return
         
         with self._stats_lock:
@@ -705,13 +707,13 @@ class MessageBus:
         """订阅消息"""
         with self._subscriber_lock:
             self._subscribers[agent_id] = callback
-        logger.warning(f"Subscribed: {agent_id}")
+        _et_warn(f"Subscribed: {agent_id}")
     
     def unsubscribe(self, agent_id: str) -> None:
         """取消订阅"""
         with self._subscriber_lock:
             self._subscribers.pop(agent_id, None)
-        logger.warning(f"Unsubscribed: {agent_id}")
+        _et_warn(f"Unsubscribed: {agent_id}")
     
     def publish(self, msg: AgentMessage) -> None:
         """
@@ -747,7 +749,7 @@ class MessageBus:
                     except Exception as e:
                         logger.error(f"Deliver to {msg.receiver} failed: {e}")
                 else:
-                    logger.warning(f"No subscriber for {msg.receiver}, message dropped")
+                    _et_warn(f"No subscriber for {msg.receiver}, message dropped")
     
     def _add_to_history(self, msg: AgentMessage) -> None:
         """添加消息到历史"""
