@@ -346,7 +346,7 @@ class AgentMessenger:
             return True
             
         except Exception as e:
-            logger.error(f"Failed to send message: {e}")
+            _et_warn(f"Failed to send message: {e}")
             with self._stats_lock:
                 self._stats["errors"] += 1
             return False
@@ -574,7 +574,7 @@ class AgentMessenger:
             try:
                 self._dispatch_to_handlers(msg)
             except Exception as e:
-                logger.error(f"Handler error for {msg.msg_id}: {e}")
+                _et_warn(f"Handler error for {msg.msg_id}: {e}")
     
     def _dispatch_to_handlers(self, msg: AgentMessage) -> None:
         """分发给匹配的处理器"""
@@ -585,7 +585,7 @@ class AgentMessenger:
                     if reply:
                         self.send(reply)
                 except Exception as e:
-                    logger.error(f"Handler exception: {e}")
+                    _et_warn(f"Handler exception: {e}")
     
     def start(self) -> None:
         """启动消息接收"""
@@ -739,7 +739,7 @@ class MessageBus:
                         try:
                             callback(msg)
                         except Exception as e:
-                            logger.error(f"Broadcast to {agent_id} failed: {e}")
+                            _et_warn(f"Broadcast to {agent_id} failed: {e}")
             else:
                 # 点对点：只发给接收方
                 callback = subscribers.get(msg.receiver)
@@ -747,7 +747,7 @@ class MessageBus:
                     try:
                         callback(msg)
                     except Exception as e:
-                        logger.error(f"Deliver to {msg.receiver} failed: {e}")
+                        _et_warn(f"Deliver to {msg.receiver} failed: {e}")
                 else:
                     _et_warn(f"No subscriber for {msg.receiver}, message dropped")
     

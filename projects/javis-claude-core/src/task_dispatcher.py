@@ -567,7 +567,7 @@ class TaskDispatcher:
                         error=f"任务执行超时（{subtask.timeout_seconds}秒）"
                     ))
                 except Exception as e:
-                    logger.error(f"[Dispatcher] subtask {subtask.task_id} failed: {e}")
+                    _et_warn(f"[Dispatcher] subtask {subtask.task_id} failed: {e}")
                     subtask_results.append(SubTaskResult(
                         task_id=subtask.task_id,
                         agent_id=subtask.assigned_agent or "unknown",

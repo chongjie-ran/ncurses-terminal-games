@@ -668,7 +668,7 @@ def translate_error(error: Exception) -> Optional[FallbackErrorDetail]:
 def wrap_as_friendly(error: Exception) -> FallbackSummaryError:
     """将任意异常转换为用户友好错误"""
     detail = FallbackErrorTranslator.translate_or_raise(error)
-    return FallbackErrorTranslator.translate_or_raise(error)  # Already has fallback
+    return FallbackSummaryError.from_translator(detail)
 
 
 def is_fallback_error(error: Exception) -> bool:
