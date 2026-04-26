@@ -288,6 +288,30 @@ class TestCronAlertManager:
         status = manager.get_alert_status("old_task")
         assert status["exists"] is False
     
+    def test_remove_channel_race_condition(self):
+        """remove_channel 竞态条件测试：ValueError 不应抛出"""
+        manager = CronAlertManager()
+        mock_channel = Mock(spec=AlertChannel)
+        manager.add_channel(mock_channel)
+        assert mock_channel in manager._channels
+        
+        # 第一次移除：正常移除
+        manager.remove_channel(mock_channel)
+        assert mock_channel not in manager._channels
+        
+        # 第二次移除：模拟竞态（channel 已不在列表中）- 不应抛异常
+        result = manager.remove_channel(mock_channel)
+        assert result is None
+    
+    def test_remove_channel_nonexistent(self):
+        """移除从未添加的渠道不抛异常"""
+        manager = CronAlertManager()
+        mock_channel = Mock(spec=AlertChannel)
+        
+        # 从未添加过的 channel，直接移除不应抛异常
+        result = manager.remove_channel(mock_channel)
+        assert result is None
+
     def test_reset(self):
         """重置管理器"""
         manager = CronAlertManager()

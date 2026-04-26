@@ -278,7 +278,11 @@ class CronAlertManager:
     def remove_channel(self, channel: AlertChannel) -> None:
         """移除告警渠道"""
         if channel in self._channels:
-            self._channels.remove(channel)
+            try:
+                self._channels.remove(channel)
+            except ValueError:
+                # 线程竞态：检查后、移除前，另一线程已移除该元素
+                pass
     
     def _compute_task_hash(self, task_name: str, error_message: str) -> str:
         """计算任务标识hash（用于去重）
